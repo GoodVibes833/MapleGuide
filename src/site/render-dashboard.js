@@ -5571,14 +5571,16 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
       }
 
       .result-summary-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
         gap: 12px;
       }
 
       .result-summary-block {
         display: grid;
         gap: 8px;
+        width: 100%;
         padding: 14px;
         border: 1px solid rgba(15, 61, 127, 0.1);
         border-radius: var(--radius-md);
