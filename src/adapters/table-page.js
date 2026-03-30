@@ -1,4 +1,11 @@
-import { extractFirstDate, extractPageTitle, extractTables, normalizeWhitespace, stripTags } from "../core/html.js";
+import {
+  extractContentRoot,
+  extractFirstDate,
+  extractPageTitle,
+  extractTables,
+  normalizeWhitespace,
+  stripTags
+} from "../core/html.js";
 
 function findHeaderIndex(headers, aliases) {
   const normalizedAliases = aliases.map((alias) => alias.toLowerCase().trim());
@@ -52,8 +59,9 @@ function buildSummary(source, metrics) {
 
 export function parseTablePage(source, html) {
   const title = extractPageTitle(html);
-  const pageDate = extractFirstDate(stripTags(html));
-  const tables = extractTables(html);
+  const contentHtml = extractContentRoot(html);
+  const pageDate = extractFirstDate(stripTags(contentHtml));
+  const tables = extractTables(contentHtml);
   const table = selectBestTable(tables, source);
 
   if (!table) {

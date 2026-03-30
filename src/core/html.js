@@ -56,9 +56,19 @@ export function extractMetaDescription(html = "") {
   );
 }
 
+function extractSection(html = "", tagName) {
+  const regex = new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "i");
+  const match = html.match(regex);
+  return match ? match[1] : null;
+}
+
+export function extractContentRoot(html = "") {
+  return extractSection(html, "main") ?? extractSection(html, "article") ?? extractSection(html, "body") ?? html;
+}
+
 export function extractParagraphs(html = "", limit = 4) {
   const paragraphs = [];
-  const regex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+  const regex = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
   let match;
   while ((match = regex.exec(html)) && paragraphs.length < limit) {
     const text = normalizeWhitespace(match[1]);
@@ -71,7 +81,7 @@ export function extractParagraphs(html = "", limit = 4) {
 
 export function extractBullets(html = "", limit = 6) {
   const bullets = [];
-  const regex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+  const regex = /<li\b[^>]*>([\s\S]*?)<\/li>/gi;
   let match;
   while ((match = regex.exec(html)) && bullets.length < limit) {
     const text = normalizeWhitespace(match[1]);
@@ -125,21 +135,21 @@ export function extractFirstDate(value = "") {
 
 export function extractTables(html = "") {
   const tables = [];
-  const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi;
+  const tableRegex = /<table\b[^>]*>([\s\S]*?)<\/table>/gi;
   let tableMatch;
 
   while ((tableMatch = tableRegex.exec(html))) {
     const rows = [];
-    const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    const rowRegex = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi;
     let rowMatch;
 
     while ((rowMatch = rowRegex.exec(tableMatch[1]))) {
       const cells = [];
-      const cellRegex = /<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi;
+      const cellRegex = /<t[hd]\b[^>]*>([\s\S]*?)<\/t[hd]>/gi;
       let cellMatch;
 
       while ((cellMatch = cellRegex.exec(rowMatch[1]))) {
-        const value = normalizeWhitespace(cellMatch[1]);
+        const value = stripTags(cellMatch[1]);
         cells.push(value);
       }
 

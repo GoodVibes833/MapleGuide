@@ -1,4 +1,10 @@
-import { extractFirstDate, extractPageTitle, normalizeWhitespace, stripTags } from "../core/html.js";
+import {
+  extractContentRoot,
+  extractFirstDate,
+  extractPageTitle,
+  normalizeWhitespace,
+  stripTags
+} from "../core/html.js";
 
 function buildFacts(metrics) {
   return Object.entries(metrics)
@@ -27,7 +33,7 @@ function buildSummary(source, metrics) {
 
 export function parseMetricLabels(source, html) {
   const title = extractPageTitle(html);
-  const cleanText = stripTags(html);
+  const cleanText = stripTags(extractContentRoot(html));
   const metrics = {};
 
   for (const [key, pattern] of Object.entries(source.metricPatterns ?? {})) {

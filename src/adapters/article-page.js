@@ -1,4 +1,5 @@
 import {
+  extractContentRoot,
   extractBullets,
   extractFirstDate,
   extractMetaDescription,
@@ -53,9 +54,10 @@ function buildSummary(paragraphs, bullets, metaDescription) {
 
 export function parseArticlePage(source, html) {
   const title = extractPageTitle(html);
-  const cleanText = stripTags(html);
-  const paragraphs = extractParagraphs(html);
-  const bullets = extractBullets(html);
+  const contentHtml = extractContentRoot(html);
+  const cleanText = stripTags(contentHtml);
+  const paragraphs = extractParagraphs(contentHtml);
+  const bullets = extractBullets(contentHtml);
   const metaDescription = extractMetaDescription(html);
   const metrics = extractConfiguredMetrics(cleanText, source);
   const publishedAt = extractFirstDate(cleanText);

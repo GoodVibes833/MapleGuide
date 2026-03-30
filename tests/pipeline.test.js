@@ -4,6 +4,8 @@ import { mkdtemp, readFile, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { extractTables } from "../src/core/html.js";
+import { parseArticlePage } from "../src/adapters/article-page.js";
+import { parseTablePage } from "../src/adapters/table-page.js";
 import { runPipeline } from "../src/core/pipeline.js";
 
 test("extractTables parses headers and rows", () => {
@@ -18,6 +20,87 @@ test("extractTables parses headers and rows", () => {
   assert.equal(tables.length, 1);
   assert.deepEqual(tables[0].headers, ["date", "invitations"]);
   assert.deepEqual(tables[0].rows[0], ["2026-03-24", "15"]);
+});
+
+test("article parser ignores svg path and head link markup", () => {
+  const html = `
+    <html>
+      <head>
+        <title>Ontario update</title>
+        <link rel="stylesheet" href="/app.css" />
+      </head>
+      <body>
+        <svg><path d="M0 0h24v24" /></svg>
+        <main>
+          <p>Published date: March 25, 2026</p>
+          <p>Ontario opened a new intake window.</p>
+          <ul>
+            <li>New intake opens April 2, 2026.</li>
+          </ul>
+        </main>
+      </body>
+    </html>
+  `;
+
+  const update = parseArticlePage({ metricPatterns: {} }, html)[0];
+  assert.equal(update.publishedAt, "2026-03-25");
+  assert.equal(update.facts[0], "New intake opens April 2, 2026.");
+  assert.doesNotMatch(update.summaryEn, /<path|stylesheet|href=/i);
+});
+
+test("table parser strips nested html from cells", () => {
+  const html = `
+    <main>
+      <table>
+        <tr>
+          <th>Date</th>
+          <th>Stream</th>
+          <th>Candidates invited</th>
+        </tr>
+        <tr>
+          <td><p><b>March 18, 2026</b></p></td>
+          <td><p>Employment in New Brunswick</p></td>
+          <td><strong>52</strong></td>
+        </tr>
+      </table>
+    </main>
+  `;
+
+  const updates = parseTablePage(
+    {
+      name: "New Brunswick invitation and selection rounds",
+      fieldMap: {
+        date: ["date"],
+        stream: ["stream"],
+        candidatesInvited: ["candidates invited"]
+      }
+    },
+    html
+  );
+
+  assert.equal(updates[0].metrics.date, "March 18, 2026");
+  assert.equal(updates[0].metrics.stream, "Employment in New Brunswick");
+  assert.equal(updates[0].metrics.candidatesInvited, "52");
+});
+
+test("pipeline falls back to fixtures when a live source looks blocked", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "mapleguide-fallback-"));
+  const result = await runPipeline({
+    sourceIds: ["pei-eoi-draws"],
+    outputDir,
+    fetchImpl: async () =>
+      new Response(
+        `<!doctype html><html><head><title>Radware Page</title></head><body>Access denied</body></html>`,
+        { status: 200, headers: { "content-type": "text/html" } }
+      )
+  });
+
+  assert.equal(result.reports.length, 1);
+  assert.equal(result.reports[0].mode, "fixture-quality-fallback");
+  assert.match(result.reports[0].warning ?? "", /fixture fallback/i);
+  assert.equal(result.updates[0].sourceId, "pei-eoi-draws");
+  assert.equal(result.updates[0].metrics.date, "2026-03-20");
+  assert.equal(result.updates[0].metrics.labourExpressEntryInvitations, "124");
 });
 
 test("fixture pipeline writes feed and dashboard", async () => {

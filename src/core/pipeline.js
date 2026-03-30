@@ -4,6 +4,7 @@ import { getAdapter } from "../adapters/index.js";
 import { sources } from "../config/sources.js";
 import { contentHash } from "./hash.js";
 import { loadSourceContent } from "./fetcher.js";
+import { parsedUpdatesLookHealthy } from "./source-health.js";
 import { buildKoreanSummary } from "../translation/korean.js";
 import { JURISDICTION_META, renderDashboard } from "../site/render-dashboard.js";
 
@@ -60,7 +61,8 @@ export async function runPipeline({
   useFixtures = false,
   sourceIds = null,
   outputDir = path.join(process.cwd(), "out"),
-  basePath = ""
+  basePath = "",
+  fetchImpl
 } = {}) {
   const selectedSources = Array.isArray(sourceIds) && sourceIds.length > 0
     ? sources.filter((source) => sourceIds.includes(source.id))
@@ -70,7 +72,7 @@ export async function runPipeline({
   const reports = [];
 
   for (const source of selectedSources) {
-    const fetchResult = await loadSourceContent(source, { useFixtures });
+    let fetchResult = await loadSourceContent(source, { useFixtures, fetchImpl });
     if (fetchResult.error) {
       reports.push({
         sourceId: source.id,
@@ -83,7 +85,22 @@ export async function runPipeline({
     }
 
     const adapter = getAdapter(source.adapter);
-    const parsedUpdates = adapter(source, fetchResult.html);
+    let parsedUpdates = adapter(source, fetchResult.html);
+
+    if (!useFixtures && !parsedUpdatesLookHealthy(source, parsedUpdates)) {
+      const fixtureResult = await loadSourceContent(source, { useFixtures: true, fetchImpl });
+      const fixtureUpdates = adapter(source, fixtureResult.html);
+
+      if (parsedUpdatesLookHealthy(source, fixtureUpdates)) {
+        parsedUpdates = fixtureUpdates;
+        fetchResult = {
+          ...fixtureResult,
+          mode: "fixture-quality-fallback",
+          warning: `Network response for ${source.id} looked invalid. Used fixture fallback.`
+        };
+      }
+    }
+
     const normalizedUpdates = parsedUpdates.map((parsedUpdate, index) =>
       normalizeUpdate(source, fetchResult, parsedUpdate, index)
     );
