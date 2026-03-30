@@ -594,9 +594,11 @@ function renderComparisonTable(insights) {
 }
 
 function renderLatestUpdateCards(updates) {
-  const latestUpdates = [...updates]
-    .sort((left, right) => (right.publishedAt ?? right.fetchedAt).localeCompare(left.publishedAt ?? left.fetchedAt))
-    .slice(0, 4);
+  const sortedUpdates = [...updates].sort((left, right) =>
+    (right.publishedAt ?? right.fetchedAt).localeCompare(left.publishedAt ?? left.fetchedAt)
+  );
+  const latestUpdates = sortedUpdates.slice(0, 4);
+  const olderUpdates = sortedUpdates.slice(4);
 
   if (latestUpdates.length === 0) {
     return `
@@ -664,12 +666,56 @@ function renderLatestUpdateCards(updates) {
     return fallback || update.translation.titleKo;
   };
 
-  return `
+  const buildDetailSummary = (update) => {
+    const metrics = update.metrics ?? {};
+    const updateDate = update.publishedAt ?? update.fetchedAt.slice(0, 10);
+
+    if (update.sourceId === "ee-rounds") {
+      const cutoff = metrics.cutoffScore;
+      const invitations = metrics.invitationsIssued;
+      if (cutoff && invitations) {
+        return `${updateDate} 발표 기준 익스프레스 엔트리 초청 라운드예요. 최저 CRS는 ${cutoff}점이고 ${invitations}명에게 초청장이 나왔습니다.`;
+      }
+    }
+
+    if (update.sourceId === "manitoba-eoi-draw") {
+      const stream = metrics.stream;
+      const invitations = metrics.invitationsIssued;
+      const rankingScore = metrics.rankingScore;
+      if (stream && invitations && rankingScore) {
+        return `${updateDate} 발표 기준 매니토바 드로우예요. ${stream}에서 ${invitations}명을 초청했고 최저 점수는 ${rankingScore}점입니다.`;
+      }
+    }
+
+    if (update.sourceId === "bc-pnp-invitations") {
+      const category = metrics.category;
+      const invitations = metrics.invitations;
+      const minimumScore = metrics.minimumScore;
+      if (category && invitations && minimumScore) {
+        return `${updateDate} 발표 기준 BC PNP 초청이에요. ${category} 카테고리에서 ${invitations}명을 초청했고 최저 점수는 ${minimumScore}점입니다.`;
+      }
+    }
+
+    return update.translation.summaryKo;
+  };
+
+  const buildDetailLines = (update) => {
+    const rawLines = update.translation.metricLinesKo?.length
+      ? update.translation.metricLinesKo
+      : update.translation.bulletsKo?.length
+        ? update.translation.bulletsKo
+        : [];
+
+    return [...new Set(rawLines.map((line) => line.trim()).filter(Boolean))].slice(0, 4);
+  };
+
+  const renderUpdateFlashGrid = (items) => `
     <div class="update-flash-grid">
-      ${latestUpdates
+      ${items
         .map((update) => {
           const headline = buildHeadline(update);
-          const leadLine = update.translation.metricLinesKo?.[0] ?? update.translation.summaryKo;
+          const detailSummary = buildDetailSummary(update);
+          const detailLines = buildDetailLines(update);
           const updateDate = update.publishedAt ?? update.fetchedAt.slice(0, 10);
 
           return `
@@ -680,10 +726,18 @@ function renderLatestUpdateCards(updates) {
                   <span class="mini-flag">${escapeHtml(updateDate)}</span>
                 </div>
                 <strong>${escapeHtml(headline)}</strong>
+                <span class="update-flash-chevron" aria-hidden="true">▾</span>
               </summary>
               <div class="update-flash-detail">
                 <p class="update-flash-original">${escapeHtml(update.translation.titleKo)}</p>
-                <p>${escapeHtml(leadLine)}</p>
+                <p class="update-flash-description">${escapeHtml(detailSummary)}</p>
+                ${detailLines.length
+                  ? `
+                    <ul class="update-flash-list">
+                      ${detailLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}
+                    </ul>
+                  `
+                  : ""}
                 <div class="card-footer">
                   <span>${escapeHtml(update.program.toUpperCase())}</span>
                   <div class="card-links">
@@ -697,6 +751,31 @@ function renderLatestUpdateCards(updates) {
         })
         .join("")}
     </div>
+  `;
+
+  return `
+    ${renderUpdateFlashGrid(latestUpdates)}
+    ${olderUpdates.length
+      ? `
+        <div class="update-flash-more">
+          <button
+            type="button"
+            class="btn ghost update-more-button"
+            id="updates-more-toggle"
+            data-open-label="업데이트 더보기"
+            data-close-label="업데이트 접기"
+            aria-expanded="false"
+            aria-controls="older-updates-list"
+          >
+            업데이트 더보기
+          </button>
+          <div class="update-flash-more-list" id="older-updates-list" hidden>
+            <p class="update-flash-more-note">이전 공지와 드로우도 한국어 요약과 함께 펼쳐서 볼 수 있어요.</p>
+            ${renderUpdateFlashGrid(olderUpdates)}
+          </div>
+        </div>
+      `
+      : ""}
   `;
 }
 
@@ -1342,6 +1421,8 @@ function renderClientScript({ page, updates }) {
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
         const quickStartResults = document.getElementById("quick-start-results");
+        const updatesMoreToggle = document.getElementById("updates-more-toggle");
+        const olderUpdatesList = document.getElementById("older-updates-list");
         const quickRegionFederalButton = document.querySelector("[data-quick-region-toggle='federal']");
         const quickRegionClearButton = document.querySelector("[data-quick-region-clear]");
         const quickRegionSelection = document.getElementById("quick-region-selection");
@@ -1462,6 +1543,18 @@ function renderClientScript({ page, updates }) {
 
         function isCanadianExperienceIntent(path) {
           return ["working-holiday", "pgwp-pr", "canadian-worker"].includes(path);
+        }
+
+        if (updatesMoreToggle && olderUpdatesList) {
+          updatesMoreToggle.addEventListener("click", () => {
+            const expanded = updatesMoreToggle.getAttribute("aria-expanded") === "true";
+            const nextExpanded = !expanded;
+            updatesMoreToggle.setAttribute("aria-expanded", String(nextExpanded));
+            updatesMoreToggle.textContent = nextExpanded
+              ? updatesMoreToggle.dataset.closeLabel || "업데이트 접기"
+              : updatesMoreToggle.dataset.openLabel || "업데이트 더보기";
+            olderUpdatesList.hidden = !nextExpanded;
+          });
         }
 
         ${countsCanadianExperienceForCrs.toString()}
@@ -3710,6 +3803,18 @@ function renderLayout({ title, page, body, updates }) {
         text-overflow: ellipsis;
       }
 
+      .update-flash-chevron {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 0.94rem;
+        transition: transform 160ms ease, color 160ms ease;
+      }
+
+      .update-flash-card[open] .update-flash-chevron {
+        transform: rotate(180deg);
+        color: var(--accent-deep);
+      }
+
       .update-flash-detail {
         display: grid;
         gap: 10px;
@@ -3721,6 +3826,45 @@ function renderLayout({ title, page, body, updates }) {
         margin: 0;
         color: var(--muted);
         line-height: 1.65;
+      }
+
+      .update-flash-description {
+        color: var(--text);
+      }
+
+      .update-flash-list {
+        display: grid;
+        gap: 6px;
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+
+      .update-flash-list li {
+        line-height: 1.55;
+      }
+
+      .update-flash-more {
+        display: grid;
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      .update-more-button {
+        min-height: 42px;
+        padding: 0 18px;
+        justify-self: start;
+      }
+
+      .update-flash-more-note {
+        margin: 0 0 2px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .update-flash-more-list {
+        display: grid;
+        gap: 10px;
       }
 
       .update-flash-original {

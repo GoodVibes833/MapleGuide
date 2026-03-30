@@ -75,6 +75,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /ECA \/ 학력평가 상태/);
   assert.match(dashboardResponse.body, /학비·생활비 부담/);
   assert.match(dashboardResponse.body, /정착 선호/);
+  assert.match(dashboardResponse.body, /업데이트 더보기/);
+  assert.match(dashboardResponse.body, /update-flash-chevron/);
   assert.match(dashboardResponse.body, /완료 시 예상 CRS \+/);
   assert.match(dashboardResponse.body, /캐나다 한눈에 비교/);
 
