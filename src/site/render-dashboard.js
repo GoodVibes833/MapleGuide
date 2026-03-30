@@ -2253,6 +2253,8 @@ function renderClientScript({ page, updates }) {
               return exactLift({ foreignExp: "1" });
             case "french":
               return { lift: null, futureLift: 50, badge: "최대 +50점", label: "NCLC 7+면 최대 +50점", tone: "deferred" };
+            case "expand-regions":
+              return { lift: 0, badge: "선택 확장", label: "점수는 그대로, 선택지는 확장", tone: "neutral" };
             default:
               return null;
           }
@@ -2261,13 +2263,15 @@ function renderClientScript({ page, updates }) {
         function buildImprovementPlan(answers, insight, immigrationChancePercent) {
           const actions = [];
 
-          function addAction(delta, title, detail, actionId) {
+          function addAction(delta, title, detail, actionId, priority = 0) {
             if (actions.some((action) => action.title === title)) {
               return;
             }
 
             actions.push({
+              actionId,
               delta,
+              priority,
               title,
               detail,
               scoreImpact: actionId ? describeActionScoreImpact(answers, insight, actionId) : null
@@ -2316,6 +2320,16 @@ function renderClientScript({ page, updates }) {
           if (answers.ee !== "yes" && statusSupports(insight.statuses.ee)) {
             const delta = insight.statuses.ee === "핵심" ? 6 : 4;
             addAction(delta, "EE 자격 확인 후 프로필 열기", "이 지역은 EE와 같이 볼 때 선택지가 넓어지고 초청 연결이 쉬워질 수 있습니다.", "ee-profile");
+          }
+
+          if (activeQuickRegions.size > 0 && activeQuickRegions.size <= 2) {
+            addAction(
+              9,
+              "지역을 다른 곳으로 넓혀보세요",
+              "지금은 몇 개 지역만 골라서 보고 있어 비슷한 조건의 주정부 기회를 놓칠 수 있습니다. 인접 권역이나 Atlantic 전체처럼 조금 넓혀보는 편이 좋습니다.",
+              "expand-regions",
+              1
+            );
           }
 
           if (insight.id !== "federal" && statusSupports(insight.statuses.ee)) {
@@ -2384,6 +2398,10 @@ function renderClientScript({ page, updates }) {
           const crsSnapshot = estimateCrsSnapshot(answers);
           const topActions = actions
             .sort((left, right) => {
+              if ((right.priority ?? 0) !== (left.priority ?? 0)) {
+                return (right.priority ?? 0) - (left.priority ?? 0);
+              }
+
               const rightLift = right.scoreImpact?.lift ?? -1;
               const leftLift = left.scoreImpact?.lift ?? -1;
 
@@ -3842,18 +3860,24 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .wizard-filter-map-frame {
+        display: grid;
+        place-items: center;
+        min-height: 220px;
         border: 1px solid rgba(15, 61, 127, 0.1);
         border-radius: var(--radius-lg);
         background:
           radial-gradient(circle at top right, rgba(47, 110, 196, 0.1), transparent 30%),
           linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 249, 255, 0.8));
-        padding: 18px;
+        padding: 6px 8px 0;
+        overflow: hidden;
       }
 
       .quick-filter-map {
         width: 100%;
         height: auto;
-        max-height: 300px;
+        max-height: none;
+        transform: scale(1.16) translateY(-24px);
+        transform-origin: center top;
       }
 
       .quick-filter-region path,

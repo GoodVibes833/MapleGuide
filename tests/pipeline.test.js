@@ -68,6 +68,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /TEER 0-3 직무로 옮겨 skilled 경력 1년 만들기/);
   assert.match(dashboardHtml, /이 지역의 EE-linked nomination 노리기/);
   assert.match(dashboardHtml, /캐나다 skilled 경력 .*년까지 늘리기/);
+  assert.match(dashboardHtml, /지역을 다른 곳으로 넓혀보세요/);
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
   assert.match(dashboardHtml, /연방 \/ Express Entry/);
   assert.match(dashboardHtml, /Map Explorer/);
