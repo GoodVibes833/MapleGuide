@@ -24,20 +24,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
 
 export const JURISDICTION_META = [
-  { id: "federal", labelKo: "연방 / EE", labelEn: "Federal / EE", shortLabel: "EE", svgId: null },
-  { id: "yukon", labelKo: "유콘", labelEn: "Yukon", shortLabel: "YT", svgId: "CA-YT" },
-  { id: "northwest-territories", labelKo: "노스웨스트 준주", labelEn: "Northwest Terr.", shortLabel: "NT", svgId: "CA-NT" },
-  { id: "nunavut", labelKo: "누나붓", labelEn: "Nunavut", shortLabel: "NU", svgId: "CA-NU" },
-  { id: "british-columbia", labelKo: "브리티시컬럼비아", labelEn: "British Columbia", shortLabel: "BC", svgId: "CA-BC" },
-  { id: "alberta", labelKo: "알버타", labelEn: "Alberta", shortLabel: "AB", svgId: "CA-AB" },
-  { id: "saskatchewan", labelKo: "사스카츄완", labelEn: "Saskatchewan", shortLabel: "SK", svgId: "CA-SK" },
-  { id: "manitoba", labelKo: "매니토바", labelEn: "Manitoba", shortLabel: "MB", svgId: "CA-MB" },
-  { id: "ontario", labelKo: "온타리오", labelEn: "Ontario", shortLabel: "ON", svgId: "CA-ON" },
-  { id: "quebec", labelKo: "퀘벡", labelEn: "Quebec", shortLabel: "QC", svgId: "CA-QC" },
-  { id: "new-brunswick", labelKo: "뉴브런즈윅", labelEn: "New Brunswick", shortLabel: "NB", svgId: "CA-NB" },
-  { id: "prince-edward-island", labelKo: "프린스에드워드아일랜드", labelEn: "Prince Edward Isl.", shortLabel: "PE", svgId: "CA-PE" },
-  { id: "nova-scotia", labelKo: "노바스코샤", labelEn: "Nova Scotia", shortLabel: "NS", svgId: "CA-NS" },
-  { id: "newfoundland-and-labrador", labelKo: "뉴펀들랜드 래브라도", labelEn: "Newfoundland & Labrador", shortLabel: "NL", svgId: "CA-NL" }
+  { id: "federal", labelKo: "연방 / EE", labelEn: "Federal / EE", chipLabelEn: "Federal / EE", shortLabel: "EE", svgId: null },
+  { id: "yukon", labelKo: "유콘", labelEn: "Yukon", chipLabelEn: "Yukon", shortLabel: "YT", svgId: "CA-YT" },
+  { id: "northwest-territories", labelKo: "노스웨스트 준주", labelEn: "Northwest Terr.", chipLabelEn: "NWT", shortLabel: "NT", svgId: "CA-NT" },
+  { id: "nunavut", labelKo: "누나붓", labelEn: "Nunavut", chipLabelEn: "Nunavut", shortLabel: "NU", svgId: "CA-NU" },
+  { id: "british-columbia", labelKo: "브리티시컬럼비아", labelEn: "British Columbia", chipLabelEn: "B.C.", shortLabel: "BC", svgId: "CA-BC" },
+  { id: "alberta", labelKo: "알버타", labelEn: "Alberta", chipLabelEn: "Alberta", shortLabel: "AB", svgId: "CA-AB" },
+  { id: "saskatchewan", labelKo: "사스카츄완", labelEn: "Saskatchewan", chipLabelEn: "Sask.", shortLabel: "SK", svgId: "CA-SK" },
+  { id: "manitoba", labelKo: "매니토바", labelEn: "Manitoba", chipLabelEn: "Manitoba", shortLabel: "MB", svgId: "CA-MB" },
+  { id: "ontario", labelKo: "온타리오", labelEn: "Ontario", chipLabelEn: "Ontario", shortLabel: "ON", svgId: "CA-ON" },
+  { id: "quebec", labelKo: "퀘벡", labelEn: "Quebec", chipLabelEn: "Quebec", shortLabel: "QC", svgId: "CA-QC" },
+  { id: "new-brunswick", labelKo: "뉴브런즈윅", labelEn: "New Brunswick", chipLabelEn: "N.B.", shortLabel: "NB", svgId: "CA-NB" },
+  { id: "prince-edward-island", labelKo: "프린스에드워드아일랜드", labelEn: "Prince Edward Isl.", chipLabelEn: "PEI", shortLabel: "PE", svgId: "CA-PE" },
+  { id: "nova-scotia", labelKo: "노바스코샤", labelEn: "Nova Scotia", chipLabelEn: "Nova Scotia", shortLabel: "NS", svgId: "CA-NS" },
+  { id: "newfoundland-and-labrador", labelKo: "뉴펀들랜드 래브라도", labelEn: "Newfoundland & Labrador", chipLabelEn: "Newfoundland", shortLabel: "NL", svgId: "CA-NL" }
 ];
 
 function buildCanadaMapSvg({ idPrefix = "", className = "canada-map actual-map", ariaLabel = "캐나다 주 및 준주 지도" } = {}) {
@@ -79,8 +79,7 @@ function renderQuickFilterCoins() {
               aria-label="${escapeHtml(region.labelEn ?? region.labelKo)} 선택"
               title="${escapeHtml(region.labelEn ?? region.labelKo)}"
             >
-              <span class="quick-coin-abbr">${escapeHtml(region.shortLabel)}</span>
-              <span class="quick-coin-label">${escapeHtml(region.labelEn ?? region.labelKo)}</span>
+              <span class="quick-coin-label">${escapeHtml(region.chipLabelEn ?? region.labelEn ?? region.labelKo)}</span>
             </button>
           `
         )
@@ -3854,7 +3853,7 @@ function renderLayout({ title, page, body, updates }) {
         display: grid;
         justify-items: start;
         gap: 8px;
-        width: min(100%, 760px);
+        width: 100%;
         padding: 10px;
         border: 1px solid rgba(15, 61, 127, 0.12);
         border-radius: var(--radius-lg);
@@ -3871,29 +3870,27 @@ function renderLayout({ title, page, body, updates }) {
       .quick-filter-coins {
         display: flex;
         flex-wrap: nowrap;
-        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
         width: 100%;
         max-width: 100%;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 4px;
-        scrollbar-width: thin;
-        scrollbar-color: rgba(15, 61, 127, 0.28) transparent;
+        overflow: hidden;
       }
 
       .quick-coin {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
-        min-height: 48px;
-        padding: 8px 14px 8px 10px;
+        justify-content: center;
+        min-height: 38px;
+        padding: 0 10px;
         border: 1px solid rgba(15, 61, 127, 0.14);
         border-radius: 999px;
         background:
           radial-gradient(circle at top left, rgba(47, 110, 196, 0.1), transparent 45%),
           rgba(255, 255, 255, 0.9);
         color: var(--accent-deep);
-        text-align: left;
+        text-align: center;
         white-space: nowrap;
         flex: 0 0 auto;
         cursor: pointer;
@@ -3920,30 +3917,10 @@ function renderLayout({ title, page, body, updates }) {
         color: #fff9f5;
       }
 
-      .quick-coin-abbr {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-        color: #fff9f5;
-        font-size: 0.72rem;
-        font-weight: 800;
-        letter-spacing: 0.05em;
-        flex: 0 0 auto;
-      }
-
-      .quick-coin.is-selected .quick-coin-abbr {
-        background: rgba(255, 255, 255, 0.96);
-        color: var(--accent-deep);
-        box-shadow: inset 0 0 0 1px rgba(10, 44, 93, 0.08);
-      }
-
       .quick-coin-label {
-        font-size: 0.88rem;
-        font-weight: 700;
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.01em;
         line-height: 1;
         white-space: nowrap;
       }
