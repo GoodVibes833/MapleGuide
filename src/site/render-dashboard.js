@@ -3859,7 +3859,8 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .wizard-filter-shell {
-        display: grid;
+        display: inline-grid;
+        justify-items: start;
         gap: 8px;
         padding: 10px;
         border: 1px solid rgba(15, 61, 127, 0.12);
@@ -3871,11 +3872,13 @@ function renderLayout({ title, page, body, updates }) {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
+        max-width: 460px;
       }
 
       .wizard-filter-map-frame {
         display: grid;
         place-items: center;
+        width: min(100%, 460px);
         min-height: 68px;
         border: 1px solid rgba(15, 61, 127, 0.1);
         border-radius: var(--radius-lg);
@@ -3911,6 +3914,7 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .wizard-filter-selection {
+        max-width: 460px;
         color: var(--muted);
         font-size: 0.92rem;
         line-height: 1.7;
