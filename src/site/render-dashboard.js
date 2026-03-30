@@ -162,16 +162,9 @@ function serializeForScript(value) {
 }
 
 function renderNav(page) {
-  const dashboardClass = page === "dashboard" || page === "jurisdiction" ? "is-active" : "";
-  const dashboardActions = page === "dashboard"
-    ? `
-      <div class="site-actions">
-        <a class="btn tone-blue" href="#situations">내 상황 먼저 보기</a>
-        <a class="btn ghost" href="#compare-table">전체 비교 보기</a>
-        <button id="refresh-feed" class="btn tone-red">새 정보 새로고침</button>
-      </div>
-    `
-    : "";
+  const latestHref = page === "dashboard" ? "#latest-updates" : "/#latest-updates";
+  const situationsHref = page === "dashboard" ? "#situations" : "/#situations";
+  const compareHref = page === "dashboard" ? "#compare-table" : "/#compare-table";
 
   return `
     <header class="site-header">
@@ -184,9 +177,10 @@ function renderNav(page) {
       </a>
       <div class="site-header-tools">
         <nav class="site-nav" aria-label="주요 메뉴">
-          <a class="${dashboardClass}" href="/">업데이트 허브</a>
+          <a href="${latestHref}">최신정보</a>
+          <a href="${situationsHref}">내 상황</a>
+          <a href="${compareHref}">전체비교</a>
         </nav>
-        ${dashboardActions}
       </div>
     </header>
   `;
@@ -780,7 +774,7 @@ function renderLatestUpdateCards(updates) {
 function renderHomeHero(updates) {
 
   return `
-    <section class="section home-latest-section">
+    <section class="section home-latest-section" id="latest-updates">
       <div class="panel-head panel-head-tight">
         <div>
           <p class="panel-kicker">Latest Changes</p>
@@ -1307,7 +1301,6 @@ function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports 
         <h1>${escapeHtml(meta.labelKo)}</h1>
         <p class="hero-text">${escapeHtml(heroText)}</p>
         <div class="hero-actions">
-          <button id="refresh-feed" class="btn tone-red">새 정보 새로고침</button>
           <a class="btn ghost" href="/">지도 허브로 돌아가기</a>
           ${sourceDefs[0]
             ? `<a class="btn tone-blue" href="${escapeHtml(sourceDefs[0].url)}" target="_blank" rel="noreferrer">대표 공식 소스</a>`
@@ -1382,39 +1375,6 @@ function renderClientScript({ page, updates }) {
       const DASHBOARD_INSIGHTS = ${serializeForScript(
         page === "dashboard" ? buildJurisdictionInsights(updates) : []
       )};
-
-      async function postJson(url, payload) {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-          throw new Error("Request failed");
-        }
-
-        return response.json();
-      }
-
-      if (PAGE === "dashboard" || PAGE === "jurisdiction") {
-        const refreshButton = document.getElementById("refresh-feed");
-
-        if (refreshButton) {
-          refreshButton.addEventListener("click", async () => {
-            refreshButton.disabled = true;
-            refreshButton.textContent = "새로고침 중...";
-            try {
-              await postJson("/api/refresh", {});
-              window.location.reload();
-            } catch (error) {
-              alert("로컬 서버에서 실행 중일 때만 새로고침 API를 사용할 수 있습니다.");
-              refreshButton.disabled = false;
-              refreshButton.textContent = "새 정보 새로고침";
-            }
-          });
-        }
-      }
 
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
@@ -3194,53 +3154,42 @@ function renderLayout({ title, page, body, updates }) {
       .site-nav {
         display: inline-flex;
         flex-wrap: wrap;
-        gap: 18px;
-        color: var(--muted);
-        font-size: 0.95rem;
+        gap: 10px;
       }
 
       .site-header-tools {
         display: flex;
         align-items: center;
-        gap: 16px;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-      }
-
-      .site-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
+        gap: 12px;
         flex-wrap: wrap;
         justify-content: flex-end;
       }
 
       .site-nav a {
-        position: relative;
-        padding-bottom: 2px;
-      }
-
-      .site-nav a::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        bottom: -2px;
-        width: 100%;
-        height: 1px;
-        background: currentColor;
-        transform: scaleX(0);
-        transform-origin: left;
-        transition: transform 180ms ease;
-      }
-
-      .site-nav a:hover::after,
-      .site-nav a:focus-visible::after,
-      .site-nav a.is-active::after {
-        transform: scaleX(1);
-      }
-
-      .site-nav a.is-active {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 18px;
+        border: 1px solid rgba(15, 61, 127, 0.14);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
         color: var(--accent-deep);
+        font-size: 0.92rem;
+        font-weight: 700;
+        transition:
+          transform 180ms ease,
+          box-shadow 180ms ease,
+          background 180ms ease,
+          border-color 180ms ease;
+      }
+
+      .site-nav a:hover,
+      .site-nav a:focus-visible {
+        transform: translateY(-1px);
+        border-color: rgba(15, 61, 127, 0.24);
+        box-shadow: 0 10px 24px rgba(15, 61, 127, 0.08);
+        background: rgba(255, 255, 255, 0.92);
       }
 
       .hero {
@@ -4950,14 +4899,16 @@ function renderLayout({ title, page, body, updates }) {
           padding: 18px;
         }
 
-        .site-nav {
-          display: none;
-        }
-
-        .site-header-tools,
-        .site-actions {
+        .site-header-tools {
           width: 100%;
           justify-content: flex-start;
+        }
+
+        .site-nav {
+          width: 100%;
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          padding-bottom: 2px;
         }
       }
 
@@ -4986,10 +4937,6 @@ function renderLayout({ title, page, body, updates }) {
         .news-card,
         .studio-card {
           padding: 22px;
-        }
-
-        .site-actions .btn {
-          width: 100%;
         }
 
         .hero-stats {

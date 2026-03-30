@@ -59,7 +59,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
     url: "/"
   });
   assert.equal(dashboardResponse.statusCode, 200);
-  assert.match(dashboardResponse.body, /업데이트 허브/);
+  assert.match(dashboardResponse.body, /최신정보/);
+  assert.match(dashboardResponse.body, /전체비교/);
   assert.match(dashboardResponse.body, /내 상황으로 먼저 찾기/);
   assert.match(dashboardResponse.body, /나이/);
   assert.match(dashboardResponse.body, /캐나다 밖에서 바로 EE\/취업이민을 보고 있어요/);
