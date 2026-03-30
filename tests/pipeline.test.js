@@ -43,6 +43,11 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /캐나다 이민/);
   assert.match(dashboardHtml, /내 상황으로 먼저 찾기/);
   assert.match(dashboardHtml, /나이/);
+  assert.match(dashboardHtml, /캐나다 밖에서 바로 EE\/취업이민을 보고 있어요/);
+  assert.match(dashboardHtml, /워홀·오픈퍼밋으로 현지 경력 쌓아 이민을 보려 해요/);
+  assert.match(dashboardHtml, /유학 시작부터 이민 경로를 같이 보고 있어요/);
+  assert.match(dashboardHtml, /캐나다 졸업 후 PGWP\/현지 취업으로 이민을 보고 있어요/);
+  assert.match(dashboardHtml, /현재 캐나다 skilled 경력으로 바로 PR을 노리고 있어요/);
   assert.match(dashboardHtml, /최종 학력/);
   assert.match(dashboardHtml, /현재 직군/);
   assert.match(dashboardHtml, /영어 상태/);

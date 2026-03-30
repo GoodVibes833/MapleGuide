@@ -62,6 +62,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /업데이트 허브/);
   assert.match(dashboardResponse.body, /내 상황으로 먼저 찾기/);
   assert.match(dashboardResponse.body, /나이/);
+  assert.match(dashboardResponse.body, /캐나다 밖에서 바로 EE\/취업이민을 보고 있어요/);
+  assert.match(dashboardResponse.body, /워홀·오픈퍼밋으로 현지 경력 쌓아 이민을 보려 해요/);
   assert.match(dashboardResponse.body, /최종 학력/);
   assert.match(dashboardResponse.body, /영어 상태/);
   assert.match(dashboardResponse.body, /캐나다 경력의 성격/);

@@ -253,8 +253,11 @@ function renderSituationSection(insights) {
             <span>가장 가까운 현재 상황</span>
             <select name="path">
               <option value="unsure">아직 잘 모르겠어요</option>
-              <option value="worker">해외 경력으로 취업 이민을 보고 있어요</option>
-              <option value="graduate">캐나다 유학 후 이민을 보고 있어요</option>
+              <option value="outside-worker">캐나다 밖에서 바로 EE/취업이민을 보고 있어요</option>
+              <option value="working-holiday">워홀·오픈퍼밋으로 현지 경력 쌓아 이민을 보려 해요</option>
+              <option value="study-plan">유학 시작부터 이민 경로를 같이 보고 있어요</option>
+              <option value="pgwp-pr">캐나다 졸업 후 PGWP/현지 취업으로 이민을 보고 있어요</option>
+              <option value="canadian-worker">현재 캐나다 skilled 경력으로 바로 PR을 노리고 있어요</option>
               <option value="business">사업·창업 경로를 보고 있어요</option>
             </select>
           </label>
@@ -1301,6 +1304,26 @@ function renderClientScript({ page, updates }) {
           return ["working-holiday", "pgwp", "worker"].includes(base);
         }
 
+        function isWorkerIntent(path) {
+          return ["worker", "outside-worker", "working-holiday", "canadian-worker"].includes(path);
+        }
+
+        function isGraduateIntent(path) {
+          return ["graduate", "study-plan", "pgwp-pr"].includes(path);
+        }
+
+        function isStudyStartIntent(path) {
+          return path === "study-plan";
+        }
+
+        function isPgwpIntent(path) {
+          return ["pgwp-pr", "graduate"].includes(path);
+        }
+
+        function isCanadianExperienceIntent(path) {
+          return ["working-holiday", "pgwp-pr", "canadian-worker"].includes(path);
+        }
+
         ${countsCanadianExperienceForCrs.toString()}
         ${describeCanadianExperienceCrsTreatment.toString()}
         ${estimateCanadianExperienceCrsPoints.toString()}
@@ -1350,14 +1373,29 @@ function renderClientScript({ page, updates }) {
             lifestyleReasons.push(reason);
           }
 
-          if (answers.path === "worker" && (statusSupports(insight.statuses.ee) || statusSupports(insight.statuses.jobOffer))) {
+          if (isWorkerIntent(answers.path) && (statusSupports(insight.statuses.ee) || statusSupports(insight.statuses.jobOffer))) {
             add(2, "취업형 경로로 볼 수 있는 주");
           }
-          if (answers.path === "graduate" && statusSupports(insight.statuses.graduate)) {
+          if (isGraduateIntent(answers.path) && statusSupports(insight.statuses.graduate)) {
             add(4, "졸업자 경로가 있는 지역");
           }
           if (answers.path === "business" && statusSupports(insight.statuses.entrepreneur)) {
             add(4, "사업·창업 경로가 있는 지역");
+          }
+          if (answers.path === "outside-worker" && statusSupports(insight.statuses.ee)) {
+            add(2, "캐나다 밖에서 바로 EE 또는 취업형 경로를 보기 좋은 지역");
+          }
+          if (answers.path === "working-holiday" && statusSupports(insight.statuses.localExperience)) {
+            add(3, "워홀·오픈퍼밋 경력을 현지경력 경로로 연결하기 좋은 지역");
+          }
+          if (isStudyStartIntent(answers.path) && statusSupports(insight.statuses.graduate)) {
+            add(3, "유학 시작 단계에서 졸업 후 경로를 같이 보기 좋은 지역");
+          }
+          if (isPgwpIntent(answers.path) && (statusSupports(insight.statuses.graduate) || statusSupports(insight.statuses.localExperience))) {
+            add(3, "PGWP 또는 졸업 후 현지경력과 이어 보기 좋은 지역");
+          }
+          if (answers.path === "canadian-worker" && statusSupports(insight.statuses.localExperience)) {
+            add(4, "현재 캐나다 skilled 경력으로 바로 PR을 이어보기 좋은 지역");
           }
           if (answers.base === "student" && statusSupports(insight.statuses.graduate)) {
             add(3, "현재 학생 상태와 연결되는 졸업자 경로가 있음");
@@ -1536,7 +1574,7 @@ function renderClientScript({ page, updates }) {
               addLifestyle(-2, "비용 부담이 큰 편");
             }
 
-            if (answers.path === "graduate") {
+            if (isGraduateIntent(answers.path)) {
               if (insight.lifestyle.tuitionLevel <= 1) {
                 addLifestyle(2, "학비 부담도 비교적 낮은 편");
               } else if (insight.lifestyle.tuitionLevel >= 3) {
@@ -2148,11 +2186,11 @@ function renderClientScript({ page, updates }) {
             addAction(4, "캐나다 경력 2년까지 늘리기", "일부 경로는 현지 경력이 길수록 안정적으로 보이는 편입니다.", "canadian-exp-2");
           }
 
-          if (answers.path === "worker" && answers.foreignExp === "0") {
+          if (["worker", "outside-worker"].includes(answers.path) && answers.foreignExp === "0") {
             addAction(5, "숙련 경력 1년 채우기", "해외 숙련 경력 1년은 EE와 취업형 주정부 경로의 최소 판단선이 되는 경우가 많습니다.", "foreign-exp-1");
           }
 
-          if (answers.path === "graduate" && answers.base === "outside") {
+          if (isStudyStartIntent(answers.path) && answers.base === "outside") {
             addAction(7, "학교와 주를 같이 고른 유학 경로 설계", "유학은 학교보다 지역과 졸업 후 경로를 먼저 같이 봐야 실제 이민 연결이 좋아집니다.", "study-route");
           }
 
@@ -2201,11 +2239,20 @@ function renderClientScript({ page, updates }) {
             ];
           }
 
-          if (answers.base === "student" || answers.path === "graduate") {
+          if (answers.base === "student" || isStudyStartIntent(answers.path)) {
             return [
               "1. 학비와 지역을 기준으로 학교·주 선택: 1-3개월",
               "2. 학업 후 졸업자 경로 또는 PGWP 준비: 1-2년+",
               "3. 현지 경력 1년 전후 확보 후 EE/PNP 검토",
+              "4. nomination 또는 ITA 후 PR 접수: 추가 6개월+"
+            ];
+          }
+
+          if (answers.base === "pgwp" || isPgwpIntent(answers.path)) {
+            return [
+              "1. 현재 학위와 PGWP 가능 기간 기준으로 주와 직무 우선순위 정리: 2-4주",
+              "2. 현지 skilled 경력과 언어점수, ECA 상태를 기준으로 EE/PNP 재계산: 1-2개월",
+              "3. 졸업자 또는 현지경력 stream 등록/초청 대기: 1-6개월",
               "4. nomination 또는 ITA 후 PR 접수: 추가 6개월+"
             ];
           }
@@ -2237,7 +2284,7 @@ function renderClientScript({ page, updates }) {
             ];
           }
 
-          if (hasCanadianWorkBase(answers.base) || answers.canadianExp !== "0") {
+          if (hasCanadianWorkBase(answers.base) || answers.canadianExp !== "0" || isCanadianExperienceIntent(answers.path)) {
             return [
               "1. 현재 NOC, 근무시간, 합법 체류 상태 정리: 2-4주",
               "2. 언어시험과 필요한 서류 정리: 1-3개월",
