@@ -542,21 +542,83 @@ function renderLatestUpdateCards(updates) {
     `;
   }
 
+  const buildHeadline = (update) => {
+    const metrics = update.metrics ?? {};
+    const bullets = update.translation.bulletsKo ?? [];
+
+    if (update.sourceId === "ee-rounds") {
+      const cutoff = metrics.cutoffScore;
+      const invitations = metrics.invitationsIssued;
+      if (cutoff && invitations) {
+        return `EE 컷오프 ${cutoff}점, ${invitations}명 초청됐어요`;
+      }
+    }
+
+    if (update.sourceId === "manitoba-eoi-draw") {
+      const stream = metrics.stream;
+      const invitations = metrics.invitationsIssued;
+      const rankingScore = metrics.rankingScore;
+      if (stream && invitations && rankingScore) {
+        return `${stream}에서 ${invitations}명 초청, 최저 ${rankingScore}점이 나왔어요`;
+      }
+    }
+
+    if (update.sourceId === "bc-pnp-invitations") {
+      const category = metrics.category;
+      const invitations = metrics.invitations;
+      const minimumScore = metrics.minimumScore;
+      if (category && invitations && minimumScore) {
+        return `${category} 카테고리에서 ${invitations}명 초청, 최저 ${minimumScore}점이 나왔어요`;
+      }
+    }
+
+    if (update.sourceId === "ontario-oinp-updates") {
+      const firstBullet = bullets[0];
+      const secondBullet = bullets[1];
+
+      if (firstBullet && secondBullet) {
+        return `${firstBullet} 보건의료·기술직 우선 기조도 유지됐어요`;
+      }
+
+      if (firstBullet) {
+        return firstBullet;
+      }
+    }
+
+    if (update.eventType === "draw") {
+      const firstLine = update.translation.metricLinesKo?.[0];
+      if (firstLine) {
+        return `${firstLine} 관련 초청이 나왔어요`;
+      }
+    }
+
+    const fallback = update.translation.summaryKo
+      .replace(/^.*?발표일은\s+\d{4}-\d{2}-\d{2}입니다\.\s*/u, "")
+      .split(" / ")[0]
+      .trim();
+
+    return fallback || update.translation.titleKo;
+  };
+
   return `
     <div class="update-flash-grid">
       ${latestUpdates
         .map((update) => {
+          const headline = buildHeadline(update);
           const leadLine = update.translation.metricLinesKo?.[0] ?? update.translation.summaryKo;
           const updateDate = update.publishedAt ?? update.fetchedAt.slice(0, 10);
 
           return `
             <details class="update-flash-card">
               <summary class="update-flash-summary">
-                <span class="tag">${escapeHtml(getJurisdictionMeta(update.jurisdiction).labelKo)}</span>
-                <span class="mini-flag">${escapeHtml(updateDate)}</span>
-                <strong>${escapeHtml(update.translation.titleKo)}</strong>
+                <div class="update-flash-meta">
+                  <span class="tag">${escapeHtml(getJurisdictionMeta(update.jurisdiction).labelKo)}</span>
+                  <span class="mini-flag">${escapeHtml(updateDate)}</span>
+                </div>
+                <strong>${escapeHtml(headline)}</strong>
               </summary>
               <div class="update-flash-detail">
+                <p class="update-flash-original">${escapeHtml(update.translation.titleKo)}</p>
                 <p>${escapeHtml(leadLine)}</p>
                 <div class="card-footer">
                   <span>${escapeHtml(update.program.toUpperCase())}</span>
@@ -3119,28 +3181,22 @@ function renderLayout({ title, page, body, updates }) {
 
       .update-flash-grid {
         display: grid;
-        grid-auto-flow: column;
-        grid-auto-columns: minmax(260px, 320px);
-        overflow-x: auto;
-        gap: 14px;
-        padding-bottom: 4px;
-        scroll-snap-type: x proximity;
+        grid-template-columns: 1fr;
+        gap: 10px;
       }
 
       .update-flash-card {
         display: block;
-        min-height: 100%;
         padding: 0;
         border: 1px solid rgba(15, 61, 127, 0.12);
         border-radius: var(--radius-lg);
         background: rgba(255, 255, 255, 0.76);
-        scroll-snap-align: start;
       }
 
       .update-flash-summary {
         display: grid;
-        gap: 10px;
-        padding: 14px 16px;
+        gap: 8px;
+        padding: 12px 16px;
         cursor: pointer;
         list-style: none;
       }
@@ -3149,9 +3205,16 @@ function renderLayout({ title, page, body, updates }) {
         display: none;
       }
 
+      .update-flash-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
       .update-flash-summary strong {
-        font-size: 0.98rem;
-        line-height: 1.45;
+        font-size: 1rem;
+        line-height: 1.4;
         font-weight: 800;
       }
 
@@ -3166,6 +3229,12 @@ function renderLayout({ title, page, body, updates }) {
         margin: 0;
         color: var(--muted);
         line-height: 1.65;
+      }
+
+      .update-flash-original {
+        font-size: 0.88rem;
+        color: var(--accent-deep);
+        font-weight: 700;
       }
 
       .hero-home .hero-copy,
@@ -4063,10 +4132,6 @@ function renderLayout({ title, page, body, updates }) {
         .decision-grid,
         .wizard-layout {
           grid-template-columns: 1fr;
-        }
-
-        .update-flash-grid {
-          grid-auto-columns: minmax(240px, 86vw);
         }
 
         .reason-columns {
