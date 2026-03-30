@@ -2257,6 +2257,333 @@ function renderClientScript({ page, updates }) {
           };
         }
 
+        function pushUniqueCriterion(criteria, id, label) {
+          if (!criteria.some((criterion) => criterion.id === id)) {
+            criteria.push({ id, label });
+          }
+        }
+
+        function buildPathwayCriteria(answers, insight) {
+          const selectionModel = insight.selectionModel || {};
+          const criteria = [];
+          const isFederal = insight.id === "federal";
+          const scoreView = selectionModel.scoreViewKo || "";
+          const focusText = (selectionModel.focusKo || "") + " " + (selectionModel.detailKo || "");
+          const scoreLedProvince =
+            !isFederal &&
+            (
+              ["EOI 드로우", "EOI + 노동시장 우선", "등록점수 + 타깃 초청", "EOI + EE NOI", "EOI intake + 우선점수"].includes(selectionModel.badgeKo) ||
+              /최저점 공개|컷오프와 직접 비교|점수 일부 공개|드로우 결과 공개|우선점수형/.test(scoreView)
+            );
+
+          if (isFederal) {
+            pushUniqueCriterion(criteria, "ee-profile", "EE 프로필과 연방 자격");
+            pushUniqueCriterion(criteria, "official-language", "공인 영어·불어 점수");
+            pushUniqueCriterion(criteria, "education-proof", "ECA 또는 캐나다 학위");
+            pushUniqueCriterion(criteria, "skilled-experience", "숙련 경력");
+            pushUniqueCriterion(criteria, "competitive-crs", "최근 컷오프와 점수 차이");
+            pushUniqueCriterion(criteria, "category-fit", "카테고리 기반 선발 해당 여부");
+
+            return {
+              modeLabel: "연방 점수형",
+              summary: "연방은 CRS와 라운드 컷오프로 직접 비교하고, 카테고리 기반 선발 해당 여부를 함께 봅니다.",
+              criteria
+            };
+          }
+
+          pushUniqueCriterion(criteria, "stream-choice", "어느 스트림으로 갈지 먼저 정리");
+          pushUniqueCriterion(criteria, "official-language", "공인 언어점수");
+          pushUniqueCriterion(criteria, "skilled-experience", "숙련 경력");
+
+          if (statusSupports(insight.statuses.ee)) {
+            pushUniqueCriterion(criteria, "ee-profile", "EE 프로필 또는 EE-linked 가능성");
+          }
+          if (["중심", "있음", "일부"].includes(insight.statuses.jobOffer)) {
+            pushUniqueCriterion(criteria, "employer-offer", "고용주 오퍼 또는 현재 근무 연결");
+          }
+          if (statusSupports(insight.statuses.graduate)) {
+            pushUniqueCriterion(criteria, "local-graduate", "캐나다 또는 해당 주 학위/졸업 연결");
+          }
+          if (statusSupports(insight.statuses.localExperience)) {
+            pushUniqueCriterion(criteria, "provincial-connection", "현지 경력 또는 주 연결성");
+          }
+          if (/직군|카테고리|우선산업|sector|타깃|파일럿|고용주|포털|community|커뮤니티|지역추천/u.test(focusText)) {
+            pushUniqueCriterion(criteria, "priority-occupation", "직군·우선산업·타깃 조건");
+          }
+          if (statusSupports(insight.statuses.regional)) {
+            pushUniqueCriterion(criteria, "regional-intent", "지역 정착 의사 또는 커뮤니티 조건");
+          }
+          if (answers.path === "business" && statusSupports(insight.statuses.entrepreneur)) {
+            pushUniqueCriterion(criteria, "business-funds", "사업 자금·계획·운영 준비");
+          }
+          if (scoreLedProvince) {
+            pushUniqueCriterion(criteria, "competitive-crs", "점수형이면 최근 공개 결과와 차이");
+          }
+
+          return {
+            modeLabel: scoreLedProvince ? "점수·랭킹형" : "요건·타깃형",
+            summary: scoreLedProvince
+              ? "이 주는 EOI·등록점수·공개 드로우 결과를 함께 보는 편이라, 점수와 연결 조건을 같이 읽는 게 좋습니다."
+              : "이 주는 점수 하나보다 stream 자격, 고용·직군·지역 조건, 신청 구조를 먼저 보는 편입니다.",
+            criteria: criteria.slice(0, 6)
+          };
+        }
+
+        function evaluatePathwayCriterion(criterion, answers, insight, eeSnapshot) {
+          switch (criterion.id) {
+            case "ee-profile":
+              if (answers.ee === "yes") {
+                return { state: "has", detail: "EE 프로필이 있거나 만들 예정이에요." };
+              }
+              if (answers.ee === "unsure") {
+                return { state: "partial", detail: "EE를 같이 볼지는 아직 미정이에요." };
+              }
+              return { state: "missing", detail: "EE를 같이 봐야 하는 경로라면 프로필 확인이 먼저예요." };
+            case "official-language":
+              if (answers.languageScoreStatus === "official") {
+                return { state: "has", detail: "공인 점수로 바로 비교할 수 있어요." };
+              }
+              if (answers.languageScoreStatus === "booked") {
+                return { state: "partial", detail: "목표 점수는 있지만 실제 점수표가 더 필요해요." };
+              }
+              return { state: "missing", detail: "공식 언어점수표가 있어야 판단이 선명해져요." };
+            case "education-proof":
+              if (["completed", "canadian-degree"].includes(answers.ecaStatus)) {
+                return { state: "has", detail: "학력 점수화 또는 학위 증명이 준비됐어요." };
+              }
+              if (answers.ecaStatus === "in-progress") {
+                return { state: "partial", detail: "ECA는 진행 중이지만 완료가 더 필요해요." };
+              }
+              return { state: "missing", detail: "ECA 또는 캐나다 학위 확인이 더 필요해요." };
+            case "skilled-experience":
+              if ((answers.foreignExp && answers.foreignExp !== "0") || (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0")) {
+                return { state: "has", detail: "숙련 경력을 현재 경로에 연결해 볼 수 있어요." };
+              }
+              if (answers.canadianExp !== "0") {
+                return { state: "partial", detail: "캐나다 경력은 있지만 skilled 기준 확인이 더 필요해요." };
+              }
+              return { state: "missing", detail: "숙련 경력 축이 약해서 경력 설계가 먼저예요." };
+            case "competitive-crs":
+              if (eeSnapshot.crsSnapshot.gap == null) {
+                return { state: "partial", detail: "최신 EE 컷오프와 직접 비교 중이에요." };
+              }
+              if (eeSnapshot.crsSnapshot.gap >= 0) {
+                return { state: "has", detail: "최근 컷오프 기준으로는 점수 경쟁력이 있어요." };
+              }
+              if (eeSnapshot.crsSnapshot.gap >= -20) {
+                return { state: "partial", detail: "컷오프와 가깝지만 조금 더 보완이 필요해요." };
+              }
+              return { state: "missing", detail: "최근 컷오프와 차이가 커서 다른 축도 같이 봐야 해요." };
+            case "category-fit":
+              if (["healthcare-social", "trades", "education", "transport", "physician-canada", "senior-manager-canada", "researcher-canada"].includes(answers.occupation) || answers.advantage === "french") {
+                return { state: "has", detail: "현재 입력상 카테고리 기반 선발 축을 같이 볼 수 있어요." };
+              }
+              if (answers.occupation && answers.occupation !== "general") {
+                return { state: "partial", detail: "직군 축은 있지만 카테고리 직접 해당은 더 확인이 필요해요." };
+              }
+              return { state: "missing", detail: "카테고리 기반 선발 강점은 아직 뚜렷하지 않아요." };
+            case "stream-choice":
+              if (answers.targetOccupationPlan && answers.targetOccupationPlan !== "unsure") {
+                return { state: "has", detail: "어느 경력 축으로 볼지 방향이 정해져 있어요." };
+              }
+              if (answers.path && answers.path !== "unsure") {
+                return { state: "partial", detail: "큰 방향은 있지만 세부 스트림 선택은 아직 열려 있어요." };
+              }
+              return { state: "missing", detail: "먼저 어떤 스트림으로 갈지 정해야 비교가 쉬워져요." };
+            case "employer-offer":
+              if (answers.jobOffer === "yes") {
+                return { state: "has", detail: "잡오퍼 또는 고용 연결 가능성이 있어요." };
+              }
+              if (answers.jobOffer === "unsure") {
+                return { state: "partial", detail: "고용 연결 여부를 더 확인해야 해요." };
+              }
+              return { state: "missing", detail: "이 주는 고용주 연결이 있으면 훨씬 유리할 수 있어요." };
+            case "local-graduate":
+              if (answers.ecaStatus === "canadian-degree" || ["student", "pgwp"].includes(answers.base) || ["study-plan", "pgwp-pr"].includes(answers.path)) {
+                return { state: "has", detail: "캐나다 학위·학생·PGWP 축을 활용할 수 있어요." };
+              }
+              return { state: "missing", detail: "졸업자 축은 현재 입력상 직접 연결이 약해요." };
+            case "provincial-connection":
+              if (answers.canadianExp !== "0" || answers.ecaStatus === "canadian-degree" || answers.jobOffer === "yes") {
+                return { state: "has", detail: "현지 경력·학위·고용 연결 중 하나는 있어요." };
+              }
+              if (["student", "working-holiday", "pgwp", "worker"].includes(answers.base)) {
+                return { state: "partial", detail: "캐나다 체류 기반은 있지만 직접 연결은 더 필요해요." };
+              }
+              return { state: "missing", detail: "이 주와 연결되는 현지 요소를 더 만들어야 할 수 있어요." };
+            case "priority-occupation":
+              if (answers.occupation && answers.occupation !== "general") {
+                return { state: "has", detail: "직군 축이 잡혀 있어 타깃 초청과 비교하기 쉬워요." };
+              }
+              if (answers.targetOccupationPlan && answers.targetOccupationPlan !== "unsure") {
+                return { state: "partial", detail: "경력 방향은 있지만 주력 직군 정리가 더 필요해요." };
+              }
+              return { state: "missing", detail: "직군·우선산업 기준으로는 아직 방향이 넓어요." };
+            case "regional-intent":
+              if (answers.setting === "regional") {
+                return { state: "has", detail: "지역 정착 의사가 분명해요." };
+              }
+              if (answers.setting === "balanced") {
+                return { state: "partial", detail: "지역 정착도 열어둘 수는 있어요." };
+              }
+              return { state: "missing", detail: "대도시 우선이면 지역 경로 활용은 제한될 수 있어요." };
+            case "business-funds":
+              return { state: "missing", detail: "사업 자금·순자산·운영계획 정보는 아직 안 받아서 별도 확인이 필요해요." };
+            default:
+              return { state: "partial", detail: "현재 입력으로는 추가 확인이 필요해요." };
+          }
+        }
+
+        function renderPathwayGuidePanel(answers, insight, eeSnapshot) {
+          const guide = buildPathwayCriteria(answers, insight);
+          const evaluated = guide.criteria.map((criterion) => ({
+            ...criterion,
+            ...evaluatePathwayCriterion(criterion, answers, insight, eeSnapshot)
+          }));
+
+          return [
+            '<section class="pathway-guide-panel">',
+            '<div class="pathway-guide-head">',
+            '<strong>' + escapeHtmlClient(insight.id === "federal" ? "연방 방향에서 주로 보는 것" : "이 주에서 실제로 보는 것") + '</strong>',
+            '<span class="pathway-guide-badge">' + escapeHtmlClient(guide.modeLabel) + '</span>',
+            '</div>',
+            '<p class="pathway-guide-copy">' + escapeHtmlClient(guide.summary) + '</p>',
+            '<div class="pathway-guide-grid">',
+            '<div class="pathway-guide-block">',
+            '<span class="pathway-guide-label">' + escapeHtmlClient(insight.id === "federal" ? "연방이 주로 보는 항목" : "이 주가 주로 보는 항목") + '</span>',
+            '<ul class="pathway-factor-list">'
+              + guide.criteria.map((criterion) => '<li>' + escapeHtmlClient(criterion.label) + '</li>').join("")
+              + '</ul>',
+            '</div>',
+            '<div class="pathway-guide-block">',
+            '<span class="pathway-guide-label">내 정보 비교</span>',
+            '<ul class="pathway-compare-list">'
+              + evaluated.map((criterion) => [
+                '<li class="pathway-compare-item is-' + escapeHtmlClient(criterion.state) + '">',
+                '<span class="pathway-compare-state">' + escapeHtmlClient(
+                  criterion.state === "has" ? "있음" : criterion.state === "partial" ? "진행/확인" : "더 필요"
+                ) + '</span>',
+                '<div class="pathway-compare-copy">',
+                '<strong>' + escapeHtmlClient(criterion.label) + '</strong>',
+                '<p>' + escapeHtmlClient(criterion.detail) + '</p>',
+                '</div>',
+                '</li>'
+              ].join("")).join("")
+              + '</ul>',
+            '</div>',
+            '</div>',
+            '</section>'
+          ].join("");
+        }
+
+        function buildDirectionOverviewCardHtml(card) {
+          const currentList = card.currentItems.length > 0
+            ? card.currentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+            : '<li>아직 강점이 뚜렷하지 않아요.</li>';
+          const nextList = card.nextItems.length > 0
+            ? card.nextItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+            : '<li>추가 준비보다 최신 공지 추적이 더 중요해요.</li>';
+
+          return [
+            '<article class="direction-summary-card">',
+            '<div class="direction-summary-head">',
+            '<div>',
+            '<p class="panel-kicker">' + escapeHtmlClient(card.kicker) + '</p>',
+            '<h3>' + escapeHtmlClient(card.title) + '</h3>',
+            '</div>',
+            '<span class="direction-summary-badge">' + escapeHtmlClient(card.badge) + '</span>',
+            '</div>',
+            '<p class="direction-summary-copy">' + escapeHtmlClient(card.copy) + '</p>',
+            '<div class="direction-summary-pill-row">' + card.pills.map((pill) => '<span class="compare-pill">' + escapeHtmlClient(pill) + '</span>').join("") + '</div>',
+            '<div class="direction-summary-grid">',
+            '<div class="direction-summary-block">',
+            '<span class="direction-summary-label">현재 갖고 있는 것</span>',
+            '<ul class="direction-summary-list">' + currentList + '</ul>',
+            '</div>',
+            '<div class="direction-summary-block">',
+            '<span class="direction-summary-label">다음으로 더 필요한 것</span>',
+            '<ul class="direction-summary-list">' + nextList + '</ul>',
+            '</div>',
+            '</div>',
+            '</article>'
+          ].join("");
+        }
+
+        function buildDirectionOverviewHtml(answers, allEvaluated) {
+          const cards = [];
+          const federalEntry = allEvaluated.find((entry) => entry.insight.id === "federal");
+          const provincialEntries = allEvaluated.filter((entry) => entry.insight.id !== "federal");
+
+          if (federalEntry) {
+            const federalSnapshot = getEESnapshot(answers, federalEntry.insight);
+            const federalCriteria = buildPathwayCriteria(answers, federalEntry.insight).criteria
+              .map((criterion) => ({
+                ...criterion,
+                ...evaluatePathwayCriterion(criterion, answers, federalEntry.insight, federalSnapshot)
+              }));
+
+            cards.push(buildDirectionOverviewCardHtml({
+              kicker: "Direction 1",
+              title: "연방으로 먼저 보기",
+              badge: "Express Entry",
+              copy: "연방은 EE 자격과 CRS를 기준으로 바로 비교합니다. 주정부와 달리 점수와 라운드 컷오프를 직접 읽는 방향이에요.",
+              pills: [
+                "연방 점수형",
+                "현재 " + federalSnapshot.crsSnapshot.score + "점",
+                federalSnapshot.crsSnapshot.cutoff != null
+                  ? "최근 컷오프 " + federalSnapshot.crsSnapshot.cutoff + "점"
+                  : "컷오프 대기"
+              ],
+              currentItems: federalCriteria.filter((criterion) => criterion.state === "has").map((criterion) => criterion.label).slice(0, 3),
+              nextItems: federalCriteria.filter((criterion) => criterion.state !== "has").map((criterion) => criterion.label).slice(0, 3)
+            }));
+          }
+
+          if (provincialEntries.length > 0) {
+            const bestProvince = provincialEntries[0];
+            const provinceSnapshot = getEESnapshot(answers, bestProvince.insight);
+            const provinceCriteria = buildPathwayCriteria(answers, bestProvince.insight).criteria
+              .map((criterion) => ({
+                ...criterion,
+                ...evaluatePathwayCriterion(criterion, answers, bestProvince.insight, provinceSnapshot)
+              }));
+            const provinceNames = provincialEntries.slice(0, 3).map((entry) => entry.insight.labelKo).join(" / ");
+
+            cards.push(buildDirectionOverviewCardHtml({
+              kicker: "Direction 2",
+              title: "주정부로 먼저 보기",
+              badge: bestProvince.insight.selectionModel.badgeKo,
+              copy: provinceNames + " 쪽이 현재 조건과 더 가까워 보여요. 주정부는 점수 하나보다 stream 자격, 직군, 고용 연결, 지역 조건을 함께 읽어야 합니다.",
+              pills: [
+                "현재 1순위 " + bestProvince.insight.labelKo,
+                "선발 방식 " + bestProvince.insight.selectionModel.badgeKo,
+                "EE " + bestProvince.insight.statuses.ee
+              ],
+              currentItems: provinceCriteria.filter((criterion) => criterion.state === "has").map((criterion) => criterion.label).slice(0, 3),
+              nextItems: provinceCriteria.filter((criterion) => criterion.state !== "has").map((criterion) => criterion.label).slice(0, 3)
+            }));
+          }
+
+          if (cards.length === 0) {
+            return "";
+          }
+
+          return [
+            '<section class="direction-summary-section">',
+            '<div class="wizard-section-heading">',
+            '<div>',
+            '<p class="panel-kicker">Direction Split</p>',
+            '<h3>연방 vs 주정부 먼저 정리</h3>',
+            '</div>',
+            '<p class="panel-note">연방은 점수와 컷오프를 직접 비교하고, 주정부는 주마다 다른 선발 방식과 요구 조건을 같이 봅니다.</p>',
+            '</div>',
+            '<div class="direction-summary-cards">',
+            cards.join(""),
+            '</div>',
+            '</section>'
+          ].join("");
+        }
+
         function buildCareerRecognitionItems(answers, insight) {
           const items = [];
 
@@ -2701,13 +3028,14 @@ function renderClientScript({ page, updates }) {
             ...completedRawAnswers,
             ...normalizeLanguageAnswers(completedRawAnswers)
           };
-          const ranked = DASHBOARD_INSIGHTS
+          const allEvaluated = DASHBOARD_INSIGHTS
             .filter((insight) => insight.id !== "nunavut")
             .filter((insight) => activeQuickRegions.size === 0 || activeQuickRegions.has(insight.id))
             .map((insight) => ({
               insight,
               evaluation: scoreInsight(insight, answers)
-            }))
+            }));
+          const ranked = allEvaluated
             .sort((left, right) => {
               if (right.evaluation.score !== left.evaluation.score) {
                 return right.evaluation.score - left.evaluation.score;
@@ -2716,8 +3044,19 @@ function renderClientScript({ page, updates }) {
               return right.insight.updateCount - left.insight.updateCount;
             })
             .slice(0, 5);
+          const directionOverviewHtml = buildDirectionOverviewHtml(answers, allEvaluated);
 
-          quickStartResults.innerHTML = ranked
+          quickStartResults.innerHTML = directionOverviewHtml
+            + [
+              '<div class="wizard-section-heading">',
+              '<div>',
+              '<p class="panel-kicker">Recommendations</p>',
+              '<h3>현재 조건에서 먼저 볼 지역</h3>',
+              '</div>',
+              '<p class="panel-note">각 카드에서 주정부 선발 방식과 연방 EE 참고를 분리해서 보여줍니다.</p>',
+              '</div>'
+            ].join("")
+            + ranked
             .map(({ insight, evaluation }, index) => {
               const fitPercent = estimateFitPercent(answers, evaluation);
               const immigrationChancePercent = estimateImmigrationChancePercent(answers, evaluation, insight);
@@ -2790,6 +3129,7 @@ function renderClientScript({ page, updates }) {
                     '</section>'
                   ].join("")
                 : "";
+              const pathwayGuideHtml = renderPathwayGuidePanel(answers, insight, eeSnapshot);
 
               return [
                 '<article class="wizard-result-card">',
@@ -2843,6 +3183,7 @@ function renderClientScript({ page, updates }) {
                     + '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + "</p>"
                   : ""),
                 eeReferenceHtml,
+                pathwayGuideHtml,
                 '<section class="career-check-panel">',
                 '<strong>경력 인정 체크</strong>',
                 '<ul class="reason-list career-check-list">' + careerRecognitionHtml + '</ul>',
@@ -4182,6 +4523,107 @@ function renderLayout({ title, page, body, updates }) {
         gap: 14px;
       }
 
+      .wizard-section-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 2px;
+      }
+
+      .wizard-section-heading h3 {
+        margin: 0;
+        font-size: 1.14rem;
+      }
+
+      .direction-summary-section {
+        display: grid;
+        gap: 14px;
+      }
+
+      .direction-summary-cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .direction-summary-card {
+        display: grid;
+        gap: 12px;
+        padding: 18px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: linear-gradient(180deg, rgba(252, 254, 255, 0.94), rgba(245, 249, 255, 0.82));
+      }
+
+      .direction-summary-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .direction-summary-head h3 {
+        margin: 2px 0 0;
+        font-size: 1.18rem;
+      }
+
+      .direction-summary-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(15, 61, 127, 0.08);
+        color: var(--accent-deep);
+        font-size: 0.8rem;
+        font-weight: 800;
+      }
+
+      .direction-summary-copy {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .direction-summary-pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .direction-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .direction-summary-block {
+        display: grid;
+        gap: 8px;
+        padding: 12px 14px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .direction-summary-label {
+        color: var(--accent-deep);
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .direction-summary-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
       .wizard-form {
         padding: 20px;
         border: 1px solid rgba(15, 61, 127, 0.12);
@@ -4398,6 +4840,148 @@ function renderLayout({ title, page, body, updates }) {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
+      }
+
+      .pathway-guide-panel {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .pathway-guide-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .pathway-guide-head strong {
+        color: var(--accent-deep);
+        font-size: 0.96rem;
+      }
+
+      .pathway-guide-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(47, 110, 196, 0.1);
+        color: var(--accent-deep);
+        font-size: 0.8rem;
+        font-weight: 800;
+      }
+
+      .pathway-guide-copy {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .pathway-guide-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .pathway-guide-block {
+        display: grid;
+        gap: 8px;
+        padding: 12px 14px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.82);
+      }
+
+      .pathway-guide-label {
+        color: var(--accent-deep);
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .pathway-factor-list,
+      .pathway-compare-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .pathway-factor-list {
+        padding-left: 18px;
+        list-style: disc;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .pathway-compare-item {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(248, 251, 255, 0.88);
+      }
+
+      .pathway-compare-item.is-has {
+        border: 1px solid rgba(33, 95, 79, 0.12);
+      }
+
+      .pathway-compare-item.is-partial {
+        border: 1px solid rgba(15, 61, 127, 0.12);
+      }
+
+      .pathway-compare-item.is-missing {
+        border: 1px solid rgba(181, 124, 46, 0.16);
+      }
+
+      .pathway-compare-state {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 62px;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        font-weight: 800;
+      }
+
+      .pathway-compare-item.is-has .pathway-compare-state {
+        background: rgba(33, 95, 79, 0.12);
+        color: var(--green);
+      }
+
+      .pathway-compare-item.is-partial .pathway-compare-state {
+        background: rgba(15, 61, 127, 0.08);
+        color: var(--accent-deep);
+      }
+
+      .pathway-compare-item.is-missing .pathway-compare-state {
+        background: rgba(181, 124, 46, 0.14);
+        color: #8c4f00;
+      }
+
+      .pathway-compare-copy {
+        display: grid;
+        gap: 4px;
+      }
+
+      .pathway-compare-copy strong {
+        color: var(--text);
+        font-size: 0.92rem;
+      }
+
+      .pathway-compare-copy p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
       }
 
       .selection-model-stat {
@@ -5238,6 +5822,9 @@ function renderLayout({ title, page, body, updates }) {
           grid-template-columns: 1fr;
         }
 
+        .direction-summary-cards,
+        .direction-summary-grid,
+        .pathway-guide-grid,
         .reason-columns {
           grid-template-columns: 1fr;
         }
@@ -5356,6 +5943,10 @@ function renderLayout({ title, page, body, updates }) {
         .wizard-card-mini-map {
           justify-self: start;
           width: 112px;
+        }
+
+        .wizard-section-heading {
+          align-items: flex-start;
         }
 
         .selection-model-grid {
