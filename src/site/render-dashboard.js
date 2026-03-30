@@ -1797,6 +1797,22 @@ function renderClientScript({ page, updates }) {
           return points[answers.english] ?? 0;
         }
 
+        function estimateCanadianEducationBonus(answers) {
+          if (answers.ecaStatus !== "canadian-degree") {
+            return 0;
+          }
+
+          if (["one-year", "two-year"].includes(answers.education)) {
+            return 15;
+          }
+
+          if (["bachelor", "two-plus", "master", "professional", "doctorate"].includes(answers.education)) {
+            return 30;
+          }
+
+          return 0;
+        }
+
         function estimateCanadianExperienceCrsPoints(answers, withSpouse) {
           if (!hasSkilledCanadianTrack(answers)) {
             return 0;
@@ -1846,6 +1862,16 @@ function renderClientScript({ page, updates }) {
           return Math.min(100, total);
         }
 
+        function estimateProjectedCrsLift(answers, overrides) {
+          const baselineScore = estimateCrsSnapshot(answers).score;
+          const projectedScore = estimateCrsSnapshot({
+            ...answers,
+            ...overrides
+          }).score;
+
+          return Math.max(0, projectedScore - baselineScore);
+        }
+
         function estimateCrsSnapshot(answers) {
           const latestCutoff = getLatestEECutoff();
           const withSpouse = answers.household === "with-spouse";
@@ -1855,8 +1881,9 @@ function renderClientScript({ page, updates }) {
           const languagePoints = estimateLanguageCrsPoints(answers, withSpouse);
           const canadianPoints = estimateCanadianExperienceCrsPoints(answers, withSpouse);
           const transferabilityPoints = estimateSkillTransferabilityPoints(answers);
+          const canadianEducationBonus = estimateCanadianEducationBonus(answers);
           const frenchBonus = 0;
-          const score = agePoints + educationPoints + languagePoints + canadianPoints + transferabilityPoints + frenchBonus;
+          const score = agePoints + educationPoints + languagePoints + canadianPoints + transferabilityPoints + canadianEducationBonus + frenchBonus;
           const gap = latestCutoff ? score - Number(latestCutoff) : null;
           const notes = [];
 
@@ -1959,15 +1986,81 @@ function renderClientScript({ page, updates }) {
           return items.slice(0, 3);
         }
 
+        function describeActionScoreImpact(answers, insight, actionId) {
+          if (!(insight.id === "federal" || statusSupports(insight.statuses.ee))) {
+            return null;
+          }
+
+          function exactLift(overrides) {
+            const lift = estimateProjectedCrsLift(answers, overrides);
+            return lift > 0
+              ? { label: "완료 시 예상 CRS +" + lift + "점", tone: "positive" }
+              : { label: "CRS 직접 변화 없음", tone: "neutral" };
+          }
+
+          switch (actionId) {
+            case "language-proof":
+              return answers.english === "unknown"
+                ? { label: "실제 점수표가 나와야 계산 가능", tone: "neutral" }
+                : { label: "현재 추정 CRS와 동일", tone: "neutral" };
+            case "language-clb9":
+              return exactLift({
+                english: "clb9plus",
+                languageScoreStatus: "official",
+                languageEvidence: "official"
+              });
+            case "eca-complete":
+            case "eca-finish":
+              return exactLift({ ecaStatus: "completed" });
+            case "eca-check":
+              return { label: "학력 종류 확인 후 계산 가능", tone: "neutral" };
+            case "ee-profile":
+            case "focus-occupation":
+            case "korea-primary-noc":
+            case "korea-noc-detail":
+            case "regional-setting":
+              return { label: "CRS 직접 변화 없음", tone: "neutral" };
+            case "teer-upgrade":
+            case "degree-experience":
+            case "study-route":
+              return { label: "경력 누적 후 점수 반영", tone: "deferred" };
+            case "job-offer":
+              return { label: "EE 잡오퍼 점수 없음", tone: "neutral" };
+            case "canadian-exp-1":
+              return exactLift({
+                base: hasCanadianWorkBase(answers.base) ? answers.base : "worker",
+                canadianJobSkill: "skilled",
+                canadianExp: "1"
+              });
+            case "canadian-exp-2":
+              return exactLift({
+                base: hasCanadianWorkBase(answers.base) ? answers.base : "worker",
+                canadianJobSkill: "skilled",
+                canadianExp: "2"
+              });
+            case "foreign-exp-1":
+              return exactLift({ foreignExp: "1" });
+            case "french":
+              return { label: "프랑스어 세부점수 입력 필요", tone: "neutral" };
+            default:
+              return null;
+          }
+        }
+
         function buildImprovementPlan(answers, insight, immigrationChancePercent) {
           const actions = [];
 
-          function addAction(delta, title, detail) {
+          function addAction(delta, title, detail, actionId) {
             if (actions.some((action) => action.title === title)) {
               return;
             }
 
-            actions.push({ delta, title, detail });
+            actions.push({
+              delta,
+              title,
+              detail,
+              scoreImpact: actionId ? describeActionScoreImpact(answers, insight, actionId) : null
+            });
           }
 
           if (answers.path === "business" && statusSupports(insight.statuses.entrepreneur)) {
@@ -1989,72 +2082,73 @@ function renderClientScript({ page, updates }) {
             addAction(
               delta,
               answers.languageEvidence === "guess" ? "언어시험 응시 후 공식 점수표 확보" : "공식 언어점수표까지 확보",
-              "EE와 대부분의 주정부 경로는 공식 언어점수가 있어야 실제 비교와 프로필 판단이 정확해집니다."
+              "EE와 대부분의 주정부 경로는 공식 언어점수가 있어야 실제 비교와 프로필 판단이 정확해집니다.",
+              "language-proof"
             );
           } else if (answers.languageScoreStatus === "booked") {
-            addAction(6, "생각하는 목표 점수를 실제 공인 점수로 확인", "목표 점수도 좋지만 실제 공인 점수표가 있어야 점수와 경로 판단이 훨씬 선명해집니다.");
+            addAction(6, "생각하는 목표 점수를 실제 공인 점수로 확인", "목표 점수도 좋지만 실제 공인 점수표가 있어야 점수와 경로 판단이 훨씬 선명해집니다.", "language-proof");
           } else if (answers.languageScoreStatus === "official" && ["clb6", "clb7", "clb8"].includes(answers.english)) {
             const delta = answers.english === "clb8" ? 5 : answers.english === "clb7" ? 8 : 10;
-            addAction(delta, "언어점수 CLB 9 이상 목표", "특히 EE와 점수형 주정부 경로는 CLB 9 전후에서 체감 차이가 커질 수 있습니다.");
+            addAction(delta, "언어점수 CLB 9 이상 목표", "특히 EE와 점수형 주정부 경로는 CLB 9 전후에서 체감 차이가 커질 수 있습니다.", "language-clb9");
           }
 
           if (answers.ecaStatus === "needed") {
-            addAction(8, "ECA 완료", "해외 학력을 점수 구조에 올리려면 ECA가 먼저 정리돼야 합니다.");
+            addAction(8, "ECA 완료", "해외 학력을 점수 구조에 올리려면 ECA가 먼저 정리돼야 합니다.", "eca-complete");
           } else if (answers.ecaStatus === "in-progress") {
-            addAction(4, "ECA 결과 수령까지 마무리", "진행 중 상태보다 완료 상태가 되어야 실제 비교와 프로필 제출이 쉬워집니다.");
+            addAction(4, "ECA 결과 수령까지 마무리", "진행 중 상태보다 완료 상태가 되어야 실제 비교와 프로필 제출이 쉬워집니다.", "eca-finish");
           } else if (answers.ecaStatus === "unsure") {
-            addAction(5, "ECA 필요 여부 먼저 확인", "해외 학위인지 캐나다 학위인지에 따라 준비 서류와 점수 계산이 크게 달라집니다.");
+            addAction(5, "ECA 필요 여부 먼저 확인", "해외 학위인지 캐나다 학위인지에 따라 준비 서류와 점수 계산이 크게 달라집니다.", "eca-check");
           }
 
           if (answers.ee !== "yes" && statusSupports(insight.statuses.ee)) {
             const delta = insight.statuses.ee === "핵심" ? 6 : 4;
-            addAction(delta, "EE 자격 확인 후 프로필 열기", "이 지역은 EE와 같이 볼 때 선택지가 넓어지고 초청 연결이 쉬워질 수 있습니다.");
+            addAction(delta, "EE 자격 확인 후 프로필 열기", "이 지역은 EE와 같이 볼 때 선택지가 넓어지고 초청 연결이 쉬워질 수 있습니다.", "ee-profile");
           }
 
           if (answers.targetOccupationPlan === "unsure") {
-            addAction(7, "이민에 쓸 주력 직군 1개 정하기", "현재 캐나다 일, 한국 경력, 전공 기반 직군 중 무엇으로 갈지 먼저 정해야 점수와 전략 계산이 정확해집니다.");
+            addAction(7, "이민에 쓸 주력 직군 1개 정하기", "현재 캐나다 일, 한국 경력, 전공 기반 직군 중 무엇으로 갈지 먼저 정해야 점수와 전략 계산이 정확해집니다.", "focus-occupation");
           }
 
           if (answers.targetOccupationPlan === "current-canada-job" && answers.canadianJobSkill === "non-skilled") {
-            addAction(11, "캐나다에서 TEER 0-3 직무로 옮기기", "현재 캐나다 일을 기준으로 갈 계획이라면 skilled 직무 전환이 가장 큰 차이를 만들 수 있습니다.");
+            addAction(11, "캐나다에서 TEER 0-3 직무로 옮기기", "현재 캐나다 일을 기준으로 갈 계획이라면 skilled 직무 전환이 가장 큰 차이를 만들 수 있습니다.", "teer-upgrade");
           }
 
           if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment === "unrelated") {
-            addAction(9, "한국 경력과 맞는 primary occupation 다시 정리", "연방 FSW 쪽은 목표 직군과 같은 NOC의 숙련 경력으로 설명이 되어야 훨씬 안정적입니다.");
+            addAction(9, "한국 경력과 맞는 primary occupation 다시 정리", "연방 FSW 쪽은 목표 직군과 같은 NOC의 숙련 경력으로 설명이 되어야 훨씬 안정적입니다.", "korea-primary-noc");
           } else if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment === "related-skilled") {
-            addAction(6, "한국 경력의 NOC와 job duties 정교하게 정리", "비슷한 분야라도 직무 설명이 맞아야 primary occupation으로 설득력이 생깁니다.");
+            addAction(6, "한국 경력의 NOC와 job duties 정교하게 정리", "비슷한 분야라도 직무 설명이 맞아야 primary occupation으로 설득력이 생깁니다.", "korea-noc-detail");
           }
 
           if (answers.targetOccupationPlan === "degree-field" && answers.degreeCareerPlan === "use-degree") {
-            addAction(5, "전공 기반 직무로 실제 경력 만들기", "전공을 살린 직군으로 실제 경력이 생기면 경력 연결성과 설명력이 좋아질 수 있습니다.");
+            addAction(5, "전공 기반 직무로 실제 경력 만들기", "전공을 살린 직군으로 실제 경력이 생기면 경력 연결성과 설명력이 좋아질 수 있습니다.", "degree-experience");
           }
 
           if (answers.jobOffer !== "yes" && ["중심", "있음", "일부"].includes(insight.statuses.jobOffer)) {
             const delta = insight.statuses.jobOffer === "중심" ? 9 : insight.statuses.jobOffer === "있음" ? 7 : 5;
-            addAction(delta, "해당 주 고용주 잡오퍼 확보", "이 지역은 고용주 오퍼가 있으면 지원 가능한 stream 수와 실제 속도가 함께 올라갈 수 있습니다.");
+            addAction(delta, "해당 주 고용주 잡오퍼 확보", "이 지역은 고용주 오퍼가 있으면 지원 가능한 stream 수와 실제 속도가 함께 올라갈 수 있습니다.", "job-offer");
           }
 
           if (answers.canadianExp === "0" && (statusSupports(insight.statuses.localExperience) || statusSupports(insight.statuses.graduate) || answers.base === "student")) {
             const delta = statusSupports(insight.statuses.localExperience) ? 10 : 7;
-            addAction(delta, "캐나다 경력 1년 만들기", "현지 경력 1년은 CEC와 여러 주정부 경로에서 직접적인 체감 차이를 만드는 경우가 많습니다.");
+            addAction(delta, "캐나다 경력 1년 만들기", "현지 경력 1년은 CEC와 여러 주정부 경로에서 직접적인 체감 차이를 만드는 경우가 많습니다.", "canadian-exp-1");
           } else if (answers.canadianExp === "1" && statusSupports(insight.statuses.localExperience)) {
-            addAction(4, "캐나다 경력 2년까지 늘리기", "일부 경로는 현지 경력이 길수록 안정적으로 보이는 편입니다.");
+            addAction(4, "캐나다 경력 2년까지 늘리기", "일부 경로는 현지 경력이 길수록 안정적으로 보이는 편입니다.", "canadian-exp-2");
           }
 
           if (answers.path === "worker" && answers.foreignExp === "0") {
-            addAction(5, "숙련 경력 1년 채우기", "해외 숙련 경력 1년은 EE와 취업형 주정부 경로의 최소 판단선이 되는 경우가 많습니다.");
+            addAction(5, "숙련 경력 1년 채우기", "해외 숙련 경력 1년은 EE와 취업형 주정부 경로의 최소 판단선이 되는 경우가 많습니다.", "foreign-exp-1");
           }
 
           if (answers.path === "graduate" && answers.base === "outside") {
-            addAction(7, "학교와 주를 같이 고른 유학 경로 설계", "유학은 학교보다 지역과 졸업 후 경로를 먼저 같이 봐야 실제 이민 연결이 좋아집니다.");
+            addAction(7, "학교와 주를 같이 고른 유학 경로 설계", "유학은 학교보다 지역과 졸업 후 경로를 먼저 같이 봐야 실제 이민 연결이 좋아집니다.", "study-route");
           }
 
           if (answers.advantage !== "french" && statusSupports(insight.statuses.french)) {
-            addAction(4, "프랑스어 점수도 선택지에 포함", "프랑스어 점수는 연방과 일부 주에서 예상보다 큰 차별점이 될 수 있습니다.");
+            addAction(4, "프랑스어 점수도 선택지에 포함", "프랑스어 점수는 연방과 일부 주에서 예상보다 큰 차별점이 될 수 있습니다.", "french");
           }
 
           if (answers.setting !== "regional" && ["많음", "중심"].includes(insight.statuses.regional)) {
-            addAction(4, "지역 정착 옵션도 열어두기", "이 지역은 대도시보다 지역·커뮤니티 경로에서 실제 선택지가 더 넓을 수 있습니다.");
+            addAction(4, "지역 정착 옵션도 열어두기", "이 지역은 대도시보다 지역·커뮤니티 경로에서 실제 선택지가 더 넓을 수 있습니다.", "regional-setting");
           }
 
           if (actions.length === 0) {
@@ -2216,7 +2310,12 @@ function renderClientScript({ page, updates }) {
                   '<li class="improvement-item">',
                   '<span class="improvement-delta">+' + escapeHtmlClient(item.delta) + '%p</span>',
                   '<div class="improvement-copy">',
+                  '<div class="improvement-title-row">',
                   '<strong>' + escapeHtmlClient(item.title) + '</strong>',
+                  item.scoreImpact
+                    ? '<span class="improvement-score-impact is-' + escapeHtmlClient(item.scoreImpact.tone) + '">' + escapeHtmlClient(item.scoreImpact.label) + '</span>'
+                    : "",
+                  '</div>',
                   '<p>' + escapeHtmlClient(item.detail) + '</p>',
                   '</div>',
                   '</li>'
@@ -2268,6 +2367,9 @@ function renderClientScript({ page, updates }) {
                 '<span class="improvement-total">' + escapeHtmlClient(immigrationChancePercent) + '% → ' + escapeHtmlClient(improvementPlan.projectedChance) + '%</span>',
                 '</div>',
                 '<p class="wizard-freshness">현재 입력 기준으로 먼저 체감이 큰 순서입니다. 중복 효과를 줄여 보수적으로 계산하면 추정 +' + escapeHtmlClient(improvementPlan.estimatedLift) + '%p 개선 여지가 있습니다.</p>',
+                (insight.id === "federal" || statusSupports(insight.statuses.ee))
+                  ? '<p class="wizard-freshness">EE가 연결된 지역은 각 액션 아래에 CRS 직접 변화도 같이 표시합니다.</p>'
+                  : "",
                 '<ul class="improvement-list">' + improvementHtml + '</ul>',
                 '</section>',
                 '<div class="reason-columns">',
@@ -3588,9 +3690,42 @@ function renderLayout({ title, page, body, updates }) {
         gap: 4px;
       }
 
+      .improvement-title-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
       .improvement-copy strong {
         color: var(--text);
         font-size: 0.95rem;
+      }
+
+      .improvement-score-impact {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 0.77rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+      }
+
+      .improvement-score-impact.is-positive {
+        background: rgba(33, 95, 79, 0.12);
+        color: var(--green);
+      }
+
+      .improvement-score-impact.is-neutral {
+        background: rgba(28, 61, 108, 0.08);
+        color: var(--accent-deep);
+      }
+
+      .improvement-score-impact.is-deferred {
+        background: rgba(191, 143, 68, 0.12);
+        color: #8b611e;
       }
 
       .improvement-copy p {

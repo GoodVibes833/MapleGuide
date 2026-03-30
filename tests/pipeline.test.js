@@ -51,6 +51,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /정착 선호/);
   assert.match(dashboardHtml, /먼저 볼 지역 5곳/);
   assert.match(dashboardHtml, /예상 적합도/);
+  assert.match(dashboardHtml, /완료 시 예상 CRS \+/);
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
   assert.match(dashboardHtml, /연방 \/ Express Entry/);
   assert.match(dashboardHtml, /Map Explorer/);
