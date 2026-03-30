@@ -550,21 +550,23 @@ function renderLatestUpdateCards(updates) {
           const updateDate = update.publishedAt ?? update.fetchedAt.slice(0, 10);
 
           return `
-            <article class="update-flash-card">
-              <div class="card-topline">
+            <details class="update-flash-card">
+              <summary class="update-flash-summary">
                 <span class="tag">${escapeHtml(getJurisdictionMeta(update.jurisdiction).labelKo)}</span>
                 <span class="mini-flag">${escapeHtml(updateDate)}</span>
-              </div>
-              <h3>${escapeHtml(update.translation.titleKo)}</h3>
-              <p>${escapeHtml(leadLine)}</p>
-              <div class="card-footer">
-                <span>${escapeHtml(update.program.toUpperCase())}</span>
-                <div class="card-links">
-                  <a href="${escapeHtml(getJurisdictionHref(update.jurisdiction))}">지역 보기</a>
-                  <a href="${escapeHtml(update.sourceUrl)}" target="_blank" rel="noreferrer">원문</a>
+                <strong>${escapeHtml(update.translation.titleKo)}</strong>
+              </summary>
+              <div class="update-flash-detail">
+                <p>${escapeHtml(leadLine)}</p>
+                <div class="card-footer">
+                  <span>${escapeHtml(update.program.toUpperCase())}</span>
+                  <div class="card-links">
+                    <a href="${escapeHtml(getJurisdictionHref(update.jurisdiction))}">지역 보기</a>
+                    <a href="${escapeHtml(update.sourceUrl)}" target="_blank" rel="noreferrer">원문</a>
+                  </div>
                 </div>
               </div>
-            </article>
+            </details>
           `;
         })
         .join("")}
@@ -1516,16 +1518,24 @@ function renderClientScript({ page, updates }) {
         }
 
         function estimateImmigrationChancePercent(answers, evaluation, insight) {
-          let chance = estimateFitPercent(answers, evaluation) - 10;
+          const crsSnapshot = estimateCrsSnapshot(answers);
+          const hasJobOfferRoute = answers.jobOffer === "yes" && ["중심", "있음", "일부"].includes(insight.statuses.jobOffer);
+          const hasLocalExperienceRoute = answers.canadianExp !== "0" && (
+            statusSupports(insight.statuses.localExperience) ||
+            statusSupports(insight.statuses.graduate) ||
+            insight.id === "federal"
+          );
+          const hasRegionalFallback = answers.setting === "regional" && ["많음", "중심", "있음", "일부"].includes(insight.statuses.regional);
+          let chance = estimateFitPercent(answers, evaluation) - 30;
 
           if (answers.languageScoreStatus === "official") {
-            chance += 6;
+            chance += 4;
           } else if (answers.languageScoreStatus === "none") {
             chance -= 6;
           }
 
           if (answers.ecaStatus === "completed" || answers.ecaStatus === "canadian-degree") {
-            chance += 5;
+            chance += 4;
           } else if (answers.ecaStatus === "needed") {
             chance -= 8;
           } else if (answers.ecaStatus === "in-progress") {
@@ -1533,14 +1543,14 @@ function renderClientScript({ page, updates }) {
           }
 
           if (answers.canadianExp !== "0") {
-            chance += 5;
+            chance += 4;
           }
 
           if (answers.ee === "yes" && !statusSupports(insight.statuses.ee)) {
             chance -= 6;
           }
 
-          if (answers.jobOffer === "yes" && ["중심", "있음", "일부"].includes(insight.statuses.jobOffer)) {
+          if (hasJobOfferRoute) {
             chance += 4;
           }
 
@@ -1562,7 +1572,59 @@ function renderClientScript({ page, updates }) {
             }
           }
 
-          return Math.max(12, Math.min(88, chance));
+          if (crsSnapshot.gap != null) {
+            if (insight.id === "federal") {
+              if (crsSnapshot.gap >= 20) {
+                chance += 18;
+              } else if (crsSnapshot.gap >= 0) {
+                chance += 10;
+              } else if (crsSnapshot.gap >= -20) {
+                chance -= 8;
+              } else if (crsSnapshot.gap >= -50) {
+                chance -= 18;
+              } else if (crsSnapshot.gap >= -80) {
+                chance -= 30;
+              } else if (crsSnapshot.gap >= -100) {
+                chance -= 40;
+              } else {
+                chance -= 50;
+              }
+            } else if (statusSupports(insight.statuses.ee)) {
+              if (crsSnapshot.gap >= 20) {
+                chance += 8;
+              } else if (crsSnapshot.gap >= 0) {
+                chance += 4;
+              } else if (crsSnapshot.gap >= -20) {
+                chance -= 4;
+              } else if (crsSnapshot.gap >= -50) {
+                chance -= 12;
+              } else if (crsSnapshot.gap >= -80) {
+                chance -= 22;
+              } else if (crsSnapshot.gap >= -100) {
+                chance -= 30;
+              } else {
+                chance -= 36;
+              }
+            }
+          }
+
+          if (hasLocalExperienceRoute) {
+            chance += 4;
+          }
+
+          if (hasRegionalFallback) {
+            chance += 3;
+          }
+
+          if (crsSnapshot.gap != null && insight.id === "federal" && crsSnapshot.gap <= -100) {
+            chance = Math.min(chance, 28);
+          }
+
+          if (crsSnapshot.gap != null && insight.id !== "federal" && crsSnapshot.gap <= -100 && !hasJobOfferRoute && !hasLocalExperienceRoute) {
+            chance = Math.min(chance, 35);
+          }
+
+          return Math.max(10, Math.min(84, chance));
         }
 
         function estimateAgeCrsPoints(answers, withSpouse) {
@@ -2101,7 +2163,7 @@ function renderClientScript({ page, updates }) {
                 '<p class="wizard-result-system">' + escapeHtmlClient(insight.system) + "</p>",
                 '<div class="fit-band-row">',
                 '<span class="fit-score">예상 적합도 ' + escapeHtmlClient(fitPercent) + '%</span>',
-                '<span class="chance-score">이민 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
+                '<span class="chance-score">현재 진입 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
                 '<span class="compare-pill">EE 경쟁력 ' + escapeHtmlClient(eeSnapshot.band) + "</span>",
                 "</div>",
                 '<div class="ee-score-row">',
@@ -3066,20 +3128,38 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .update-flash-card {
-        display: grid;
-        gap: 10px;
+        display: block;
         min-height: 100%;
-        padding: 16px;
+        padding: 0;
         border: 1px solid rgba(15, 61, 127, 0.12);
         border-radius: var(--radius-lg);
         background: rgba(255, 255, 255, 0.76);
         scroll-snap-align: start;
       }
 
-      .update-flash-card h3 {
-        margin: 0;
-        font-size: 1rem;
+      .update-flash-summary {
+        display: grid;
+        gap: 10px;
+        padding: 14px 16px;
+        cursor: pointer;
+        list-style: none;
+      }
+
+      .update-flash-summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .update-flash-summary strong {
+        font-size: 0.98rem;
         line-height: 1.45;
+        font-weight: 800;
+      }
+
+      .update-flash-detail {
+        display: grid;
+        gap: 10px;
+        padding: 0 16px 16px;
+        border-top: 1px solid rgba(15, 61, 127, 0.08);
       }
 
       .update-flash-card p {
