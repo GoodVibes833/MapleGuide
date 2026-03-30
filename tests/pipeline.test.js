@@ -156,6 +156,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /현재 조건에서 먼저 볼 주정부 추천 순위/);
   assert.match(dashboardHtml, /주정부 추천은 아래 순위로 보고, 연방 EE는 따로 비교합니다|지금 조건에서 먼저 볼 주정부 순서를 1순위부터 정리했습니다/);
   assert.match(dashboardHtml, /연방 \/ EE는 따로 보기/);
+  assert.match(dashboardHtml, /대도시가 우선이어도, 지역 정착까지 열면 PR 기회가 더 좋아질 수 있어요/);
   assert.match(dashboardHtml, /예상 적합도/);
   assert.match(dashboardHtml, /입력한 캐나다 skilled 경력은 CRS에 반영했습니다/);
   assert.match(dashboardHtml, /update-flash-chevron/);

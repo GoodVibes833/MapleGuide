@@ -84,6 +84,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /정착 선호/);
   assert.match(dashboardResponse.body, /현재 조건에서 먼저 볼 주정부 추천 순위/);
   assert.match(dashboardResponse.body, /연방 \/ EE는 따로 보기/);
+  assert.match(dashboardResponse.body, /대도시가 우선이어도, 지역 정착까지 열면 PR 기회가 더 좋아질 수 있어요/);
   assert.match(dashboardResponse.body, /업데이트 더보기/);
   assert.match(dashboardResponse.body, /update-flash-chevron/);
   assert.match(dashboardResponse.body, /id="older-updates-list" hidden/);

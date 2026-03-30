@@ -2196,6 +2196,72 @@ function renderClientScript({ page, updates, basePath = "" }) {
           return Math.max(10, Math.min(84, chance));
         }
 
+        function sortEvaluatedEntries(entries, answers) {
+          return [...entries].sort((left, right) => {
+            if (right.evaluation.score !== left.evaluation.score) {
+              return right.evaluation.score - left.evaluation.score;
+            }
+
+            const rightPreferenceScore = getLifestylePreferenceSortScore(right.insight, answers);
+            const leftPreferenceScore = getLifestylePreferenceSortScore(left.insight, answers);
+
+            if (rightPreferenceScore !== leftPreferenceScore) {
+              return rightPreferenceScore - leftPreferenceScore;
+            }
+
+            return right.insight.updateCount - left.insight.updateCount;
+          });
+        }
+
+        function buildRegionalFallbackHint(answers, allEvaluated) {
+          if (answers.setting !== "metro") {
+            return "";
+          }
+
+          const regionalAnswers = { ...answers, setting: "regional" };
+          const lifts = allEvaluated
+            .filter(({ insight }) => insight.id !== "federal")
+            .map((entry) => {
+              const currentChance = estimateImmigrationChancePercent(answers, entry.evaluation, entry.insight);
+              const regionalEvaluation = scoreInsight(entry.insight, regionalAnswers);
+              const regionalChance = estimateImmigrationChancePercent(regionalAnswers, regionalEvaluation, entry.insight);
+
+              return {
+                insight: entry.insight,
+                lift: regionalChance - currentChance,
+                regionalChance
+              };
+            })
+            .filter((entry) => entry.lift >= 4)
+            .sort((left, right) => {
+              if (right.lift !== left.lift) {
+                return right.lift - left.lift;
+              }
+
+              if (right.regionalChance !== left.regionalChance) {
+                return right.regionalChance - left.regionalChance;
+              }
+
+              return right.insight.updateCount - left.insight.updateCount;
+            })
+            .slice(0, 3);
+
+          if (lifts.length === 0) {
+            return "";
+          }
+
+          const liftText = lifts
+            .map((entry) => entry.insight.labelKo + " (+" + entry.lift + "%p)")
+            .join(" / ");
+
+          return [
+            '<div class="metro-fallback-note">',
+            '<strong>대도시가 우선이어도, 지역 정착까지 열면 PR 기회가 더 좋아질 수 있어요.</strong>',
+            '<span>지금 입력값 기준으로는 ' + escapeHtmlClient(liftText) + ' 쪽이 지역·시골 정착까지 열었을 때 더 유리해집니다.</span>',
+            '</div>'
+          ].join("");
+        }
+
         function estimateAgeCrsPoints(answers, withSpouse) {
           const points = withSpouse
             ? {
@@ -3812,25 +3878,12 @@ function renderClientScript({ page, updates, basePath = "" }) {
               insight,
               evaluation: scoreInsight(insight, answers)
             }));
-          const sortedEvaluated = allEvaluated
-            .sort((left, right) => {
-              if (right.evaluation.score !== left.evaluation.score) {
-                return right.evaluation.score - left.evaluation.score;
-              }
-
-              const rightPreferenceScore = getLifestylePreferenceSortScore(right.insight, answers);
-              const leftPreferenceScore = getLifestylePreferenceSortScore(left.insight, answers);
-
-              if (rightPreferenceScore !== leftPreferenceScore) {
-                return rightPreferenceScore - leftPreferenceScore;
-              }
-
-              return right.insight.updateCount - left.insight.updateCount;
-            });
+          const sortedEvaluated = sortEvaluatedEntries(allEvaluated, answers);
           const federalEntry = sortedEvaluated.find(({ insight }) => insight.id === "federal") ?? null;
           const provinceRanked = sortedEvaluated
             .filter(({ insight }) => insight.id !== "federal")
             .slice(0, 3);
+          const regionalFallbackHint = buildRegionalFallbackHint(answers, allEvaluated);
 
           function renderRecommendationCard(entry, index = null, mode = "province") {
             const { insight, evaluation } = entry;
@@ -4092,6 +4145,9 @@ function renderClientScript({ page, updates, basePath = "" }) {
                 '</div>'
               ].join("")
             );
+            if (regionalFallbackHint) {
+              resultsSections.push(regionalFallbackHint);
+            }
             resultsSections.push(provinceRanked.map((entry, index) => renderRecommendationCard(entry, index, "province")).join(""));
           }
 
@@ -5815,6 +5871,25 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
 
       .wizard-empty span,
       .wizard-result-system {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .metro-fallback-note {
+        display: grid;
+        gap: 6px;
+        padding: 14px 16px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-md);
+        background: rgba(241, 247, 255, 0.92);
+      }
+
+      .metro-fallback-note strong {
+        color: var(--accent-deep);
+        font-size: 0.95rem;
+      }
+
+      .metro-fallback-note span {
         color: var(--muted);
         line-height: 1.7;
       }
