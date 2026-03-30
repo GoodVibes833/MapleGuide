@@ -350,6 +350,12 @@ function renderSituationSection(insights) {
       </div>
       <div class="wizard-layout">
         <form class="wizard-form" id="quick-start-form">
+          <div class="wizard-section-heading wizard-form-group-heading">
+            <div>
+              <h3>먼저 꼭 필요한 정보</h3>
+              <p class="panel-note">필수* 항목을 먼저 고르면 추천이 바로 열립니다.</p>
+            </div>
+          </div>
           <label class="wizard-field" data-required-field="path">
             <span class="wizard-field-label">지금 생각하는 큰 방향 <em class="required-mark">필수*</em></span>
             <select name="path">
@@ -373,17 +379,6 @@ function renderSituationSection(insights) {
               <option value="pgwp">PGWP 또는 졸업 후 취업 상태예요</option>
               <option value="worker">캐나다에서 일반 취업 상태예요</option>
               <option value="unsure">설명하기 애매해요</option>
-            </select>
-          </label>
-          <label class="wizard-field">
-            <span>현재 비자 / 퍼밋 남은 기간</span>
-            <select name="permitRemaining">
-              <option value="">잘 모르겠어요</option>
-              <option value="not-applicable">아직 캐나다 밖이거나 해당 없어요</option>
-              <option value="lt6">6개월 미만 남았어요</option>
-              <option value="6to12">6-12개월 남았어요</option>
-              <option value="12to24">1-2년 정도 남았어요</option>
-              <option value="24plus">2년 이상 남았어요</option>
             </select>
           </label>
           <label class="wizard-field" data-required-field="age">
@@ -510,6 +505,23 @@ function renderSituationSection(insights) {
               <option value="in-progress">ECA 진행 중</option>
               <option value="needed">해외 학력인데 아직 안 했어요</option>
               <option value="unsure">잘 모르겠어요</option>
+            </select>
+          </label>
+          <div class="wizard-section-heading wizard-form-group-heading wizard-form-group-heading-subtle">
+            <div>
+              <h3>추가로 알려주면 더 정확해요</h3>
+              <p class="panel-note">아래 항목은 추천 순서와 다음 액션을 더 구체적으로 잡는 데 씁니다.</p>
+            </div>
+          </div>
+          <label class="wizard-field">
+            <span>현재 비자 / 퍼밋 남은 기간</span>
+            <select name="permitRemaining">
+              <option value="">잘 모르겠어요</option>
+              <option value="not-applicable">아직 캐나다 밖이거나 해당 없어요</option>
+              <option value="lt6">6개월 미만 남았어요</option>
+              <option value="6to12">6-12개월 남았어요</option>
+              <option value="12to24">1-2년 정도 남았어요</option>
+              <option value="24plus">2년 이상 남았어요</option>
             </select>
           </label>
           <label class="wizard-field">
@@ -5408,6 +5420,19 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
       .wizard-section-heading h3 {
         margin: 0;
         font-size: 1.14rem;
+      }
+
+      .wizard-form-group-heading {
+        padding-bottom: 6px;
+        border-bottom: 1px solid rgba(15, 61, 127, 0.08);
+      }
+
+      .wizard-form-group-heading .panel-note {
+        margin: 4px 0 0;
+      }
+
+      .wizard-form-group-heading-subtle {
+        margin-top: 6px;
       }
 
       .direction-summary-section {

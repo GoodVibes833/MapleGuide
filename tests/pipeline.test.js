@@ -148,6 +148,9 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /캐나다 경력의 성격/);
   assert.match(dashboardHtml, /현재 비자 \/ 퍼밋 남은 기간/);
   assert.match(dashboardHtml, /ECA \/ 학력평가 상태/);
+  assert.match(dashboardHtml, /먼저 꼭 필요한 정보/);
+  assert.match(dashboardHtml, /추가로 알려주면 더 정확해요/);
+  assert.ok(dashboardHtml.indexOf("먼저 꼭 필요한 정보") < dashboardHtml.indexOf("추가로 알려주면 더 정확해요"));
   assert.match(dashboardHtml, /학비·생활비 부담/);
   assert.match(dashboardHtml, /정착 선호/);
   assert.match(dashboardHtml, /현재 조건에서 먼저 볼 주정부 추천 순위/);
