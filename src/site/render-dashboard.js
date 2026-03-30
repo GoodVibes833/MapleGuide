@@ -5572,7 +5572,7 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
 
       .result-summary-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
         gap: 12px;
       }
 
@@ -6053,11 +6053,9 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
       }
 
       .improvement-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        flex-wrap: wrap;
+        display: grid;
+        gap: 8px;
+        justify-items: start;
       }
 
       .improvement-head strong {
@@ -6075,6 +6073,7 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
         border: 1px solid rgba(33, 95, 79, 0.14);
         color: var(--green);
         font-weight: 800;
+        max-width: 100%;
       }
 
       .improvement-list {
