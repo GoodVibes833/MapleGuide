@@ -87,6 +87,10 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /연방 EE 참고/);
   assert.match(dashboardResponse.body, /이 주 자체 점수 아님/);
   assert.match(dashboardResponse.body, /scorePlanLabel = eeSnapshot\.isFederal \? "예상 CRS" : "연방 EE 참고점수"/);
+  assert.match(dashboardResponse.body, /전국·특수 경로 같이 보기/);
+  assert.match(dashboardResponse.body, /Atlantic Immigration Program/);
+  assert.match(dashboardResponse.body, /Rural Community Immigration Pilot/);
+  assert.match(dashboardResponse.body, /뉴펀들랜드 2단계 EOI/);
   assert.match(dashboardResponse.body, /캐나다 한눈에 비교/);
 
   const ontarioRegionResponse = await invoke(handler, {

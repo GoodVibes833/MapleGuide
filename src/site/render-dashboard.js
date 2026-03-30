@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { escapeHtml } from "../core/html.js";
 import { getJurisdictionProfile } from "../config/jurisdiction-profiles.js";
+import { specialPathways } from "../config/pathway-rules.js";
 import { sources } from "../config/sources.js";
 import {
   buildJurisdictionInsight,
@@ -1405,6 +1406,7 @@ function renderClientScript({ page, updates }) {
       const UPDATES = ${serializeForScript(updates)};
       const MAP_REGION_DEFS = ${serializeForScript(JURISDICTION_META)};
       const MINI_REGION_MAPS = ${serializeForScript(MINI_REGION_MAP_SVGS)};
+      const SPECIAL_PATHWAYS = ${serializeForScript(page === "dashboard" ? specialPathways : [])};
       const DASHBOARD_INSIGHTS = ${serializeForScript(
         page === "dashboard" ? buildJurisdictionInsights(updates) : []
       )};
@@ -2476,6 +2478,373 @@ function renderClientScript({ page, updates }) {
           ].join("");
         }
 
+        function getRegionDisplayLabel(regionId) {
+          const region = MAP_REGION_DEFS.find((entry) => entry.id === regionId);
+          return region?.labelEn ?? region?.labelKo ?? regionId;
+        }
+
+        function pathwayMatchesSelectedRegions(pathway) {
+          if (!Array.isArray(pathway.regionIds) || pathway.regionIds.length === 0) {
+            return true;
+          }
+
+          if (activeQuickRegions.size === 0 || activeQuickRegions.size === allQuickRegionIds.length) {
+            return true;
+          }
+
+          return pathway.regionIds.some((regionId) => activeQuickRegions.has(regionId));
+        }
+
+        function summarizeSpecialPathwayRegions(pathway) {
+          if (!Array.isArray(pathway.regionIds) || pathway.regionIds.length === 0) {
+            return "전국";
+          }
+
+          if (pathway.id === "atlantic-aip") {
+            return "Atlantic 4개 주";
+          }
+
+          const labels = pathway.regionIds.map((regionId) => getRegionDisplayLabel(regionId));
+
+          if (labels.length === 1) {
+            return labels[0];
+          }
+
+          if (labels.length === 2) {
+            return labels.join(" / ");
+          }
+
+          return labels[0] + " 외 " + (labels.length - 1) + "곳";
+        }
+
+        function evaluateSpecialPathwayCriterion(criterion, answers, pathway, crsSnapshot) {
+          const hasEducationReady = ["completed", "canadian-degree"].includes(answers.ecaStatus);
+          const hasSkilledExperience = answers.foreignExp !== "0" || hasSkilledCanadianTrack(answers);
+          const hasAnyExperience = answers.foreignExp !== "0" || answers.canadianExp !== "0";
+          const hasAtlanticSelection = pathway.regionIds?.some((regionId) => activeQuickRegions.has(regionId));
+          const hasNlSelection = activeQuickRegions.has("newfoundland-and-labrador");
+          const hasAlbertaSelection = activeQuickRegions.has("alberta");
+
+          switch (criterion.id) {
+            case "ee-eligible":
+              if (hasSkilledExperience && answers.languageScoreStatus !== "none" && hasEducationReady) {
+                return { state: "has", detail: "EE 기본 비교에 필요한 언어·학력·경력 축이 대부분 준비돼 있어요." };
+              }
+              if ((hasSkilledExperience && answers.languageScoreStatus !== "none") || (hasSkilledExperience && hasEducationReady)) {
+                return { state: "partial", detail: "EE 기본 자격은 가까워 보이지만 언어 또는 학력 축 한 가지를 더 확인해야 해요." };
+              }
+              return { state: "missing", detail: "EE 쪽은 숙련 경력, 언어, 학력 준비를 같이 갖춰야 비교가 안정적이에요." };
+            case "official-language":
+              if (answers.languageScoreStatus === "official") {
+                return { state: "has", detail: "공인 언어점수가 있어 실제 자격 비교에 바로 넣을 수 있어요." };
+              }
+              if (answers.languageScoreStatus === "booked") {
+                return { state: "partial", detail: "목표 점수는 있지만 공인 점수표가 있어야 실제 자격 판정이 선명해져요." };
+              }
+              return { state: "missing", detail: "이 경로는 공인 언어점수가 거의 필수라 먼저 시험 계획이 필요해요." };
+            case "education-ready":
+              if (hasEducationReady) {
+                return { state: "has", detail: "학력/ECA 또는 캐나다 학위 축은 바로 쓸 수 있어요." };
+              }
+              if (answers.ecaStatus === "in-progress") {
+                return { state: "partial", detail: "학력 준비는 진행 중이라 결과만 나오면 비교가 훨씬 쉬워져요." };
+              }
+              return { state: "missing", detail: "학력/ECA 상태가 정리돼야 이 경로 자격을 더 정확히 볼 수 있어요." };
+            case "skilled-experience":
+              if (hasSkilledExperience) {
+                return { state: "has", detail: "숙련 경력 축이 있어 연방 또는 기술직 경로 비교에 넣을 수 있어요." };
+              }
+              if (hasAnyExperience) {
+                return { state: "partial", detail: "경력은 있지만 skilled 기준 또는 직군 정리가 더 필요해요." };
+              }
+              return { state: "missing", detail: "이 경로는 숙련 경력 축이 핵심이라 경력 설계가 먼저예요." };
+            case "competitive-crs":
+              if (crsSnapshot.gap == null) {
+                return { state: "partial", detail: "최신 EE 컷오프와 직접 비교 중이에요." };
+              }
+              if (crsSnapshot.gap >= 0) {
+                return { state: "has", detail: "최근 EE 컷오프와 직접 붙여볼 수 있는 점수예요." };
+              }
+              if (crsSnapshot.gap >= -20) {
+                return { state: "partial", detail: "점수 차이는 있지만 아직 연방 축을 같이 볼 수 있어요." };
+              }
+              return { state: "missing", detail: "최근 EE 컷오프와 차이가 커서 다른 경로나 nomination 축을 같이 봐야 해요." };
+            case "category-fit":
+              if (["healthcare-social", "trades", "education", "transport", "physician-canada", "senior-manager-canada", "researcher-canada"].includes(answers.occupation) || answers.advantage === "french") {
+                return { state: "has", detail: "현재 입력상 category-based selection 축을 같이 볼 수 있어요." };
+              }
+              if (answers.occupation && answers.occupation !== "general") {
+                return { state: "partial", detail: "직군 축은 있지만 현재 category 직접 해당 여부는 더 확인이 필요해요." };
+              }
+              return { state: "missing", detail: "카테고리 기반 선발과 바로 맞물리는 강점은 아직 뚜렷하지 않아요." };
+            case "trade-occupation":
+              if (answers.occupation === "trades" || answers.advantage === "trades") {
+                return { state: "has", detail: "현재 입력상 기술직·trade 축이 분명해 이 경로와 잘 맞아요." };
+              }
+              if (answers.targetOccupationPlan && answers.targetOccupationPlan !== "unsure") {
+                return { state: "partial", detail: "주력 직군은 잡히지만 trade NOC로 갈지 더 구체화가 필요해요." };
+              }
+              return { state: "missing", detail: "Trade 경로는 어떤 기술직 NOC로 갈지부터 정하는 게 중요해요." };
+            case "trade-certification":
+              if ((answers.occupation === "trades" || answers.advantage === "trades") && answers.jobOffer === "yes") {
+                return { state: "partial", detail: "직군과 고용 연결은 있지만 캐나다 자격증·레드실 여부는 별도 확인이 필요해요." };
+              }
+              if (answers.occupation === "trades" || answers.advantage === "trades") {
+                return { state: "partial", detail: "Trade 직군 자체는 맞지만 자격증·오퍼 같은 실무 조건은 더 필요할 수 있어요." };
+              }
+              return { state: "missing", detail: "기술직 연방 경로는 trade 직군 확인과 캐나다 실무 조건 점검이 같이 필요해요." };
+            case "employer-offer":
+              if (answers.jobOffer === "yes") {
+                return { state: "has", detail: "잡오퍼 또는 고용 연결 가능성이 있어 employer-driven 경로와 잘 맞아요." };
+              }
+              if (answers.jobOffer === "unsure") {
+                return { state: "partial", detail: "고용 연결 여부를 더 확인하면 이 경로 현실성이 바로 달라질 수 있어요." };
+              }
+              return { state: "missing", detail: "이 경로는 지정 고용주나 고용 연결이 사실상 핵심이에요." };
+            case "relevant-experience":
+              if (hasSkilledExperience || hasAnyExperience) {
+                return { state: "has", detail: "관련 경력 축이 있어 예외 여부와 함께 실제 자격을 검토할 수 있어요." };
+              }
+              return { state: "missing", detail: "관련 경력 또는 졸업자 예외 여부를 먼저 확인해야 해요." };
+            case "atlantic-settlement":
+              if (answers.setting === "regional" || hasAtlanticSelection) {
+                return { state: "has", detail: "대서양 4개 주 정착 의사와 지역 선택이 비교적 분명한 편이에요." };
+              }
+              if (answers.setting === "balanced") {
+                return { state: "partial", detail: "대서양 정착도 열어둘 수는 있지만 생활 선호를 더 좁히면 좋아요." };
+              }
+              return { state: "missing", detail: "AIP는 Atlantic 정착 의사와 settlement plan 설명이 중요해요." };
+            case "community-recommendation":
+              if (answers.jobOffer === "yes" && answers.setting === "regional") {
+                return { state: "partial", detail: "지역 정착 의사와 고용 연결이 있어 community recommendation 단계로 갈 여지는 있어요." };
+              }
+              if (answers.setting === "regional" || answers.setting === "balanced") {
+                return { state: "partial", detail: "지역 정착 의사는 있지만 실제 community recommendation 요건은 더 확인해야 해요." };
+              }
+              return { state: "missing", detail: "이 경로는 지역 커뮤니티 추천 축이 중요해서 지역 정착 의사가 분명해야 해요." };
+            case "regional-intent":
+              if (answers.setting === "regional") {
+                return { state: "has", detail: "시골·지역 정착 의사가 분명해요." };
+              }
+              if (answers.setting === "balanced") {
+                return { state: "partial", detail: "지역 정착도 열어둘 수 있지만 우선순위는 더 확인이 필요해요." };
+              }
+              return { state: "missing", detail: "대도시 우선이면 rural·community 경로 활용 폭이 줄어들 수 있어요." };
+            case "french-ability":
+              if (answers.advantage === "french") {
+                return { state: "has", detail: "프랑스어 강점이 있어 Francophone 경로를 실제 후보로 볼 수 있어요." };
+              }
+              return { state: "missing", detail: "이 경로는 프랑스어가 핵심이라 불어 점수 여부가 가장 중요해요." };
+            case "alberta-community-endorsement":
+              if (answers.jobOffer === "yes" && (answers.setting === "regional" || hasAlbertaSelection)) {
+                return { state: "partial", detail: "알버타 지역 고용 연결과 정착 의사는 있지만 community endorsement 자체는 따로 받아야 해요." };
+              }
+              if (answers.setting === "regional" || hasAlbertaSelection) {
+                return { state: "partial", detail: "알버타 지역 정착 방향은 맞지만 endorsement와 job 연결이 더 필요해요." };
+              }
+              return { state: "missing", detail: "이 경로는 알버타 designated community endorsement가 사실상 출발점이에요." };
+            case "nl-eoi-ready":
+              if (getMissingRequiredFields(answers).length === 0) {
+                return { state: "has", detail: "기본 프로필 정보는 있어 NL EOI 쪽 운영 체계를 같이 보는 데 무리가 없어요." };
+              }
+              return { state: "partial", detail: "EOI 비교 전 기본 프로필 입력을 더 채우면 좋아요." };
+            case "priority-occupation":
+              if (answers.occupation && answers.occupation !== "general") {
+                return { state: "has", detail: "직군 축이 잡혀 있어 우선 sector·occupation과 비교하기 쉬워요." };
+              }
+              if (answers.targetOccupationPlan && answers.targetOccupationPlan !== "unsure") {
+                return { state: "partial", detail: "큰 방향은 있지만 우선 sector에 맞는 주력 직군 정리가 더 필요해요." };
+              }
+              return { state: "missing", detail: "직군 방향이 넓으면 우선 sector 중심 경로를 읽기 어려워져요." };
+            case "nl-intent":
+              if (hasNlSelection || answers.setting === "regional") {
+                return { state: "has", detail: "뉴펀들랜드 정착 의사를 설명하기 좋은 상태예요." };
+              }
+              if (answers.setting === "balanced") {
+                return { state: "partial", detail: "뉴펀들랜드 정착도 열어둘 수 있지만 선호 지역을 더 좁히면 좋아요." };
+              }
+              return { state: "missing", detail: "뉴펀들랜드 EOI는 지역 정착 의사를 구체적으로 설명하는 게 중요해요." };
+            default:
+              return { state: "partial", detail: "현재 입력으로는 추가 확인이 필요해요." };
+          }
+        }
+
+        function scoreSpecialPathwayEntry(pathway, answers) {
+          if (pathway.id === "federal-ee") {
+            return null;
+          }
+
+          if (!pathwayMatchesSelectedRegions(pathway)) {
+            return null;
+          }
+
+          const crsSnapshot = estimateCrsSnapshot(answers);
+          const compared = (pathway.criteria || []).map((criterion) => ({
+            ...criterion,
+            ...evaluateSpecialPathwayCriterion(criterion, answers, pathway, crsSnapshot)
+          }));
+          let score = compared.reduce((sum, criterion) => (
+            sum + (criterion.state === "has" ? 3 : criterion.state === "partial" ? 1 : -1)
+          ), 0);
+
+          if (pathway.id === "federal-trades") {
+            score += answers.occupation === "trades" || answers.advantage === "trades" ? 5 : -3;
+          }
+
+          if (pathway.id === "atlantic-aip") {
+            score += answers.jobOffer === "yes" ? 3 : answers.jobOffer === "unsure" ? 1 : -2;
+            score += answers.setting === "regional" ? 3 : answers.setting === "balanced" ? 1 : -1;
+          }
+
+          if (pathway.id === "rural-community-pilot") {
+            score += answers.setting === "regional" ? 4 : answers.setting === "balanced" ? 1 : -2;
+            score += answers.jobOffer === "yes" ? 2 : 0;
+          }
+
+          if (pathway.id === "francophone-community-pilot") {
+            score += answers.advantage === "french" ? 6 : -4;
+          }
+
+          if (pathway.id === "alberta-rural-renewal") {
+            score += activeQuickRegions.has("alberta") ? 2 : 0;
+            score += answers.setting === "regional" ? 3 : answers.setting === "balanced" ? 1 : -1;
+          }
+
+          if (pathway.id === "newfoundland-eoi") {
+            score += activeQuickRegions.has("newfoundland-and-labrador") ? 3 : 0;
+            score += answers.jobOffer === "yes" ? 2 : 0;
+            score += answers.occupation && answers.occupation !== "general" ? 1 : 0;
+          }
+
+          const currentItems = compared
+            .filter((criterion) => criterion.state === "has" || criterion.state === "partial")
+            .map((criterion) => criterion.label)
+            .slice(0, 3);
+          const nextItems = compared
+            .filter((criterion) => criterion.state === "missing")
+            .map((criterion) => criterion.label)
+            .slice(0, 3);
+
+          let fitLabel = "준비 필요";
+          let fitTone = "neutral";
+
+          if (score >= 14) {
+            fitLabel = "지금 같이 보기 좋음";
+            fitTone = "positive";
+          } else if (score >= 8) {
+            fitLabel = "조건 맞춰 볼만함";
+            fitTone = "partial";
+          }
+
+          return {
+            pathway,
+            compared,
+            score,
+            currentItems,
+            nextItems,
+            fitLabel,
+            fitTone,
+            regionSummary: summarizeSpecialPathwayRegions(pathway),
+            crsSnapshot
+          };
+        }
+
+        function renderSpecialPathwayCard(entry) {
+          const requiredItems = (entry.pathway.requiredKo || [])
+            .slice(0, 4)
+            .map((item) => '<li>' + escapeHtmlClient(item) + '</li>')
+            .join("");
+          const scoredItems = (entry.pathway.scoredKo || [])
+            .slice(0, 4)
+            .map((item) => '<li>' + escapeHtmlClient(item) + '</li>')
+            .join("");
+          const preferredPills = (entry.pathway.preferredKo || [])
+            .slice(0, 3)
+            .map((item) => '<span class="compare-pill">' + escapeHtmlClient(item) + '</span>')
+            .join("");
+          const compareItems = entry.compared
+            .map((criterion) => [
+              '<li class="pathway-compare-item is-' + escapeHtmlClient(criterion.state) + '">',
+              '<span class="pathway-compare-state">' + escapeHtmlClient(
+                criterion.state === "has" ? "있음" : criterion.state === "partial" ? "진행/확인" : "더 필요"
+              ) + '</span>',
+              '<div class="pathway-compare-copy">',
+              '<strong>' + escapeHtmlClient(criterion.label) + '</strong>',
+              '<p>' + escapeHtmlClient(criterion.detail) + '</p>',
+              '</div>',
+              '</li>'
+            ].join(""))
+            .join("");
+
+          return [
+            '<article class="special-pathway-card">',
+            '<div class="special-pathway-head">',
+            '<div>',
+            '<p class="panel-kicker">Extra Route</p>',
+            '<h3>' + escapeHtmlClient(entry.pathway.titleKo) + '</h3>',
+            '</div>',
+            '<span class="special-pathway-fit is-' + escapeHtmlClient(entry.fitTone) + '">' + escapeHtmlClient(entry.fitLabel) + '</span>',
+            '</div>',
+            '<p class="special-pathway-copy">' + escapeHtmlClient(entry.pathway.summaryKo) + '</p>',
+            '<div class="special-pathway-pill-row">',
+            '<span class="compare-pill">' + escapeHtmlClient(entry.pathway.directionKo) + '</span>',
+            '<span class="compare-pill">' + escapeHtmlClient(entry.pathway.selectionModelKo) + '</span>',
+            '<span class="compare-pill">대상 ' + escapeHtmlClient(entry.regionSummary) + '</span>',
+            '</div>',
+            '<div class="special-pathway-grid">',
+            '<div class="special-pathway-block">',
+            '<span class="special-pathway-label">이 경로에서 실제로 필요한 것</span>',
+            '<ul class="special-pathway-list">' + requiredItems + '</ul>',
+            '</div>',
+            '<div class="special-pathway-block">',
+            '<span class="special-pathway-label">' + escapeHtmlClient(
+              entry.pathway.directionKo.includes("점수") ? "점수·우선순위에 들어가는 것" : "우선순위로 같이 보는 것"
+            ) + '</span>',
+            '<ul class="special-pathway-list">' + scoredItems + '</ul>',
+            '</div>',
+            '</div>',
+            preferredPills
+              ? '<div class="special-pathway-pill-row">' + preferredPills + '</div>'
+              : "",
+            '<div class="special-pathway-compare-wrap">',
+            '<span class="special-pathway-label">내 정보 비교</span>',
+            '<ul class="pathway-compare-list">' + compareItems + '</ul>',
+            '</div>',
+            '<div class="special-pathway-foot">',
+            '<p class="wizard-freshness">공식 확인 ' + escapeHtmlClient(entry.pathway.verifiedOn) + (entry.pathway.updatedOn ? ' · 제도 업데이트 ' + escapeHtmlClient(entry.pathway.updatedOn) : '') + '</p>',
+            '<a class="source-link" href="' + escapeHtmlClient(entry.pathway.officialUrl) + '" target="_blank" rel="noreferrer">' + escapeHtmlClient(entry.pathway.officialLabel) + '</a>',
+            '</div>',
+            '</article>'
+          ].join("");
+        }
+
+        function buildSpecialPathwaySectionHtml(answers) {
+          const ranked = SPECIAL_PATHWAYS
+            .map((pathway) => scoreSpecialPathwayEntry(pathway, answers))
+            .filter(Boolean)
+            .sort((left, right) => right.score - left.score)
+            .slice(0, 4);
+
+          if (ranked.length === 0) {
+            return "";
+          }
+
+          return [
+            '<section class="special-pathway-section">',
+            '<div class="wizard-section-heading">',
+            '<div>',
+            '<p class="panel-kicker">Extra Routes</p>',
+            '<h3>전국·특수 경로 같이 보기</h3>',
+            '</div>',
+            '<p class="panel-note">Trade, Atlantic, Rural, Francophone처럼 일반 연방/주정부 카드 밖에서 따로 봐야 하는 경로입니다.</p>',
+            '</div>',
+            '<div class="special-pathway-cards">',
+            ranked.map((entry) => renderSpecialPathwayCard(entry)).join(""),
+            '</div>',
+            '</section>'
+          ].join("");
+        }
+
         function buildDirectionOverviewCardHtml(card) {
           const currentList = card.currentItems.length > 0
             ? card.currentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
@@ -3045,8 +3414,10 @@ function renderClientScript({ page, updates }) {
             })
             .slice(0, 5);
           const directionOverviewHtml = buildDirectionOverviewHtml(answers, allEvaluated);
+          const specialPathwaysHtml = buildSpecialPathwaySectionHtml(answers);
 
           quickStartResults.innerHTML = directionOverviewHtml
+            + specialPathwaysHtml
             + [
               '<div class="wizard-section-heading">',
               '<div>',
@@ -4624,6 +4995,115 @@ function renderLayout({ title, page, body, updates }) {
         line-height: 1.65;
       }
 
+      .special-pathway-section {
+        display: grid;
+        gap: 14px;
+      }
+
+      .special-pathway-cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .special-pathway-card {
+        display: grid;
+        gap: 12px;
+        padding: 18px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: linear-gradient(180deg, rgba(251, 253, 255, 0.95), rgba(244, 248, 255, 0.88));
+      }
+
+      .special-pathway-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .special-pathway-head h3 {
+        margin: 2px 0 0;
+        font-size: 1.12rem;
+      }
+
+      .special-pathway-fit {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 800;
+      }
+
+      .special-pathway-fit.is-positive {
+        background: rgba(33, 95, 79, 0.1);
+        color: #215f4f;
+      }
+
+      .special-pathway-fit.is-partial {
+        background: rgba(47, 110, 196, 0.1);
+        color: var(--accent-deep);
+      }
+
+      .special-pathway-fit.is-neutral {
+        background: rgba(181, 124, 46, 0.12);
+        color: #8c4f00;
+      }
+
+      .special-pathway-copy {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.68;
+      }
+
+      .special-pathway-pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .special-pathway-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .special-pathway-block,
+      .special-pathway-compare-wrap {
+        display: grid;
+        gap: 8px;
+        padding: 12px 14px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.8);
+      }
+
+      .special-pathway-label {
+        color: var(--accent-deep);
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .special-pathway-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .special-pathway-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
       .wizard-form {
         padding: 20px;
         border: 1px solid rgba(15, 61, 127, 0.12);
@@ -5823,7 +6303,9 @@ function renderLayout({ title, page, body, updates }) {
         }
 
         .direction-summary-cards,
+        .special-pathway-cards,
         .direction-summary-grid,
+        .special-pathway-grid,
         .pathway-guide-grid,
         .reason-columns {
           grid-template-columns: 1fr;

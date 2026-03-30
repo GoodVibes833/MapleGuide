@@ -79,6 +79,12 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /이 주 자체 점수 아님/);
   assert.match(dashboardHtml, /scorePlanLabel = eeSnapshot\.isFederal \? "예상 CRS" : "연방 EE 참고점수"/);
   assert.match(dashboardHtml, /EOI \+ 노동시장 우선/);
+  assert.match(dashboardHtml, /SPECIAL_PATHWAYS/);
+  assert.match(dashboardHtml, /전국·특수 경로 같이 보기/);
+  assert.match(dashboardHtml, /Atlantic Immigration Program/);
+  assert.match(dashboardHtml, /Rural Community Immigration Pilot/);
+  assert.match(dashboardHtml, /뉴펀들랜드 2단계 EOI/);
+  assert.match(dashboardHtml, /Trade, Atlantic, Rural, Francophone처럼 일반 연방\/주정부 카드 밖에서 따로 봐야 하는 경로입니다/);
   assert.match(dashboardHtml, /최저 CRS는 492점이고 4,200명에게 초청장이 나왔습니다/);
   assert.match(dashboardHtml, /언어점수 CLB 9 이상 목표/);
   assert.match(dashboardHtml, /TEER 0-3 직무로 옮겨 skilled 경력 1년 만들기/);
