@@ -68,7 +68,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /관심 지역 필터/);
   assert.match(dashboardResponse.body, /quick-coin/);
   assert.match(dashboardResponse.body, /British Columbia/);
-  assert.match(dashboardResponse.body, /선택된 지역 없음 · 전체 추천/);
+  assert.match(dashboardResponse.body, /전체 선택됨 · 모든 지역 비교/);
   assert.match(dashboardResponse.body, /필수\*/);
   assert.match(dashboardResponse.body, /data-required-field="path"/);
   assert.match(dashboardResponse.body, /작성 필요/);

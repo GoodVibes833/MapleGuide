@@ -66,15 +66,21 @@ function buildCanadaMapSvg({ idPrefix = "", className = "canada-map actual-map",
 const CANADA_MAP_SVG = buildCanadaMapSvg();
 
 function renderQuickFilterCoins() {
+  const quickRegionCount = JURISDICTION_META.filter((region) => region.id !== "federal").length;
   return `
-    <div class="quick-filter-coins" role="group" aria-label="관심 지역 선택">
+    <div
+      class="quick-filter-coins"
+      role="group"
+      aria-label="관심 지역 선택"
+      style="--quick-region-count:${quickRegionCount}"
+    >
       ${JURISDICTION_META
         .filter((region) => region.id !== "federal")
         .map(
           (region) => `
             <button
               type="button"
-              class="quick-coin"
+              class="quick-coin is-selected"
               data-quick-map-region="${escapeHtml(region.id)}"
               aria-label="${escapeHtml(region.labelEn ?? region.labelKo)} 선택"
               title="${escapeHtml(region.labelEn ?? region.labelKo)}"
@@ -282,11 +288,11 @@ function renderSituationSection(insights) {
         </div>
         <div class="wizard-filter-shell">
           <div class="wizard-filter-toolbar">
-            <button type="button" class="chip" data-quick-region-toggle="federal">연방 / EE</button>
+            <button type="button" class="chip active" data-quick-region-toggle="federal">연방 / EE</button>
             <button type="button" class="chip" data-quick-region-clear>전체 보기</button>
           </div>
           ${renderQuickFilterCoins()}
-          <div class="wizard-filter-selection" id="quick-region-selection">선택된 지역 없음 · 전체 추천</div>
+          <div class="wizard-filter-selection" id="quick-region-selection">전체 선택됨 · 모든 지역 비교</div>
         </div>
       </div>
       <div class="wizard-layout">
@@ -1390,7 +1396,8 @@ function renderClientScript({ page, updates }) {
         const mapSelectionLink = document.getElementById("map-selection-link");
         const mapTooltip = document.getElementById("map-tooltip");
         const hoverableJumpLinks = Array.from(document.querySelectorAll("[data-jurisdiction-link]"));
-        const activeQuickRegions = new Set();
+        const allQuickRegionIds = MAP_REGION_DEFS.map((region) => region.id);
+        const activeQuickRegions = new Set(allQuickRegionIds);
         const defaultSelection = {
           label: "지역을 선택해 보세요",
           meta: "비교표와 상황별 카드를 먼저 보고 범위를 좁힌 뒤, 여기서 지역 상세 페이지로 이동하면 훨씬 덜 헷갈립니다.",
@@ -1478,6 +1485,11 @@ function renderClientScript({ page, updates }) {
           }
         }
 
+        function selectAllQuickRegions() {
+          activeQuickRegions.clear();
+          allQuickRegionIds.forEach((regionId) => activeQuickRegions.add(regionId));
+        }
+
         function updateQuickRegionSummary() {
           if (!quickRegionSelection) {
             return;
@@ -1485,6 +1497,16 @@ function renderClientScript({ page, updates }) {
 
           if (activeQuickRegions.size === 0) {
             quickRegionSelection.textContent = "선택된 지역 없음 · 전체 추천";
+            return;
+          }
+
+          if (activeQuickRegions.size === allQuickRegionIds.length) {
+            quickRegionSelection.textContent = "전체 선택됨 · 모든 지역 비교";
+            return;
+          }
+
+          if (activeQuickRegions.size === allQuickRegionIds.length - 1 && !activeQuickRegions.has("federal")) {
+            quickRegionSelection.textContent = "주정부 전체 선택 · Federal / EE 제외";
             return;
           }
 
@@ -2808,9 +2830,9 @@ function renderClientScript({ page, updates }) {
 
         if (quickRegionClearButton) {
           quickRegionClearButton.addEventListener("click", () => {
-            activeQuickRegions.clear();
+            selectAllQuickRegions();
             if (quickRegionFederalButton) {
-              quickRegionFederalButton.classList.remove("active");
+              quickRegionFederalButton.classList.add("active");
             }
             quickFilterMapEntries.forEach((entry) => entry.syncSelectedState());
             updateQuickRegionSummary();
@@ -3981,11 +4003,10 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .quick-filter-coins {
-        display: flex;
-        flex-wrap: nowrap;
+        display: grid;
+        grid-template-columns: repeat(var(--quick-region-count), minmax(0, 1fr));
         align-items: center;
-        justify-content: space-between;
-        gap: 6px;
+        gap: 4px;
         width: 100%;
         max-width: 100%;
         overflow: hidden;
@@ -3995,8 +4016,10 @@ function renderLayout({ title, page, body, updates }) {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 38px;
-        padding: 0 10px;
+        width: 100%;
+        min-width: 0;
+        min-height: 40px;
+        padding: 0 8px;
         border: 1px solid rgba(15, 61, 127, 0.14);
         border-radius: 999px;
         background:
@@ -4031,11 +4054,13 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .quick-coin-label {
-        font-size: 0.76rem;
+        font-size: 0.74rem;
         font-weight: 800;
         letter-spacing: 0.01em;
         line-height: 1;
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .quick-coin.is-selected .quick-coin-label {

@@ -53,7 +53,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /quick-coin/);
   assert.match(dashboardHtml, /British Columbia/);
   assert.match(dashboardHtml, /Federal \/ EE/);
-  assert.match(dashboardHtml, /선택된 지역 없음 · 전체 추천/);
+  assert.match(dashboardHtml, /전체 선택됨 · 모든 지역 비교/);
   assert.match(dashboardHtml, /연방 \/ EE/);
   assert.match(dashboardHtml, /필수\*/);
   assert.match(dashboardHtml, /data-required-field="path"/);
