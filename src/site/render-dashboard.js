@@ -9,6 +9,11 @@ import {
   deriveStreamTags,
   flattenProfileStreams
 } from "./jurisdiction-ux.js";
+import {
+  countsCanadianExperienceForCrs,
+  describeCanadianExperienceCrsTreatment,
+  estimateCanadianExperienceCrsPoints
+} from "./crs-helpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
@@ -347,12 +352,12 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>현재 캐나다 일의 성격</span>
+            <span>캐나다 경력의 성격</span>
             <select name="canadianJobSkill">
-              <option value="not-working">아직 캐나다에서 일하지 않아요</option>
-              <option value="skilled">TEER 0-3 쪽 직무예요</option>
-              <option value="non-skilled">TEER 4-5 또는 단순 서비스 쪽이에요</option>
-              <option value="mixed">여러 일이라 딱 나누기 어려워요</option>
+              <option value="not-working">캐나다 경력은 없어요</option>
+              <option value="skilled">캐나다 경력이 있고 TEER 0-3 쪽이에요</option>
+              <option value="non-skilled">캐나다 경력은 있지만 TEER 4-5 또는 단순 서비스 쪽이에요</option>
+              <option value="mixed">캐나다 경력은 있는데 TEER를 아직 잘 모르겠어요</option>
             </select>
           </label>
           <label class="wizard-field">
@@ -1295,8 +1300,12 @@ function renderClientScript({ page, updates }) {
           return ["working-holiday", "pgwp", "worker"].includes(base);
         }
 
+        ${countsCanadianExperienceForCrs.toString()}
+        ${describeCanadianExperienceCrsTreatment.toString()}
+        ${estimateCanadianExperienceCrsPoints.toString()}
+
         function hasSkilledCanadianTrack(answers) {
-          return hasCanadianWorkBase(answers.base) && answers.canadianJobSkill === "skilled";
+          return countsCanadianExperienceForCrs(answers);
         }
 
         function normalizeLanguageAnswers(rawAnswers) {
@@ -1813,18 +1822,6 @@ function renderClientScript({ page, updates }) {
           return 0;
         }
 
-        function estimateCanadianExperienceCrsPoints(answers, withSpouse) {
-          if (!hasSkilledCanadianTrack(answers)) {
-            return 0;
-          }
-
-          const points = withSpouse
-            ? { "0": 0, "1": 35, "2": 46, "3": 56, "4": 63, "5": 70 }
-            : { "0": 0, "1": 40, "2": 53, "3": 64, "4": 72, "5": 80 };
-
-          return points[answers.canadianExp] ?? 0;
-        }
-
         function estimateSkillTransferabilityPoints(answers) {
           const hasEducation = ["completed", "canadian-degree"].includes(answers.ecaStatus);
           const educationStrong = ["bachelor", "two-plus", "master", "professional", "doctorate"].includes(answers.education);
@@ -1895,6 +1892,10 @@ function renderClientScript({ page, updates }) {
           }
           if (!["completed", "canadian-degree"].includes(answers.ecaStatus)) {
             notes.push("ECA 미완료라 학력점수 보수 반영");
+          }
+          const canadianExperienceNote = describeCanadianExperienceCrsTreatment(answers);
+          if (canadianExperienceNote) {
+            notes.push(canadianExperienceNote);
           }
 
           return {
@@ -2028,13 +2029,11 @@ function renderClientScript({ page, updates }) {
               return { label: "EE 잡오퍼 점수 없음", tone: "neutral" };
             case "canadian-exp-1":
               return exactLift({
-                base: hasCanadianWorkBase(answers.base) ? answers.base : "worker",
                 canadianJobSkill: "skilled",
                 canadianExp: "1"
               });
             case "canadian-exp-2":
               return exactLift({
-                base: hasCanadianWorkBase(answers.base) ? answers.base : "worker",
                 canadianJobSkill: "skilled",
                 canadianExp: "2"
               });
