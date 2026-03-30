@@ -21,7 +21,7 @@ test("extractTables parses headers and rows", () => {
 });
 
 test("fixture pipeline writes feed and dashboard", async () => {
-  const outputDir = await mkdtemp(path.join(tmpdir(), "maplepath-compass-"));
+  const outputDir = await mkdtemp(path.join(tmpdir(), "mapleguide-"));
   const result = await runPipeline({ useFixtures: true, outputDir });
 
   assert.equal(result.reports.length, 6);

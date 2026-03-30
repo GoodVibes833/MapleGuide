@@ -1,4 +1,4 @@
-# MaplePath Compass MVP
+# MapleGuide MVP
 
 캐나다 이민 공지를 공식 소스에서 수집하고, 한국어 요약과 지역별 상세 페이지로 보여주는 초기 MVP입니다.
 

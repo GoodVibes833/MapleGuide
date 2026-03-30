@@ -30,7 +30,7 @@ export async function loadSourceContent(
   try {
     const response = await fetchImpl(source.url, {
       headers: {
-        "user-agent": "maplepath-compass/0.1 (+https://example.local)"
+        "user-agent": "mapleguide/0.1 (+https://example.local)"
       },
       signal: AbortSignal.timeout(30_000)
     });
