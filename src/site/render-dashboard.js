@@ -3681,8 +3681,9 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .update-flash-summary {
-        display: grid;
-        gap: 8px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
         padding: 12px 16px;
         cursor: pointer;
         list-style: none;
@@ -3696,13 +3697,19 @@ function renderLayout({ title, page, body, updates }) {
         display: flex;
         align-items: center;
         gap: 8px;
-        flex-wrap: wrap;
+        flex: 0 0 auto;
+        white-space: nowrap;
       }
 
       .update-flash-summary strong {
+        flex: 1 1 auto;
+        min-width: 0;
         font-size: 1rem;
-        line-height: 1.4;
+        line-height: 1.2;
         font-weight: 800;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .update-flash-detail {
@@ -3862,13 +3869,13 @@ function renderLayout({ title, page, body, updates }) {
       .wizard-filter-map-frame {
         display: grid;
         place-items: center;
-        min-height: 220px;
+        min-height: 156px;
         border: 1px solid rgba(15, 61, 127, 0.1);
         border-radius: var(--radius-lg);
         background:
           radial-gradient(circle at top right, rgba(47, 110, 196, 0.1), transparent 30%),
           linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 249, 255, 0.8));
-        padding: 6px 8px 0;
+        padding: 0 8px;
         overflow: hidden;
       }
 
@@ -3876,7 +3883,7 @@ function renderLayout({ title, page, body, updates }) {
         width: 100%;
         height: auto;
         max-height: none;
-        transform: scale(1.16) translateY(-24px);
+        transform: scale(1.28) translateY(-56px);
         transform-origin: center top;
       }
 
