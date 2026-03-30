@@ -56,6 +56,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /선택된 지역 없음 · 전체 추천/);
   assert.match(dashboardHtml, /연방 \/ EE/);
   assert.match(dashboardHtml, /필수\*/);
+  assert.match(dashboardHtml, /data-required-field="path"/);
+  assert.match(dashboardHtml, /작성 필요/);
   assert.match(dashboardHtml, /필수\* 항목을 먼저 골라주세요/);
   assert.match(dashboardHtml, /최종 학력/);
   assert.match(dashboardHtml, /현재 직군/);

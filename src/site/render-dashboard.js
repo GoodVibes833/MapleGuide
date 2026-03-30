@@ -291,7 +291,7 @@ function renderSituationSection(insights) {
       </div>
       <div class="wizard-layout">
         <form class="wizard-form" id="quick-start-form">
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="path">
             <span class="wizard-field-label">가장 가까운 현재 상황 <em class="required-mark">필수*</em></span>
             <select name="path">
               <option value="">선택하세요</option>
@@ -304,7 +304,7 @@ function renderSituationSection(insights) {
               <option value="business">사업·창업 경로를 보고 있어요</option>
             </select>
           </label>
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="base">
             <span class="wizard-field-label">현재 캐나다 체류 상태 <em class="required-mark">필수*</em></span>
             <select name="base">
               <option value="">선택하세요</option>
@@ -316,7 +316,7 @@ function renderSituationSection(insights) {
               <option value="unsure">설명하기 애매해요</option>
             </select>
           </label>
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="age">
             <span class="wizard-field-label">나이 <em class="required-mark">필수*</em></span>
             <select name="age">
               <option value="">선택하세요</option>
@@ -341,7 +341,7 @@ function renderSituationSection(insights) {
               <option value="45+">45세 이상</option>
             </select>
           </label>
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="household">
             <span class="wizard-field-label">배우자 포함 여부 <em class="required-mark">필수*</em></span>
             <select name="household">
               <option value="">선택하세요</option>
@@ -350,7 +350,7 @@ function renderSituationSection(insights) {
               <option value="unsure">아직 잘 모르겠어요</option>
             </select>
           </label>
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="education">
             <span class="wizard-field-label">최종 학력 <em class="required-mark">필수*</em></span>
             <select name="education">
               <option value="">선택하세요</option>
@@ -364,7 +364,7 @@ function renderSituationSection(insights) {
               <option value="doctorate">박사</option>
             </select>
           </label>
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="languageProfile">
             <span class="wizard-field-label">영어 상태 <em class="required-mark">필수*</em></span>
             <select name="languageProfile">
               <option value="">선택하세요</option>
@@ -381,7 +381,7 @@ function renderSituationSection(insights) {
               <option value="official:clb9plus">공인 영어점수는 CLB 9 이상이에요</option>
             </select>
           </label>
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="foreignExp">
             <span class="wizard-field-label">해외 숙련 경력 <em class="required-mark">필수*</em></span>
             <select name="foreignExp">
               <option value="">선택하세요</option>
@@ -393,7 +393,7 @@ function renderSituationSection(insights) {
               <option value="5">5년 이상</option>
             </select>
           </label>
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="canadianExp">
             <span class="wizard-field-label">캐나다 경력 <em class="required-mark">필수*</em></span>
             <select name="canadianExp">
               <option value="">선택하세요</option>
@@ -405,7 +405,7 @@ function renderSituationSection(insights) {
               <option value="5">5년 이상</option>
             </select>
           </label>
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="canadianJobSkill">
             <span class="wizard-field-label">캐나다 경력의 성격 <em class="required-mark">필수*</em></span>
             <select name="canadianJobSkill">
               <option value="">선택하세요</option>
@@ -433,7 +433,7 @@ function renderSituationSection(insights) {
               <option value="no">없어요</option>
             </select>
           </label>
-          <label class="wizard-field">
+          <label class="wizard-field" data-required-field="ecaStatus">
             <span class="wizard-field-label">ECA / 학력평가 상태 <em class="required-mark">필수*</em></span>
             <select name="ecaStatus">
               <option value="">선택하세요</option>
@@ -1379,6 +1379,7 @@ function renderClientScript({ page, updates }) {
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
         const quickStartResults = document.getElementById("quick-start-results");
+        const requiredFieldNodes = Array.from(document.querySelectorAll("[data-required-field]"));
         const updatesMoreToggle = document.getElementById("updates-more-toggle");
         const olderUpdatesList = document.getElementById("older-updates-list");
         const quickRegionFederalButton = document.querySelector("[data-quick-region-toggle='federal']");
@@ -1431,6 +1432,19 @@ function renderClientScript({ page, updates }) {
           return Object.entries(REQUIRED_FIELD_LABELS)
             .filter(([field]) => !rawAnswers[field])
             .map(([, label]) => label);
+        }
+
+        function syncMissingRequiredStates(rawAnswers) {
+          requiredFieldNodes.forEach((fieldNode) => {
+            const fieldName = fieldNode.dataset.requiredField;
+            const missing = Boolean(fieldName && !rawAnswers[fieldName]);
+            fieldNode.classList.toggle("is-missing", missing);
+
+            const control = fieldNode.querySelector("select, input, textarea");
+            if (control) {
+              control.setAttribute("aria-invalid", String(missing));
+            }
+          });
         }
 
         function applyOptionalAnswerDefaults(rawAnswers) {
@@ -2598,14 +2612,17 @@ function renderClientScript({ page, updates }) {
           const formData = new FormData(quickStartForm);
           const rawAnswers = Object.fromEntries(formData.entries());
           const missingRequiredFields = getMissingRequiredFields(rawAnswers);
+          syncMissingRequiredStates(rawAnswers);
 
           if (missingRequiredFields.length > 0) {
             quickStartResults.innerHTML = [
-              '<div class="wizard-empty">',
+              '<div class="wizard-empty wizard-empty-warning">',
+              '<span class="wizard-empty-badge">작성 필요 ' + missingRequiredFields.length + '개</span>',
               '<strong>필수* 항목을 먼저 골라주세요.</strong>',
-              '<span>아직 선택하지 않은 항목: ' + escapeHtmlClient(missingRequiredFields.slice(0, 4).join(" / "))
-                + (missingRequiredFields.length > 4 ? " 외 " + (missingRequiredFields.length - 4) + "개" : "")
-                + '</span>',
+              '<span>아직 선택하지 않은 필수 항목이에요. 아래 강조된 항목부터 채우면 바로 추천이 열립니다.</span>',
+              '<ul class="wizard-empty-list">'
+                + missingRequiredFields.slice(0, 5).map((field) => '<li>' + escapeHtmlClient(field) + '</li>').join("")
+                + '</ul>',
               '</div>'
             ].join("");
             return;
@@ -4049,6 +4066,22 @@ function renderLayout({ title, page, body, updates }) {
       .wizard-field {
         display: grid;
         gap: 8px;
+        position: relative;
+        padding: 0;
+        border-radius: var(--radius-md);
+        transition:
+          background 160ms ease,
+          box-shadow 160ms ease,
+          transform 160ms ease;
+      }
+
+      .wizard-field.is-missing {
+        padding: 14px;
+        margin: -14px;
+        background: linear-gradient(180deg, rgba(242, 228, 203, 0.5), rgba(255, 246, 230, 0.86));
+        box-shadow:
+          inset 0 0 0 1px rgba(181, 124, 46, 0.22),
+          0 14px 32px rgba(181, 124, 46, 0.08);
       }
 
       .wizard-field span {
@@ -4069,6 +4102,14 @@ function renderLayout({ title, page, body, updates }) {
         font-style: normal;
         font-size: 0.82rem;
         font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(15, 61, 127, 0.08);
+      }
+
+      .wizard-field.is-missing .required-mark {
+        color: #8c4f00;
+        background: rgba(181, 124, 46, 0.18);
       }
 
       .wizard-field select {
@@ -4078,6 +4119,16 @@ function renderLayout({ title, page, body, updates }) {
         border-radius: var(--radius-sm);
         background: rgba(255, 255, 255, 0.82);
         color: var(--text);
+      }
+
+      .wizard-field.is-missing select {
+        border-color: rgba(181, 124, 46, 0.5);
+        background: rgba(255, 251, 245, 0.98);
+        box-shadow: 0 0 0 3px rgba(181, 124, 46, 0.12);
+      }
+
+      .wizard-field.is-missing .wizard-field-label {
+        color: #8c4f00;
       }
 
       .wizard-empty,
@@ -4094,6 +4145,33 @@ function renderLayout({ title, page, body, updates }) {
       .wizard-empty strong {
         font-size: 1.06rem;
         line-height: 1.5;
+      }
+
+      .wizard-empty-warning {
+        border-color: rgba(181, 124, 46, 0.24);
+        background: linear-gradient(180deg, rgba(255, 249, 239, 0.96), rgba(255, 243, 222, 0.9));
+      }
+
+      .wizard-empty-badge {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        min-height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(181, 124, 46, 0.16);
+        color: #8c4f00;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+
+      .wizard-empty-list {
+        display: grid;
+        gap: 6px;
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text);
       }
 
       .wizard-empty span,
