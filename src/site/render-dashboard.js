@@ -3851,9 +3851,10 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .wizard-filter-shell {
-        display: inline-grid;
+        display: grid;
         justify-items: start;
         gap: 8px;
+        width: min(100%, 760px);
         padding: 10px;
         border: 1px solid rgba(15, 61, 127, 0.12);
         border-radius: var(--radius-lg);
@@ -3864,14 +3865,20 @@ function renderLayout({ title, page, body, updates }) {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
-        max-width: 620px;
+        max-width: 100%;
       }
 
       .quick-filter-coins {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 10px;
-        max-width: 760px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 4px;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(15, 61, 127, 0.28) transparent;
       }
 
       .quick-coin {
@@ -3888,6 +3895,7 @@ function renderLayout({ title, page, body, updates }) {
         color: var(--accent-deep);
         text-align: left;
         white-space: nowrap;
+        flex: 0 0 auto;
         cursor: pointer;
         transition:
           transform 160ms ease,
@@ -3945,7 +3953,7 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .wizard-filter-selection {
-        max-width: 620px;
+        max-width: 100%;
         color: var(--muted);
         font-size: 0.92rem;
         line-height: 1.7;
