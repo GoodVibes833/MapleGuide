@@ -1724,6 +1724,30 @@ function renderClientScript({ page, updates, basePath = "" }) {
           };
         }
 
+        function getLifestylePreferenceSortScore(insight, answers) {
+          let score = 0;
+
+          if (answers.setting === "metro") {
+            score += (insight.lifestyle.metroLevel || 0) * 3;
+            score -= (insight.lifestyle.regionalLevel || 0) * 2;
+          }
+
+          if (answers.setting === "regional") {
+            score += (insight.lifestyle.regionalLevel || 0) * 3;
+            score -= (insight.lifestyle.metroLevel || 0) * 2;
+          }
+
+          if (answers.budget === "tight") {
+            score -= (insight.lifestyle.costLevel || 0) * 2;
+
+            if (isGraduateIntent(answers.path)) {
+              score -= (insight.lifestyle.tuitionLevel || 0) * 2;
+            }
+          }
+
+          return score;
+        }
+
         function scoreInsight(insight, answers) {
           let score = 0;
           const policyReasons = [];
@@ -1951,9 +1975,15 @@ function renderClientScript({ page, updates, basePath = "" }) {
 
           if (answers.setting === "metro") {
             if (insight.lifestyle.metroLevel >= 3) {
-              addLifestyle(2, "대도시 접근성이 강한 지역");
+              addLifestyle(6, "대도시 접근성이 강한 지역");
+            } else if (insight.lifestyle.metroLevel === 2) {
+              addLifestyle(1, "대도시 접근성은 보통인 편");
             } else if (insight.lifestyle.metroLevel === 1) {
-              addLifestyle(-1, "대도시 중심 선호와는 거리가 있음");
+              addLifestyle(-6, "대도시 중심 선호와는 거리가 있음");
+            }
+
+            if (insight.lifestyle.regionalLevel >= 3) {
+              addLifestyle(-2, "지역 정착 성격이 강해 대도시 선호와는 결이 다를 수 있음");
             }
           }
 
@@ -1976,7 +2006,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
           };
         }
 
-        function estimateFitPercent(answers, evaluation) {
+        function estimateFitPercent(answers, evaluation, insight) {
           let base = 52 + evaluation.score * 4;
 
           if (answers.english === "unknown") {
@@ -2001,6 +2031,22 @@ function renderClientScript({ page, updates, basePath = "" }) {
             base -= 6;
           }
 
+          if (answers.setting === "metro") {
+            if (insight.lifestyle.metroLevel >= 3) {
+              base += 5;
+            } else if (insight.lifestyle.metroLevel === 1) {
+              base -= 10;
+            }
+          }
+
+          if (answers.setting === "regional") {
+            if (insight.lifestyle.regionalLevel >= 3) {
+              base += 5;
+            } else if (insight.lifestyle.regionalLevel === 1) {
+              base -= 8;
+            }
+          }
+
           return Math.max(18, Math.min(92, base));
         }
 
@@ -2013,7 +2059,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
             insight.id === "federal"
           );
           const hasRegionalFallback = answers.setting === "regional" && ["많음", "중심", "있음", "일부"].includes(insight.statuses.regional);
-          let chance = estimateFitPercent(answers, evaluation) - 30;
+          let chance = estimateFitPercent(answers, evaluation, insight) - 30;
 
           if (answers.languageScoreStatus === "official") {
             chance += 4;
@@ -2109,6 +2155,22 @@ function renderClientScript({ page, updates, basePath = "" }) {
 
           if (hasRegionalFallback) {
             chance += 3;
+          }
+
+          if (answers.setting === "metro") {
+            if (insight.lifestyle.metroLevel >= 3) {
+              chance += 5;
+            } else if (insight.lifestyle.metroLevel === 1) {
+              chance -= 8;
+            }
+          }
+
+          if (answers.setting === "regional") {
+            if (insight.lifestyle.regionalLevel >= 3) {
+              chance += 4;
+            } else if (insight.lifestyle.regionalLevel === 1) {
+              chance -= 6;
+            }
           }
 
           if (crsSnapshot.gap != null && insight.id === "federal" && crsSnapshot.gap <= -100) {
@@ -3744,6 +3806,13 @@ function renderClientScript({ page, updates, basePath = "" }) {
                 return right.evaluation.score - left.evaluation.score;
               }
 
+              const rightPreferenceScore = getLifestylePreferenceSortScore(right.insight, answers);
+              const leftPreferenceScore = getLifestylePreferenceSortScore(left.insight, answers);
+
+              if (rightPreferenceScore !== leftPreferenceScore) {
+                return rightPreferenceScore - leftPreferenceScore;
+              }
+
               return right.insight.updateCount - left.insight.updateCount;
             });
           const federalEntry = sortedEvaluated.find(({ insight }) => insight.id === "federal") ?? null;
@@ -3754,7 +3823,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
           function renderRecommendationCard(entry, index = null, mode = "province") {
             const { insight, evaluation } = entry;
             const isFederalCard = mode === "federal";
-            const fitPercent = estimateFitPercent(answers, evaluation);
+            const fitPercent = estimateFitPercent(answers, evaluation, insight);
             const immigrationChancePercent = estimateImmigrationChancePercent(answers, evaluation, insight);
             const improvementPlan = buildImprovementPlan(answers, insight, immigrationChancePercent);
             const eeSnapshot = getEESnapshot(answers, insight);
