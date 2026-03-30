@@ -66,7 +66,9 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /ECA \/ 학력평가 상태/);
   assert.match(dashboardHtml, /학비·생활비 부담/);
   assert.match(dashboardHtml, /정착 선호/);
-  assert.match(dashboardHtml, /먼저 볼 지역 5곳/);
+  assert.match(dashboardHtml, /먼저 볼 지역 3곳/);
+  assert.match(dashboardHtml, /지금은 이 방향이 먼저예요/);
+  assert.match(dashboardHtml, /주정부가 먼저|연방 EE가 먼저/);
   assert.match(dashboardHtml, /예상 적합도/);
   assert.match(dashboardHtml, /입력한 캐나다 skilled 경력은 CRS에 반영했습니다/);
   assert.match(dashboardHtml, /update-flash-chevron/);
@@ -80,11 +82,13 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /scorePlanLabel = eeSnapshot\.isFederal \? "예상 CRS" : "연방 EE 참고점수"/);
   assert.match(dashboardHtml, /EOI \+ 노동시장 우선/);
   assert.match(dashboardHtml, /SPECIAL_PATHWAYS/);
-  assert.match(dashboardHtml, /전국·특수 경로 같이 보기/);
+  assert.match(dashboardHtml, /같이 보면 좋은 특별 경로/);
   assert.match(dashboardHtml, /Atlantic Immigration Program/);
   assert.match(dashboardHtml, /Rural Community Immigration Pilot/);
   assert.match(dashboardHtml, /뉴펀들랜드 2단계 EOI/);
   assert.match(dashboardHtml, /Trade, Atlantic, Rural, Francophone처럼 일반 연방\/주정부 카드 밖에서 따로 봐야 하는 경로입니다/);
+  assert.match(dashboardHtml, /추천 3곳만 먼저 보여주고, 자세한 설명은 카드 안에서 펼쳐서 볼 수 있게 정리했습니다/);
+  assert.match(dashboardHtml, /자세히 보기/);
   assert.match(dashboardHtml, /최저 CRS는 492점이고 4,200명에게 초청장이 나왔습니다/);
   assert.match(dashboardHtml, /언어점수 CLB 9 이상 목표/);
   assert.match(dashboardHtml, /TEER 0-3 직무로 옮겨 skilled 경력 1년 만들기/);
@@ -92,8 +96,10 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /캐나다 skilled 경력 .*년까지 늘리기/);
   assert.match(dashboardHtml, /지역을 다른 곳으로 넓혀보세요/);
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
+  assert.match(dashboardHtml, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
   assert.match(dashboardHtml, /연방 \/ Express Entry/);
   assert.match(dashboardHtml, /Map Explorer/);
+  assert.match(dashboardHtml, /지역 탐색은 필요할 때만 열기/);
   assert.match(dashboardHtml, /MAP_REGION_DEFS/);
   assert.match(dashboardHtml, /id="CA-ON"/);
   assert.match(dashboardHtml, /Wikimedia Commons/);

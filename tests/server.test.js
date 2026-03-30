@@ -78,6 +78,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /ECA \/ 학력평가 상태/);
   assert.match(dashboardResponse.body, /학비·생활비 부담/);
   assert.match(dashboardResponse.body, /정착 선호/);
+  assert.match(dashboardResponse.body, /지금은 이 방향이 먼저예요/);
   assert.match(dashboardResponse.body, /업데이트 더보기/);
   assert.match(dashboardResponse.body, /update-flash-chevron/);
   assert.match(dashboardResponse.body, /id="older-updates-list" hidden/);
@@ -87,11 +88,14 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /연방 EE 참고/);
   assert.match(dashboardResponse.body, /이 주 자체 점수 아님/);
   assert.match(dashboardResponse.body, /scorePlanLabel = eeSnapshot\.isFederal \? "예상 CRS" : "연방 EE 참고점수"/);
-  assert.match(dashboardResponse.body, /전국·특수 경로 같이 보기/);
+  assert.match(dashboardResponse.body, /같이 보면 좋은 특별 경로/);
   assert.match(dashboardResponse.body, /Atlantic Immigration Program/);
   assert.match(dashboardResponse.body, /Rural Community Immigration Pilot/);
   assert.match(dashboardResponse.body, /뉴펀들랜드 2단계 EOI/);
+  assert.match(dashboardResponse.body, /추천 3곳만 먼저 보여주고, 자세한 설명은 카드 안에서 펼쳐서 볼 수 있게 정리했습니다/);
+  assert.match(dashboardResponse.body, /자세히 보기/);
   assert.match(dashboardResponse.body, /캐나다 한눈에 비교/);
+  assert.match(dashboardResponse.body, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
 
   const ontarioRegionResponse = await invoke(handler, {
     method: "GET",

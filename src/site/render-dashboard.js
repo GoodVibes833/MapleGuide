@@ -553,7 +553,7 @@ function renderSituationSection(insights) {
         </form>
         <div class="wizard-results" id="quick-start-results">
           <div class="wizard-empty">
-            <strong>필수* 항목부터 고르면 먼저 볼 지역 5곳을 추천합니다.</strong>
+            <strong>필수* 항목부터 고르면 먼저 볼 지역 3곳을 추천합니다.</strong>
             <span>지역 필터를 먼저 고른 뒤 필수 정보를 채우면 결과가 바로 좁혀집니다.</span>
           </div>
         </div>
@@ -567,14 +567,19 @@ function renderComparisonTable(insights) {
 
   return `
     <section class="section panel">
-      <div class="panel-head">
-        <div>
-          <p class="panel-kicker">Compare</p>
-          <h2>캐나다 한눈에 비교</h2>
-        </div>
-        <p class="panel-note">공식 구조를 초보자용 비교 항목으로 정규화한 표입니다.</p>
-      </div>
-      <div class="table-wrap">
+      <details class="panel-collapsible">
+        <summary class="panel-collapsible-summary">
+          <div>
+            <p class="panel-kicker">Compare</p>
+            <h2>캐나다 한눈에 비교</h2>
+            <p class="panel-note">원할 때만 펼쳐서 보는 전체 비교표입니다.</p>
+          </div>
+          <div class="panel-collapsible-side">
+            <span class="compare-pill">전체 주 비교</span>
+            <span class="panel-collapsible-chevron" aria-hidden="true">▾</span>
+          </div>
+        </summary>
+        <div class="panel-collapsible-body table-wrap">
         <table class="compare-table">
           <thead>
             <tr>
@@ -615,7 +620,8 @@ function renderComparisonTable(insights) {
               .join("")}
           </tbody>
         </table>
-      </div>
+        </div>
+      </details>
     </section>
   `;
 }
@@ -856,15 +862,20 @@ function renderCanadaMapSection(updates, { minimal = false } = {}) {
 
   return `
     <section class="section map-section">
-      <div class="panel-head">
-        <div>
-          <p class="panel-kicker">Map Explorer</p>
-          <h2>비교를 마쳤다면 지도에서 지역 고르기</h2>
-        </div>
-        <p class="panel-note">상황별 카드와 비교표로 범위를 좁힌 뒤, 마지막에 지역 페이지로 들어가면 훨씬 덜 헷갈립니다.</p>
-      </div>
+      <details class="panel-collapsible">
+        <summary class="panel-collapsible-summary">
+          <div>
+            <p class="panel-kicker">Map Explorer</p>
+            <h2>지역 탐색은 필요할 때만 열기</h2>
+            <p class="panel-note">비교와 추천을 본 뒤, 마지막에 지도에서 지역 페이지로 들어가면 훨씬 덜 헷갈립니다.</p>
+          </div>
+          <div class="panel-collapsible-side">
+            <span class="compare-pill">지도 탐색</span>
+            <span class="panel-collapsible-chevron" aria-hidden="true">▾</span>
+          </div>
+        </summary>
 
-      <div class="map-layout">
+        <div class="panel-collapsible-body map-layout">
         <div class="map-shell">
           <div class="federal-jump-row">
             <a
@@ -936,7 +947,8 @@ function renderCanadaMapSection(updates, { minimal = false } = {}) {
             </div>
           </div>
         </aside>
-      </div>
+        </div>
+      </details>
     </section>
   `;
 }
@@ -2436,12 +2448,18 @@ function renderClientScript({ page, updates }) {
           }
         }
 
-        function renderPathwayGuidePanel(answers, insight, eeSnapshot) {
+        function buildEvaluatedPathwayGuide(answers, insight, eeSnapshot) {
           const guide = buildPathwayCriteria(answers, insight);
           const evaluated = guide.criteria.map((criterion) => ({
             ...criterion,
             ...evaluatePathwayCriterion(criterion, answers, insight, eeSnapshot)
           }));
+
+          return { guide, evaluated };
+        }
+
+        function renderPathwayGuidePanel(insight, guideBundle) {
+          const { guide, evaluated } = guideBundle;
 
           return [
             '<section class="pathway-guide-panel">',
@@ -2474,6 +2492,139 @@ function renderClientScript({ page, updates }) {
               + '</ul>',
             '</div>',
             '</div>',
+            '</section>'
+          ].join("");
+        }
+
+        function buildProfileStrengths(answers) {
+          const items = [];
+
+          if (answers.languageScoreStatus === "official") {
+            items.push("공인 언어점수");
+          }
+          if (["completed", "canadian-degree"].includes(answers.ecaStatus)) {
+            items.push("ECA 또는 캐나다 학위");
+          }
+          if (answers.foreignExp !== "0" || answers.canadianExp !== "0") {
+            items.push("숙련 경력");
+          }
+          if (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0") {
+            items.push("캐나다 skilled 경력");
+          }
+          if (answers.jobOffer === "yes") {
+            items.push("고용주 연결 가능성");
+          }
+          if (answers.advantage === "french") {
+            items.push("프랑스어 강점");
+          }
+          if (answers.occupation && answers.occupation !== "general") {
+            items.push("직군 방향");
+          }
+
+          return items.slice(0, 4);
+        }
+
+        function buildRecommendationLeadSummary(insight, evaluation, eeSnapshot) {
+          const firstPolicyReason = evaluation.policyReasons[0];
+
+          if (eeSnapshot.isFederal) {
+            return firstPolicyReason
+              ? firstPolicyReason + " 연방 EE 컷오프와 직접 비교하는 쪽이 맞아요."
+              : "연방 EE는 점수와 컷오프를 직접 비교하는 방향이에요.";
+          }
+
+          if (insight.selectionModel.badgeKo.includes("요건")) {
+            return (firstPolicyReason ?? "현재 조건상 이 주정부 경로도 볼 만해요.")
+              + " 이 주는 점수보다 stream 자격과 연결 조건을 먼저 봐야 해요.";
+          }
+
+          if (insight.selectionModel.badgeKo.includes("EOI")) {
+            return (firstPolicyReason ?? "현재 조건상 이 주정부 경로도 볼 만해요.")
+              + " 이 주는 EOI와 노동시장 우선순위를 같이 보는 편이에요.";
+          }
+
+          return (firstPolicyReason ?? "현재 조건상 이 주정부 경로도 볼 만해요.")
+            + " 이 주의 선발 방식과 요구 조건을 같이 읽는 게 중요해요.";
+        }
+
+        function buildConclusionSummaryHtml(answers, ranked) {
+          const topEntry = ranked[0];
+          if (!topEntry) {
+            return "";
+          }
+
+          const topInsight = topEntry.insight;
+          const topEESnapshot = getEESnapshot(answers, topInsight);
+          const topActions = buildImprovementPlan(answers, topInsight, estimateImmigrationChancePercent(answers, topEntry.evaluation, topInsight));
+          const primaryDirection = topInsight.id === "federal" ? "연방 EE가 먼저" : "주정부가 먼저";
+          const topNames = ranked.slice(0, 3).map((entry) => entry.insight.labelKo).join(" / ");
+          const specialNames = SPECIAL_PATHWAYS
+            .map((pathway) => scoreSpecialPathwayEntry(pathway, answers))
+            .filter(Boolean)
+            .sort((left, right) => right.score - left.score)
+            .slice(0, 2)
+            .map((entry) => entry.pathway.shortKo)
+            .join(" / ");
+          const strengths = buildProfileStrengths(answers);
+          const nextItems = topActions.items.slice(0, 2).map((item) => item.title);
+
+          return [
+            '<section class="conclusion-summary-section">',
+            '<div class="wizard-section-heading">',
+            '<div>',
+            '<p class="panel-kicker">결론</p>',
+            '<h3>지금은 이 방향이 먼저예요</h3>',
+            '</div>',
+            '</div>',
+            '<article class="conclusion-summary-card">',
+            '<div class="conclusion-summary-head">',
+            '<div>',
+            '<p class="panel-kicker">Primary Direction</p>',
+            '<h3>' + escapeHtmlClient(primaryDirection) + '</h3>',
+            '</div>',
+            '<span class="direction-summary-badge">' + escapeHtmlClient(topInsight.id === "federal" ? "Express Entry" : topInsight.labelKo) + '</span>',
+            '</div>',
+            '<p class="conclusion-summary-copy">'
+              + escapeHtmlClient(
+                topInsight.id === "federal"
+                  ? "현재 입력상 연방 EE를 직접 비교할 수 있는 상태예요. "
+                  : "현재 입력상 주정부 쪽이 더 현실적이에요. "
+              )
+              + escapeHtmlClient(
+                topInsight.id === "federal"
+                  ? (topEESnapshot.crsSnapshot.gap == null
+                    ? "최신 컷오프와 직접 비교하면서 다음 보완점을 보는 편이 좋아요."
+                    : "최근 EE 컷오프와 " + topEESnapshot.crsSnapshot.gapLabel + "점 차이예요.")
+                  : "추천 지역은 " + topNames + " 순서로 먼저 보는 편이 좋아요."
+              )
+              + (specialNames ? " " + escapeHtmlClient("같이 볼 특별 경로는 " + specialNames + "입니다.") : "")
+              + '</p>',
+            '<div class="direction-summary-pill-row">'
+              + (topInsight.id === "federal"
+                ? '<span class="compare-pill">현재 ' + escapeHtmlClient(topEESnapshot.crsSnapshot.score) + '점</span>'
+                  + '<span class="compare-pill">최근 컷오프 ' + escapeHtmlClient(topEESnapshot.crsSnapshot.cutoff ?? "대기") + '점</span>'
+                : '<span class="compare-pill">추천 1순위 ' + escapeHtmlClient(topInsight.labelKo) + '</span>'
+                  + '<span class="compare-pill">선발 방식 ' + escapeHtmlClient(topInsight.selectionModel.badgeKo) + '</span>')
+              + '</div>',
+            '<div class="direction-summary-grid">',
+            '<div class="direction-summary-block">',
+            '<span class="direction-summary-label">지금 가진 강점</span>',
+            '<ul class="direction-summary-list">'
+              + (strengths.length
+                ? strengths.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+                : '<li>아직 강점 정리가 더 필요해요.</li>')
+              + '</ul>',
+            '</div>',
+            '<div class="direction-summary-block">',
+            '<span class="direction-summary-label">지금 먼저 할 것</span>',
+            '<ul class="direction-summary-list">'
+              + (nextItems.length
+                ? nextItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+                : '<li>최신 공지와 스트림 구조를 먼저 확인해 보세요.</li>')
+              + '</ul>',
+            '</div>',
+            '</div>',
+            '</article>',
             '</section>'
           ].join("");
         }
@@ -2780,7 +2931,7 @@ function renderClientScript({ page, updates }) {
             '<article class="special-pathway-card">',
             '<div class="special-pathway-head">',
             '<div>',
-            '<p class="panel-kicker">Extra Route</p>',
+            '<p class="panel-kicker">특별 경로</p>',
             '<h3>' + escapeHtmlClient(entry.pathway.titleKo) + '</h3>',
             '</div>',
             '<span class="special-pathway-fit is-' + escapeHtmlClient(entry.fitTone) + '">' + escapeHtmlClient(entry.fitLabel) + '</span>',
@@ -2829,18 +2980,28 @@ function renderClientScript({ page, updates }) {
             return "";
           }
 
+          const compactList = ranked
+            .slice(0, 2)
+            .map((entry) => '<span class="compare-pill">' + escapeHtmlClient(entry.pathway.shortKo + " · " + entry.fitLabel) + '</span>')
+            .join("");
+
           return [
             '<section class="special-pathway-section">',
-            '<div class="wizard-section-heading">',
+            '<details class="panel-collapsible compact-collapsible">',
+            '<summary class="panel-collapsible-summary">',
             '<div>',
-            '<p class="panel-kicker">Extra Routes</p>',
-            '<h3>전국·특수 경로 같이 보기</h3>',
-            '</div>',
+            '<p class="panel-kicker">특별 경로</p>',
+            '<h3>같이 보면 좋은 특별 경로</h3>',
             '<p class="panel-note">Trade, Atlantic, Rural, Francophone처럼 일반 연방/주정부 카드 밖에서 따로 봐야 하는 경로입니다.</p>',
             '</div>',
+            '<div class="panel-collapsible-side">' + compactList + '<span class="panel-collapsible-chevron" aria-hidden="true">▾</span></div>',
+            '</summary>',
+            '<div class="panel-collapsible-body">',
             '<div class="special-pathway-cards">',
             ranked.map((entry) => renderSpecialPathwayCard(entry)).join(""),
             '</div>',
+            '</div>',
+            '</details>',
             '</section>'
           ].join("");
         }
@@ -2941,7 +3102,7 @@ function renderClientScript({ page, updates }) {
             '<section class="direction-summary-section">',
             '<div class="wizard-section-heading">',
             '<div>',
-            '<p class="panel-kicker">Direction Split</p>',
+            '<p class="panel-kicker">큰 방향</p>',
             '<h3>연방 vs 주정부 먼저 정리</h3>',
             '</div>',
             '<p class="panel-note">연방은 점수와 컷오프를 직접 비교하고, 주정부는 주마다 다른 선발 방식과 요구 조건을 같이 봅니다.</p>',
@@ -3412,11 +3573,13 @@ function renderClientScript({ page, updates }) {
 
               return right.insight.updateCount - left.insight.updateCount;
             })
-            .slice(0, 5);
+            .slice(0, 3);
+          const conclusionOverviewHtml = buildConclusionSummaryHtml(answers, ranked);
           const directionOverviewHtml = buildDirectionOverviewHtml(answers, allEvaluated);
           const specialPathwaysHtml = buildSpecialPathwaySectionHtml(answers);
 
-          quickStartResults.innerHTML = directionOverviewHtml
+          quickStartResults.innerHTML = conclusionOverviewHtml
+            + directionOverviewHtml
             + specialPathwaysHtml
             + [
               '<div class="wizard-section-heading">',
@@ -3424,7 +3587,7 @@ function renderClientScript({ page, updates }) {
               '<p class="panel-kicker">Recommendations</p>',
               '<h3>현재 조건에서 먼저 볼 지역</h3>',
               '</div>',
-              '<p class="panel-note">각 카드에서 주정부 선발 방식과 연방 EE 참고를 분리해서 보여줍니다.</p>',
+              '<p class="panel-note">추천 3곳만 먼저 보여주고, 자세한 설명은 카드 안에서 펼쳐서 볼 수 있게 정리했습니다.</p>',
               '</div>'
             ].join("")
             + ranked
@@ -3437,6 +3600,17 @@ function renderClientScript({ page, updates }) {
               const selectionModel = insight.selectionModel;
               const careerRecognitionItems = buildCareerRecognitionItems(answers, insight);
               const timeline = buildScenarioTimeline(answers, insight);
+              const pathwayGuideBundle = buildEvaluatedPathwayGuide(answers, insight, eeSnapshot);
+              const pathwayCurrentItems = pathwayGuideBundle.evaluated
+                .filter((criterion) => criterion.state === "has")
+                .map((criterion) => criterion.label)
+                .slice(0, 3);
+              const pathwayNeedItems = pathwayGuideBundle.evaluated
+                .filter((criterion) => criterion.state !== "has")
+                .map((criterion) => criterion.label)
+                .slice(0, 3);
+              const topActionItems = improvementPlan.items.slice(0, 2);
+              const leadSummary = buildRecommendationLeadSummary(insight, evaluation, eeSnapshot);
               const policyReasonsHtml = evaluation.policyReasons.length > 0
                 ? evaluation.policyReasons
                     .map((reason) => "<li>" + escapeHtmlClient(reason) + "</li>")
@@ -3500,7 +3674,20 @@ function renderClientScript({ page, updates }) {
                     '</section>'
                   ].join("")
                 : "";
-              const pathwayGuideHtml = renderPathwayGuidePanel(answers, insight, eeSnapshot);
+              const pathwayGuideHtml = renderPathwayGuidePanel(insight, pathwayGuideBundle);
+              const quickActionsHtml = topActionItems.length > 0
+                ? topActionItems
+                    .map((item) => [
+                      '<li class="compact-action-item">',
+                      '<span class="improvement-delta is-' + escapeHtmlClient(item.scoreImpact?.tone ?? "neutral") + '">' + escapeHtmlClient(item.scoreImpact?.badge ?? "준비") + '</span>',
+                      '<div class="compact-action-copy">',
+                      '<strong>' + escapeHtmlClient(item.title) + '</strong>',
+                      '<p>' + escapeHtmlClient(item.scoreImpact?.label ?? item.detail) + '</p>',
+                      '</div>',
+                      '</li>'
+                    ].join(""))
+                    .join("")
+                : '<li class="compact-action-item"><span class="improvement-delta is-neutral">준비</span><div class="compact-action-copy"><strong>최신 공지 계속 확인</strong><p>draw, intake, 직군 우선순위 변화가 실제 체감에 더 크게 작용할 수 있어요.</p></div></li>';
 
               return [
                 '<article class="wizard-result-card">',
@@ -3515,18 +3702,7 @@ function renderClientScript({ page, updates }) {
                 "</div>",
                 '<div class="wizard-card-mini-map" aria-hidden="true">' + getRecommendationMiniMapMarkup(insight.id) + "</div>",
                 "</div>",
-                '<section class="selection-model-panel">',
-                '<div class="selection-model-head">',
-                '<strong>이 지역은 이렇게 뽑아요</strong>',
-                '<span class="selection-model-badge">' + escapeHtmlClient(selectionModel.badgeKo) + '</span>',
-                '</div>',
-                '<p class="selection-model-detail">' + escapeHtmlClient(selectionModel.detailKo) + '</p>',
-                '<div class="selection-model-grid">',
-                '<div class="selection-model-stat"><span>점수 읽는 법</span><strong>' + escapeHtmlClient(selectionModel.scoreViewKo) + '</strong></div>',
-                '<div class="selection-model-stat"><span>지금 먼저 볼 것</span><strong>' + escapeHtmlClient(selectionModel.focusKo) + '</strong></div>',
-                '<div class="selection-model-stat"><span>신청 흐름</span><strong>' + escapeHtmlClient(selectionModel.intakeKo) + '</strong></div>',
-                '</div>',
-                '</section>',
+                '<p class="wizard-result-lead">' + escapeHtmlClient(leadSummary) + "</p>",
                 '<div class="fit-band-row">',
                 '<span class="fit-score">예상 적합도 ' + escapeHtmlClient(fitPercent) + '%</span>',
                 '<span class="chance-score">현재 진입 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
@@ -3546,8 +3722,53 @@ function renderClientScript({ page, updates }) {
                 '<span class="compare-pill">비용 ' + escapeHtmlClient(insight.lifestyle.costLabelKo) + "</span>",
                 '<span class="compare-pill">지역정착 ' + escapeHtmlClient(insight.lifestyle.regionalLabelKo) + "</span>",
                 "</div>",
+                '<div class="result-summary-grid">',
+                '<section class="result-summary-block">',
+                '<strong>이 경로가 보는 핵심</strong>',
+                '<ul class="result-summary-list">'
+                  + (pathwayNeedItems.length
+                    ? pathwayNeedItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+                    : pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join(""))
+                  + '</ul>',
+                '</section>',
+                '<section class="result-summary-block">',
+                '<strong>내가 이미 가진 것</strong>',
+                '<ul class="result-summary-list">'
+                  + (pathwayCurrentItems.length
+                    ? pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+                    : '<li>강점 정리를 더 해보는 게 좋아요.</li>')
+                  + '</ul>',
+                '</section>',
+                '<section class="result-summary-block">',
+                '<div class="improvement-head">',
+                '<strong>지금 할 것</strong>',
+                '<span class="improvement-total">' + escapeHtmlClient(
+                  improvementPlan.projectedScoreLift > 0
+                    ? scorePlanLabel + " " + improvementPlan.baseScore + "점 → " + improvementPlan.projectedScore + "점"
+                    : improvementPlan.bestFutureScoreLift > 0
+                      ? "지금 " + improvementPlan.baseScore + "점 · 나중에 최대 " + (improvementPlan.baseScore + improvementPlan.bestFutureScoreLift) + "점"
+                      : scorePlanLabel + " " + improvementPlan.baseScore + "점 유지"
+                ) + '</span>',
+                '</div>',
+                '<ul class="compact-action-list">' + quickActionsHtml + '</ul>',
+                '</section>',
+                '</div>',
+                '<details class="result-details">',
+                '<summary>자세히 보기</summary>',
                 '<p class="wizard-freshness">정책 반영 기준: ' + freshnessText + "</p>",
                 '<p class="wizard-freshness">서류 준비 상태: ' + readinessLine + "</p>",
+                '<section class="selection-model-panel">',
+                '<div class="selection-model-head">',
+                '<strong>이 지역은 이렇게 뽑아요</strong>',
+                '<span class="selection-model-badge">' + escapeHtmlClient(selectionModel.badgeKo) + '</span>',
+                '</div>',
+                '<p class="selection-model-detail">' + escapeHtmlClient(selectionModel.detailKo) + '</p>',
+                '<div class="selection-model-grid">',
+                '<div class="selection-model-stat"><span>점수 읽는 법</span><strong>' + escapeHtmlClient(selectionModel.scoreViewKo) + '</strong></div>',
+                '<div class="selection-model-stat"><span>지금 먼저 볼 것</span><strong>' + escapeHtmlClient(selectionModel.focusKo) + '</strong></div>',
+                '<div class="selection-model-stat"><span>신청 흐름</span><strong>' + escapeHtmlClient(selectionModel.intakeKo) + '</strong></div>',
+                '</div>',
+                '</section>',
                 (eeSnapshot.isFederal
                   ? '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.explain) + "</p>"
                     + '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.comparison) + "</p>"
@@ -3593,6 +3814,7 @@ function renderClientScript({ page, updates }) {
                 '<div><strong>생활 선호</strong><ul class="reason-list">' + lifestyleReasonsHtml + "</ul></div>",
                 "</div>",
                 '<div><strong>대략적인 진행 시나리오</strong><ul class="reason-list">' + timelineHtml + "</ul></div>",
+                '</details>',
                 '<a class="btn ghost" href="/region/' + encodeURIComponent(insight.id) + '">이 지역 먼저 보기</a>',
                 "</article>"
               ].join("");
@@ -4995,6 +5217,81 @@ function renderLayout({ title, page, body, updates }) {
         line-height: 1.65;
       }
 
+      .conclusion-summary-section {
+        display: grid;
+        gap: 14px;
+      }
+
+      .conclusion-summary-card {
+        display: grid;
+        gap: 12px;
+        padding: 20px;
+        border: 1px solid rgba(15, 61, 127, 0.14);
+        border-radius: var(--radius-lg);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(243, 248, 255, 0.9));
+      }
+
+      .conclusion-summary-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .conclusion-summary-head h3 {
+        margin: 2px 0 0;
+        font-size: 1.28rem;
+      }
+
+      .conclusion-summary-copy {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .panel-collapsible {
+        display: grid;
+        gap: 0;
+      }
+
+      .panel-collapsible[open] .panel-collapsible-chevron {
+        transform: rotate(180deg);
+      }
+
+      .panel-collapsible-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        list-style: none;
+        cursor: pointer;
+      }
+
+      .panel-collapsible-summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .panel-collapsible-side {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .panel-collapsible-chevron {
+        color: var(--accent-deep);
+        font-size: 1rem;
+        transition: transform 160ms ease;
+      }
+
+      .panel-collapsible-body {
+        display: grid;
+        gap: 14px;
+        margin-top: 14px;
+      }
+
       .special-pathway-section {
         display: grid;
         gap: 14px;
@@ -5228,6 +5525,90 @@ function renderLayout({ title, page, body, updates }) {
         margin: 0;
         font-size: 1.24rem;
         line-height: 1.4;
+      }
+
+      .wizard-result-lead {
+        margin: 0;
+        color: var(--text);
+        line-height: 1.72;
+        font-weight: 600;
+      }
+
+      .result-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .result-summary-block {
+        display: grid;
+        gap: 8px;
+        padding: 14px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .result-summary-block strong {
+        color: var(--accent-deep);
+        font-size: 0.88rem;
+      }
+
+      .result-summary-list,
+      .compact-action-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .compact-action-list {
+        list-style: none;
+        padding-left: 0;
+      }
+
+      .compact-action-item {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+      }
+
+      .compact-action-copy {
+        display: grid;
+        gap: 3px;
+      }
+
+      .compact-action-copy strong {
+        color: var(--text);
+        font-size: 0.92rem;
+      }
+
+      .compact-action-copy p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.88rem;
+        line-height: 1.55;
+      }
+
+      .result-details {
+        display: grid;
+        gap: 12px;
+        padding-top: 4px;
+        border-top: 1px solid rgba(15, 61, 127, 0.1);
+      }
+
+      .result-details summary {
+        list-style: none;
+        cursor: pointer;
+        color: var(--accent-deep);
+        font-weight: 800;
+      }
+
+      .result-details summary::-webkit-details-marker {
+        display: none;
       }
 
       .wizard-card-header {
@@ -6306,6 +6687,7 @@ function renderLayout({ title, page, body, updates }) {
         .special-pathway-cards,
         .direction-summary-grid,
         .special-pathway-grid,
+        .result-summary-grid,
         .pathway-guide-grid,
         .reason-columns {
           grid-template-columns: 1fr;
@@ -6429,6 +6811,15 @@ function renderLayout({ title, page, body, updates }) {
 
         .wizard-section-heading {
           align-items: flex-start;
+        }
+
+        .panel-collapsible-summary {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .panel-collapsible-side {
+          justify-content: flex-start;
         }
 
         .selection-model-grid {
