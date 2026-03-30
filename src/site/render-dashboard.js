@@ -14,7 +14,10 @@ import {
   describeCanadianExperienceCrsTreatment,
   estimateCanadianExperienceCrsPoints
 } from "./crs-helpers.js";
-import { getLanguageImprovementActions } from "./recommendation-helpers.js";
+import {
+  getLanguageImprovementActions,
+  shouldSuggestSkilledSwitch
+} from "./recommendation-helpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
@@ -1328,6 +1331,7 @@ function renderClientScript({ page, updates }) {
         ${describeCanadianExperienceCrsTreatment.toString()}
         ${estimateCanadianExperienceCrsPoints.toString()}
         ${getLanguageImprovementActions.toString()}
+        ${shouldSuggestSkilledSwitch.toString()}
 
         function hasSkilledCanadianTrack(answers) {
           return countsCanadianExperienceForCrs(answers);
@@ -2072,6 +2076,25 @@ function renderClientScript({ page, updates }) {
             case "regional-setting":
               return { lift: 0, badge: "변화 없음", label: "CRS 직접 변화 없음", tone: "neutral" };
             case "teer-upgrade":
+              {
+                const futureLift = estimateProjectedCrsLift({
+                  ...answers,
+                  canadianExp: "0"
+                }, {
+                  canadianJobSkill: "skilled",
+                  canadianExp: "1"
+                });
+
+                return futureLift > 0
+                  ? {
+                      lift: null,
+                      futureLift,
+                      badge: "1년 후 +" + futureLift + "점",
+                      label: "새 skilled 경력 1년이 쌓이면 예상 CRS +" + futureLift + "점",
+                      tone: "deferred"
+                    }
+                  : { lift: null, badge: "나중에 반영", label: "경력 누적 후 점수 반영", tone: "deferred" };
+              }
             case "degree-experience":
             case "study-route":
               return { lift: null, badge: "나중에 반영", label: "경력 누적 후 점수 반영", tone: "deferred" };
@@ -2160,8 +2183,8 @@ function renderClientScript({ page, updates }) {
             addAction(7, "이민에 쓸 주력 직군 1개 정하기", "현재 캐나다 일, 한국 경력, 전공 기반 직군 중 무엇으로 갈지 먼저 정해야 점수와 전략 계산이 정확해집니다.", "focus-occupation");
           }
 
-          if (answers.targetOccupationPlan === "current-canada-job" && answers.canadianJobSkill === "non-skilled") {
-            addAction(11, "캐나다에서 TEER 0-3 직무로 옮기기", "현재 캐나다 일을 기준으로 갈 계획이라면 skilled 직무 전환이 가장 큰 차이를 만들 수 있습니다.", "teer-upgrade");
+          if (shouldSuggestSkilledSwitch(answers)) {
+            addAction(11, "TEER 0-3 직무로 옮겨 skilled 경력 1년 만들기", "지금 입력된 TEER 4-5 경력은 CRS에 안 들어가서, 새 skilled 경력 1년이 쌓이기 시작해야 점수 반영이 열립니다.", "teer-upgrade");
           }
 
           if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment === "unrelated") {
@@ -2216,16 +2239,25 @@ function renderClientScript({ page, updates }) {
                 return rightLift - leftLift;
               }
 
+              const rightFutureLift = right.scoreImpact?.futureLift ?? -1;
+              const leftFutureLift = left.scoreImpact?.futureLift ?? -1;
+
+              if (rightFutureLift !== leftFutureLift) {
+                return rightFutureLift - leftFutureLift;
+              }
+
               return right.delta - left.delta;
             })
             .slice(0, 3);
           const projectedScoreLift = topActions.reduce((sum, action) => sum + Math.max(0, action.scoreImpact?.lift ?? 0), 0);
+          const bestFutureScoreLift = topActions.reduce((max, action) => Math.max(max, action.scoreImpact?.futureLift ?? 0), 0);
 
           return {
             items: topActions,
             baseScore: crsSnapshot.score,
             projectedScoreLift,
-            projectedScore: crsSnapshot.score + projectedScoreLift
+            projectedScore: crsSnapshot.score + projectedScoreLift,
+            bestFutureScoreLift
           };
         }
 
@@ -2431,9 +2463,21 @@ function renderClientScript({ page, updates }) {
                 '<section class="improvement-panel">',
                 '<div class="improvement-head">',
                 '<strong>가능성 올리는 다음 액션</strong>',
-                '<span class="improvement-total">예상 CRS ' + escapeHtmlClient(improvementPlan.baseScore) + '점 → ' + escapeHtmlClient(improvementPlan.projectedScore) + '점</span>',
+                '<span class="improvement-total">' + escapeHtmlClient(
+                  improvementPlan.projectedScoreLift > 0
+                    ? "예상 CRS " + improvementPlan.baseScore + "점 → " + improvementPlan.projectedScore + "점"
+                    : improvementPlan.bestFutureScoreLift > 0
+                      ? "지금 " + improvementPlan.baseScore + "점 · 나중에 최대 " + (improvementPlan.baseScore + improvementPlan.bestFutureScoreLift) + "점"
+                      : "예상 CRS " + improvementPlan.baseScore + "점 유지"
+                ) + '</span>',
                 '</div>',
-                '<p class="wizard-freshness">직접 점수에 반영되는 액션은 CRS 기준으로 먼저 정렬했습니다. 점수는 안 오르지만 경로를 넓히는 액션도 같이 남겼습니다.</p>',
+                '<p class="wizard-freshness">' + escapeHtmlClient(
+                  improvementPlan.projectedScoreLift > 0
+                    ? "직접 점수에 반영되는 액션은 CRS 기준으로 먼저 정렬했습니다. 점수는 안 오르지만 경로를 넓히는 액션도 같이 남겼습니다."
+                    : improvementPlan.bestFutureScoreLift > 0
+                      ? "바로 오르는 점수는 없지만, 아래처럼 시간이 필요한 액션은 나중에 실제 CRS 상승으로 이어질 수 있습니다."
+                      : "점수는 안 오르지만 경로를 넓히거나 서류를 정리하는 액션을 먼저 보여줍니다."
+                ) + '</p>',
                 (insight.id === "federal" || statusSupports(insight.statuses.ee))
                   ? '<p class="wizard-freshness">EE가 연결된 지역은 각 액션 아래에 CRS 직접 변화도 같이 표시합니다.</p>'
                   : "",

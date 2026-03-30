@@ -11,3 +11,12 @@ export function getLanguageImprovementActions(answers) {
 
   return actions;
 }
+
+export function shouldSuggestSkilledSwitch(answers) {
+  return answers.canadianJobSkill === "non-skilled"
+    && (
+      answers.canadianExp !== "0"
+      || ["working-holiday", "pgwp", "worker"].includes(answers.base)
+      || ["working-holiday", "pgwp-pr", "canadian-worker"].includes(answers.path)
+    );
+}
