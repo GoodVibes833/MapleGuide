@@ -3860,8 +3860,8 @@ function renderLayout({ title, page, body, updates }) {
 
       .wizard-filter-shell {
         display: grid;
-        gap: 10px;
-        padding: 14px;
+        gap: 8px;
+        padding: 10px;
         border: 1px solid rgba(15, 61, 127, 0.12);
         border-radius: var(--radius-lg);
         background: rgba(255, 255, 255, 0.78);
@@ -3876,13 +3876,13 @@ function renderLayout({ title, page, body, updates }) {
       .wizard-filter-map-frame {
         display: grid;
         place-items: center;
-        min-height: 112px;
+        min-height: 68px;
         border: 1px solid rgba(15, 61, 127, 0.1);
         border-radius: var(--radius-lg);
         background:
           radial-gradient(circle at top right, rgba(47, 110, 196, 0.1), transparent 30%),
           linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 249, 255, 0.8));
-        padding: 0 6px;
+        padding: 0 4px;
         overflow: hidden;
       }
 
@@ -3890,7 +3890,7 @@ function renderLayout({ title, page, body, updates }) {
         width: 100%;
         height: auto;
         max-height: none;
-        transform: scale(1.34) translateY(-92px);
+        transform: scale(1.16) translateY(-132px);
         transform-origin: center top;
       }
 
