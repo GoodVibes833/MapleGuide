@@ -123,6 +123,15 @@ function serializeForScript(value) {
 
 function renderNav(page) {
   const dashboardClass = page === "dashboard" || page === "jurisdiction" ? "is-active" : "";
+  const dashboardActions = page === "dashboard"
+    ? `
+      <div class="site-actions">
+        <a class="btn tone-blue" href="#situations">내 상황 먼저 보기</a>
+        <a class="btn ghost" href="#compare-table">전체 비교 보기</a>
+        <button id="refresh-feed" class="btn tone-red">새 정보 새로고침</button>
+      </div>
+    `
+    : "";
 
   return `
     <header class="site-header">
@@ -133,9 +142,12 @@ function renderNav(page) {
           <span>캐나다 이민 길찾기 허브</span>
         </span>
       </a>
-      <nav class="site-nav" aria-label="주요 메뉴">
-        <a class="${dashboardClass}" href="/">업데이트 허브</a>
-      </nav>
+      <div class="site-header-tools">
+        <nav class="site-nav" aria-label="주요 메뉴">
+          <a class="${dashboardClass}" href="/">업데이트 허브</a>
+        </nav>
+        ${dashboardActions}
+      </div>
     </header>
   `;
 }
@@ -564,18 +576,12 @@ function renderHomeHero(updates) {
 
   return `
     <section class="section home-latest-section">
-      <div class="panel-head">
+      <div class="panel-head panel-head-tight">
         <div>
           <p class="panel-kicker">Latest Changes</p>
           <h2>가장 최신 업데이트</h2>
         </div>
-        <div class="hero-actions">
-          <a class="btn tone-blue" href="#situations">내 상황 먼저 보기</a>
-          <a class="btn ghost" href="#compare-table">전체 비교 보기</a>
-          <button id="refresh-feed" class="btn tone-red">새 정보 새로고침</button>
-        </div>
       </div>
-      <p class="hero-panel-note">들어오자마자 최신 변경부터 보고, 아래에서 내 상황과 바로 비교할 수 있게 바꿨습니다.</p>
       ${renderLatestUpdateCards(updates)}
     </section>
   `;
@@ -2500,6 +2506,22 @@ function renderLayout({ title, page, body, updates }) {
         font-size: 0.95rem;
       }
 
+      .site-header-tools {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .site-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
       .site-nav a {
         position: relative;
         padding-bottom: 2px;
@@ -3030,34 +3052,40 @@ function renderLayout({ title, page, body, updates }) {
 
       .home-latest-section {
         display: grid;
-        gap: 16px;
+        gap: 12px;
       }
 
       .update-flash-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(260px, 320px);
+        overflow-x: auto;
         gap: 14px;
+        padding-bottom: 4px;
+        scroll-snap-type: x proximity;
       }
 
       .update-flash-card {
         display: grid;
         gap: 10px;
-        padding: 18px;
+        min-height: 100%;
+        padding: 16px;
         border: 1px solid rgba(15, 61, 127, 0.12);
         border-radius: var(--radius-lg);
         background: rgba(255, 255, 255, 0.76);
+        scroll-snap-align: start;
       }
 
       .update-flash-card h3 {
         margin: 0;
-        font-size: 1.08rem;
+        font-size: 1rem;
         line-height: 1.45;
       }
 
       .update-flash-card p {
         margin: 0;
         color: var(--muted);
-        line-height: 1.7;
+        line-height: 1.65;
       }
 
       .hero-home .hero-copy,
@@ -3958,7 +3986,7 @@ function renderLayout({ title, page, body, updates }) {
         }
 
         .update-flash-grid {
-          grid-template-columns: 1fr;
+          grid-auto-columns: minmax(240px, 86vw);
         }
 
         .reason-columns {
@@ -3972,6 +4000,12 @@ function renderLayout({ title, page, body, updates }) {
 
         .site-nav {
           display: none;
+        }
+
+        .site-header-tools,
+        .site-actions {
+          width: 100%;
+          justify-content: flex-start;
         }
       }
 
@@ -4000,6 +4034,10 @@ function renderLayout({ title, page, body, updates }) {
         .news-card,
         .studio-card {
           padding: 22px;
+        }
+
+        .site-actions .btn {
+          width: 100%;
         }
 
         .hero-stats {
