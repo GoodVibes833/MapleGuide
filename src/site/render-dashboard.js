@@ -4092,21 +4092,6 @@ function renderLayout({ title, page, body, updates }) {
         display: grid;
         gap: 8px;
         position: relative;
-        padding: 0;
-        border-radius: var(--radius-md);
-        transition:
-          background 160ms ease,
-          box-shadow 160ms ease,
-          transform 160ms ease;
-      }
-
-      .wizard-field.is-missing {
-        padding: 14px;
-        margin: -14px;
-        background: linear-gradient(180deg, rgba(242, 228, 203, 0.5), rgba(255, 246, 230, 0.86));
-        box-shadow:
-          inset 0 0 0 1px rgba(181, 124, 46, 0.22),
-          0 14px 32px rgba(181, 124, 46, 0.08);
       }
 
       .wizard-field span {
@@ -4127,14 +4112,27 @@ function renderLayout({ title, page, body, updates }) {
         font-style: normal;
         font-size: 0.82rem;
         font-weight: 800;
-        padding: 2px 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 52px;
+        min-height: 26px;
+        padding: 0 10px;
         border-radius: 999px;
         background: rgba(15, 61, 127, 0.08);
+        border: 1px solid transparent;
+        transition:
+          background 160ms ease,
+          color 160ms ease,
+          border-color 160ms ease,
+          box-shadow 160ms ease;
       }
 
       .wizard-field.is-missing .required-mark {
         color: #8c4f00;
-        background: rgba(181, 124, 46, 0.18);
+        background: rgba(181, 124, 46, 0.14);
+        border-color: rgba(181, 124, 46, 0.34);
+        box-shadow: 0 0 0 3px rgba(181, 124, 46, 0.1);
       }
 
       .wizard-field select {
@@ -4144,16 +4142,6 @@ function renderLayout({ title, page, body, updates }) {
         border-radius: var(--radius-sm);
         background: rgba(255, 255, 255, 0.82);
         color: var(--text);
-      }
-
-      .wizard-field.is-missing select {
-        border-color: rgba(181, 124, 46, 0.5);
-        background: rgba(255, 251, 245, 0.98);
-        box-shadow: 0 0 0 3px rgba(181, 124, 46, 0.12);
-      }
-
-      .wizard-field.is-missing .wizard-field-label {
-        color: #8c4f00;
       }
 
       .wizard-empty,
