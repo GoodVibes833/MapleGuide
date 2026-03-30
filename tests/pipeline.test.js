@@ -54,6 +54,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /예상 적합도/);
   assert.match(dashboardHtml, /완료 시 예상 CRS \+/);
   assert.match(dashboardHtml, /입력한 캐나다 skilled 경력은 CRS에 반영했습니다/);
+  assert.match(dashboardHtml, /언어점수 CLB 9 이상 목표/);
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
   assert.match(dashboardHtml, /연방 \/ Express Entry/);
   assert.match(dashboardHtml, /Map Explorer/);

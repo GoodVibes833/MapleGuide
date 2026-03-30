@@ -14,6 +14,7 @@ import {
   describeCanadianExperienceCrsTreatment,
   estimateCanadianExperienceCrsPoints
 } from "./crs-helpers.js";
+import { getLanguageImprovementActions } from "./recommendation-helpers.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
@@ -1303,6 +1304,7 @@ function renderClientScript({ page, updates }) {
         ${countsCanadianExperienceForCrs.toString()}
         ${describeCanadianExperienceCrsTreatment.toString()}
         ${estimateCanadianExperienceCrsPoints.toString()}
+        ${getLanguageImprovementActions.toString()}
 
         function hasSkilledCanadianTrack(answers) {
           return countsCanadianExperienceForCrs(answers);
@@ -2077,7 +2079,9 @@ function renderClientScript({ page, updates }) {
             addAction(5, "해당 지역 사업성 검토 또는 탐방 준비", "지역 시장성과 운영 가능성을 미리 정리하면 entrepreneur 심사 준비가 훨씬 쉬워집니다.");
           }
 
-          if (answers.languageScoreStatus === "none") {
+          const languageActions = getLanguageImprovementActions(answers);
+
+          if (languageActions.includes("language-proof")) {
             const delta = answers.english === "unknown"
               ? 12
               : answers.english === "clb6"
@@ -2090,14 +2094,14 @@ function renderClientScript({ page, updates }) {
 
             addAction(
               delta,
-              answers.languageEvidence === "guess" ? "언어시험 응시 후 공식 점수표 확보" : "공식 언어점수표까지 확보",
+              answers.languageEvidence === "guess" ? "언어시험 응시 후 공식 점수표 확보" : "생각하는 목표 점수를 실제 공인 점수로 확인",
               "EE와 대부분의 주정부 경로는 공식 언어점수가 있어야 실제 비교와 프로필 판단이 정확해집니다.",
               "language-proof"
             );
-          } else if (answers.languageScoreStatus === "booked") {
-            addAction(6, "생각하는 목표 점수를 실제 공인 점수로 확인", "목표 점수도 좋지만 실제 공인 점수표가 있어야 점수와 경로 판단이 훨씬 선명해집니다.", "language-proof");
-          } else if (answers.languageScoreStatus === "official" && ["clb6", "clb7", "clb8"].includes(answers.english)) {
-            const delta = answers.english === "clb8" ? 5 : answers.english === "clb7" ? 8 : 10;
+          }
+
+          if (languageActions.includes("language-clb9")) {
+            const delta = answers.english === "clb8" ? 9 : answers.english === "clb7" ? 12 : 14;
             addAction(delta, "언어점수 CLB 9 이상 목표", "특히 EE와 점수형 주정부 경로는 CLB 9 전후에서 체감 차이가 커질 수 있습니다.", "language-clb9");
           }
 
