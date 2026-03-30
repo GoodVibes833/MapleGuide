@@ -65,46 +65,25 @@ function buildCanadaMapSvg({ idPrefix = "", className = "canada-map actual-map",
 
 const CANADA_MAP_SVG = buildCanadaMapSvg();
 
-const QUICK_FILTER_LAYOUT = {
-  yukon: { left: "5%", top: "6%", width: "12%" },
-  "northwest-territories": { left: "19%", top: "4%", width: "18%" },
-  nunavut: { left: "44%", top: "2%", width: "24%" },
-  "british-columbia": { left: "2%", top: "40%", width: "13%" },
-  alberta: { left: "16%", top: "40%", width: "12%" },
-  saskatchewan: { left: "29%", top: "40%", width: "12%" },
-  manitoba: { left: "42%", top: "40%", width: "12%" },
-  ontario: { left: "55%", top: "38%", width: "16%" },
-  quebec: { left: "72%", top: "36%", width: "16%" },
-  "new-brunswick": { left: "77%", top: "66%", width: "10%" },
-  "prince-edward-island": { left: "87%", top: "64%", width: "6%" },
-  "nova-scotia": { left: "85%", top: "78%", width: "11%" },
-  "newfoundland-and-labrador": { left: "90%", top: "48%", width: "10%" }
-};
-
-function renderQuickFilterMap() {
+function renderQuickFilterCoins() {
   return `
-    <div class="quick-filter-map-schematic" role="group" aria-label="관심 지역 선택 지도">
+    <div class="quick-filter-coins" role="group" aria-label="관심 지역 선택">
       ${JURISDICTION_META
         .filter((region) => region.id !== "federal")
-        .map((region) => {
-          const layout = QUICK_FILTER_LAYOUT[region.id];
-          if (!layout) {
-            return "";
-          }
-
-          return `
+        .map(
+          (region) => `
             <button
               type="button"
-              class="quick-map-button"
+              class="quick-coin"
               data-quick-map-region="${escapeHtml(region.id)}"
               aria-label="${escapeHtml(region.labelKo)} 선택"
               title="${escapeHtml(region.labelKo)}"
-              style="left:${layout.left}; top:${layout.top}; width:${layout.width};"
             >
-              ${escapeHtml(region.shortLabel)}
+              <span class="quick-coin-abbr">${escapeHtml(region.shortLabel)}</span>
+              <span class="quick-coin-label">${escapeHtml(region.labelKo)}</span>
             </button>
-          `;
-        })
+          `
+        )
         .join("")}
     </div>
   `;
@@ -305,17 +284,15 @@ function renderSituationSection(insights) {
       </div>
       <div class="wizard-filter-bar">
         <div class="wizard-filter-copy">
-          <strong>관심 지역 지도 필터</strong>
-          <span>지도를 눌러 여러 주를 같이 고를 수 있습니다. 선택하지 않으면 전체 지역을 추천합니다.</span>
+          <strong>관심 지역 필터</strong>
+          <span>동그란 지역 버튼으로 여러 주를 같이 고를 수 있습니다. 선택하지 않으면 전체 지역을 추천합니다.</span>
         </div>
         <div class="wizard-filter-shell">
           <div class="wizard-filter-toolbar">
             <button type="button" class="chip" data-quick-region-toggle="federal">연방 / EE</button>
             <button type="button" class="chip" data-quick-region-clear>전체 보기</button>
           </div>
-          <div class="wizard-filter-map-frame">
-            ${renderQuickFilterMap()}
-          </div>
+          ${renderQuickFilterCoins()}
           <div class="wizard-filter-selection" id="quick-region-selection">선택된 지역 없음 · 전체 추천</div>
         </div>
       </div>
@@ -3887,55 +3864,66 @@ function renderLayout({ title, page, body, updates }) {
         max-width: 620px;
       }
 
-      .wizard-filter-map-frame {
-        position: relative;
-        width: min(100%, 620px);
-        height: 92px;
-        border: 1px solid rgba(15, 61, 127, 0.1);
-        border-radius: var(--radius-lg);
-        background:
-          radial-gradient(circle at top right, rgba(47, 110, 196, 0.1), transparent 30%),
-          linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 249, 255, 0.8));
-        padding: 0 4px;
-        overflow: hidden;
+      .quick-filter-coins {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        max-width: 760px;
       }
 
-      .quick-filter-map-schematic {
-        position: relative;
-        width: 100%;
-        height: 100%;
-      }
-
-      .quick-map-button {
-        position: absolute;
+      .quick-coin {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        min-height: 18px;
-        padding: 0 6px;
-        border: 1px solid rgba(15, 61, 127, 0.16);
+        gap: 10px;
+        min-height: 48px;
+        padding: 8px 14px 8px 10px;
+        border: 1px solid rgba(15, 61, 127, 0.14);
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.84);
+        background:
+          radial-gradient(circle at top left, rgba(47, 110, 196, 0.1), transparent 45%),
+          rgba(255, 255, 255, 0.9);
         color: var(--accent-deep);
-        font-size: 0.68rem;
-        font-weight: 800;
-        letter-spacing: 0.04em;
+        text-align: left;
         cursor: pointer;
         transition:
           transform 160ms ease,
+          border-color 160ms ease,
           background 160ms ease,
           box-shadow 160ms ease;
       }
 
-      .quick-map-button:hover,
-      .quick-map-button:focus-visible {
+      .quick-coin:hover,
+      .quick-coin:focus-visible {
         transform: translateY(-1px);
+        border-color: rgba(15, 61, 127, 0.24);
+        box-shadow: 0 10px 24px rgba(15, 61, 127, 0.08);
       }
 
-      .quick-map-button.is-selected {
+      .quick-coin.is-selected {
+        border-color: rgba(15, 61, 127, 0.22);
+        background: linear-gradient(135deg, rgba(47, 110, 196, 0.14), rgba(255, 255, 255, 0.96));
+        box-shadow: 0 12px 28px rgba(15, 61, 127, 0.14);
+      }
+
+      .quick-coin-abbr {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
         background: linear-gradient(135deg, var(--accent), var(--accent-strong));
         color: #fff9f5;
-        box-shadow: 0 10px 20px rgba(15, 61, 127, 0.16);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        flex: 0 0 auto;
+      }
+
+      .quick-coin-label {
+        font-size: 0.92rem;
+        font-weight: 700;
+        line-height: 1.2;
       }
 
       .wizard-filter-selection {
