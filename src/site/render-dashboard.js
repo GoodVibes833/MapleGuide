@@ -4002,6 +4002,16 @@ function renderLayout({ title, page, body, updates }) {
         max-width: 100%;
       }
 
+      .wizard-filter-toolbar .chip {
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: none;
+      }
+
+      .wizard-filter-toolbar .chip.active {
+        background: var(--accent-deep);
+        box-shadow: none;
+      }
+
       .quick-filter-coins {
         display: grid;
         grid-template-columns: repeat(var(--quick-region-count), minmax(0, 1fr));
@@ -4022,9 +4032,7 @@ function renderLayout({ title, page, body, updates }) {
         padding: 0 8px;
         border: 1px solid rgba(15, 61, 127, 0.14);
         border-radius: 999px;
-        background:
-          radial-gradient(circle at top left, rgba(47, 110, 196, 0.1), transparent 45%),
-          rgba(255, 255, 255, 0.9);
+        background: rgba(255, 255, 255, 0.96);
         color: var(--accent-deep);
         text-align: center;
         white-space: nowrap;
@@ -4033,23 +4041,18 @@ function renderLayout({ title, page, body, updates }) {
         transition:
           transform 160ms ease,
           border-color 160ms ease,
-          background 160ms ease,
-          box-shadow 160ms ease;
+          background 160ms ease;
       }
 
       .quick-coin:hover,
       .quick-coin:focus-visible {
         transform: translateY(-1px);
         border-color: rgba(15, 61, 127, 0.24);
-        box-shadow: 0 10px 24px rgba(15, 61, 127, 0.08);
       }
 
       .quick-coin.is-selected {
         border-color: rgba(10, 44, 93, 0.88);
-        background: linear-gradient(135deg, #0a2c5d, #2f6ec4 72%, #4d8de1);
-        box-shadow:
-          0 14px 30px rgba(15, 61, 127, 0.24),
-          0 0 0 3px rgba(47, 110, 196, 0.18);
+        background: var(--accent-deep);
         color: #fff9f5;
       }
 
