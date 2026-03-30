@@ -721,10 +721,8 @@ function renderLatestUpdateCards(updates) {
           return `
             <details class="update-flash-card">
               <summary class="update-flash-summary">
-                <div class="update-flash-meta">
-                  <span class="tag">${escapeHtml(getJurisdictionMeta(update.jurisdiction).labelKo)}</span>
-                  <span class="mini-flag">${escapeHtml(updateDate)}</span>
-                </div>
+                <span class="update-flash-jurisdiction">${escapeHtml(getJurisdictionMeta(update.jurisdiction).labelKo)}</span>
+                <span class="update-flash-date">${escapeHtml(updateDate)}</span>
                 <strong>${escapeHtml(headline)}</strong>
                 <span class="update-flash-chevron" aria-hidden="true">▾</span>
               </summary>
@@ -3765,10 +3763,11 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .update-flash-summary {
-        display: flex;
+        display: grid;
+        grid-template-columns: 116px 92px minmax(0, 1fr) 18px;
         align-items: center;
-        gap: 8px;
-        padding: 7px 12px;
+        gap: 12px;
+        padding: 8px 12px;
         cursor: pointer;
         list-style: none;
       }
@@ -3777,23 +3776,23 @@ function renderLayout({ title, page, body, updates }) {
         display: none;
       }
 
-      .update-flash-meta {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex: 0 0 auto;
+      .update-flash-jurisdiction {
+        color: var(--accent-deep);
+        font-size: 0.83rem;
+        font-weight: 800;
+        line-height: 1;
         white-space: nowrap;
       }
 
-      .update-flash-summary .tag,
-      .update-flash-summary .mini-flag {
-        min-height: 24px;
-        padding: 0 8px;
-        font-size: 0.72rem;
+      .update-flash-date {
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
       }
 
       .update-flash-summary strong {
-        flex: 1 1 auto;
         min-width: 0;
         font-size: 0.91rem;
         line-height: 1.1;
@@ -3865,6 +3864,10 @@ function renderLayout({ title, page, body, updates }) {
       .update-flash-more-list {
         display: grid;
         gap: 10px;
+      }
+
+      .update-flash-more-list[hidden] {
+        display: none;
       }
 
       .update-flash-original {
@@ -5023,6 +5026,32 @@ function renderLayout({ title, page, body, updates }) {
 
         .compare-table {
           min-width: 760px;
+        }
+
+        .update-flash-summary {
+          grid-template-columns: 1fr auto 18px;
+          grid-template-areas:
+            "jurisdiction date chevron"
+            "title title title";
+          row-gap: 8px;
+        }
+
+        .update-flash-jurisdiction {
+          grid-area: jurisdiction;
+        }
+
+        .update-flash-date {
+          grid-area: date;
+          justify-self: end;
+        }
+
+        .update-flash-summary strong {
+          grid-area: title;
+        }
+
+        .update-flash-chevron {
+          grid-area: chevron;
+          justify-self: end;
         }
       }
     </style>
