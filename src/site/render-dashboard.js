@@ -3752,22 +3752,22 @@ function renderClientScript({ page, updates, basePath = "" }) {
                 '<span class="compare-pill">비용 ' + escapeHtmlClient(insight.lifestyle.costLabelKo) + "</span>",
                 '<span class="compare-pill">지역정착 ' + escapeHtmlClient(insight.lifestyle.regionalLabelKo) + "</span>",
                 "</div>",
-                '<div class="result-summary-grid">',
-                '<section class="result-summary-block">',
+                '<div class="result-summary-stack">',
+                '<div class="result-summary-card">',
                 '<strong>왜 이 순위인가</strong>',
                 '<ul class="result-summary-list">'
                   + whyRankItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
                   + '</ul>',
-                '</section>',
-                '<section class="result-summary-block">',
+                '</div>',
+                '<div class="result-summary-card">',
                 '<strong>내가 이미 가진 것</strong>',
                 '<ul class="result-summary-list">'
                   + (pathwayCurrentItems.length
                     ? pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
                     : '<li>강점 정리를 더 해보는 게 좋아요.</li>')
                   + '</ul>',
-                '</section>',
-                '<section class="result-summary-block">',
+                '</div>',
+                '<div class="result-summary-card">',
                 '<div class="improvement-head">',
                 '<strong>지금 할 것</strong>',
                 '<span class="improvement-total">' + escapeHtmlClient(
@@ -3779,7 +3779,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
                 ) + '</span>',
                 '</div>',
                 '<ul class="compact-action-list">' + quickActionsHtml + '</ul>',
-                '</section>',
+                '</div>',
                 '</div>',
                 '<details class="result-details">',
                 '<summary>자세히 보기</summary>',
@@ -5570,13 +5570,18 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
         font-weight: 600;
       }
 
-      .result-summary-grid {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
+      .result-summary-stack {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
         gap: 12px;
       }
 
+      .result-summary-stack > * {
+        width: 100% !important;
+      }
+
+      .result-summary-card,
       .result-summary-block {
         display: grid;
         gap: 8px;
@@ -5587,6 +5592,7 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
         background: rgba(255, 255, 255, 0.78);
       }
 
+      .result-summary-card strong,
       .result-summary-block strong {
         color: var(--accent-deep);
         font-size: 0.88rem;
@@ -6724,7 +6730,7 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
         .special-pathway-cards,
         .direction-summary-grid,
         .special-pathway-grid,
-        .result-summary-grid,
+        .result-summary-stack,
         .pathway-guide-grid,
         .reason-columns {
           grid-template-columns: 1fr;
