@@ -65,6 +65,30 @@ function buildCanadaMapSvg({ idPrefix = "", className = "canada-map actual-map",
 
 const CANADA_MAP_SVG = buildCanadaMapSvg();
 
+function buildMiniRegionMapSvg(jurisdictionId) {
+  const prefix = `mini-${jurisdictionId}-`;
+  const activeRegionIds = jurisdictionId === "federal"
+    ? new Set(JURISDICTION_META.filter((region) => region.svgId).map((region) => region.id))
+    : new Set([jurisdictionId]);
+  let svg = buildCanadaMapSvg({
+    idPrefix: prefix,
+    className: "canada-map mini-region-map",
+    ariaLabel: `${getJurisdictionMeta(jurisdictionId).labelKo} 위치 미리보기`
+  });
+
+  JURISDICTION_META.filter((region) => region.svgId).forEach((region) => {
+    const prefixedId = `${prefix}${region.svgId}`;
+    const className = activeRegionIds.has(region.id) ? "mini-region-shape is-active" : "mini-region-shape";
+    svg = svg.replace(`id="${prefixedId}"`, `id="${prefixedId}" class="${className}"`);
+  });
+
+  return svg;
+}
+
+const MINI_REGION_MAP_SVGS = Object.fromEntries(
+  JURISDICTION_META.map((region) => [region.id, buildMiniRegionMapSvg(region.id)])
+);
+
 function renderQuickFilterCoins() {
   const quickRegionCount = JURISDICTION_META.filter((region) => region.id !== "federal").length;
   return `
@@ -1378,6 +1402,7 @@ function renderClientScript({ page, updates }) {
       const PAGE = ${JSON.stringify(page)};
       const UPDATES = ${serializeForScript(updates)};
       const MAP_REGION_DEFS = ${serializeForScript(JURISDICTION_META)};
+      const MINI_REGION_MAPS = ${serializeForScript(MINI_REGION_MAP_SVGS)};
       const DASHBOARD_INSIGHTS = ${serializeForScript(
         page === "dashboard" ? buildJurisdictionInsights(updates) : []
       )};
@@ -1537,6 +1562,10 @@ function renderClientScript({ page, updates }) {
 
         function isCanadianExperienceIntent(path) {
           return ["working-holiday", "pgwp-pr", "canadian-worker"].includes(path);
+        }
+
+        function getRecommendationMiniMapMarkup(jurisdictionId) {
+          return MINI_REGION_MAPS[jurisdictionId] || MINI_REGION_MAPS.federal || "";
         }
 
         if (updatesMoreToggle && olderUpdatesList) {
@@ -2722,12 +2751,17 @@ function renderClientScript({ page, updates }) {
 
               return [
                 '<article class="wizard-result-card">',
+                '<div class="wizard-card-header">',
+                '<div class="wizard-card-title-stack">',
                 '<div class="card-topline">',
                 '<span class="status-badge status-approved">추천 ' + (index + 1) + "</span>",
                 '<span class="tag">' + escapeHtmlClient(insight.labelKo) + "</span>",
                 "</div>",
                 "<h3>" + escapeHtmlClient(insight.labelKo) + "</h3>",
                 '<p class="wizard-result-system">' + escapeHtmlClient(insight.system) + "</p>",
+                "</div>",
+                '<div class="wizard-card-mini-map" aria-hidden="true">' + getRecommendationMiniMapMarkup(insight.id) + "</div>",
+                "</div>",
                 '<div class="fit-band-row">',
                 '<span class="fit-score">예상 적합도 ' + escapeHtmlClient(fitPercent) + '%</span>',
                 '<span class="chance-score">현재 진입 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
@@ -4209,6 +4243,51 @@ function renderLayout({ title, page, body, updates }) {
         line-height: 1.4;
       }
 
+      .wizard-card-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 126px;
+        gap: 14px;
+        align-items: start;
+      }
+
+      .wizard-card-title-stack {
+        display: grid;
+        min-width: 0;
+      }
+
+      .wizard-card-mini-map {
+        justify-self: end;
+        width: 126px;
+        padding: 8px 10px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      .mini-region-map {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .mini-region-map text {
+        display: none;
+      }
+
+      .mini-region-map .mini-region-shape,
+      .mini-region-map .mini-region-shape path {
+        fill: rgba(15, 61, 127, 0.08) !important;
+        stroke: rgba(15, 61, 127, 0.2) !important;
+        stroke-width: 8 !important;
+        vector-effect: non-scaling-stroke;
+      }
+
+      .mini-region-map .mini-region-shape.is-active,
+      .mini-region-map .mini-region-shape.is-active path {
+        fill: var(--accent-strong) !important;
+        stroke: var(--accent-deep) !important;
+      }
+
       .fit-band-row {
         display: flex;
         flex-wrap: wrap;
@@ -5093,6 +5172,15 @@ function renderLayout({ title, page, body, updates }) {
         .update-flash-chevron {
           grid-area: chevron;
           justify-self: end;
+        }
+
+        .wizard-card-header {
+          grid-template-columns: 1fr;
+        }
+
+        .wizard-card-mini-map {
+          justify-self: start;
+          width: 112px;
         }
       }
     </style>
