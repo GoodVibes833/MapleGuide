@@ -309,31 +309,19 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>영어 수준</span>
-            <select name="english">
-              <option value="unknown">아직 시험 전/모름</option>
-              <option value="clb6">CLB 6 이하</option>
-              <option value="clb7">CLB 7</option>
-              <option value="clb8">CLB 8</option>
-              <option value="clb9plus">CLB 9 이상</option>
-            </select>
-          </label>
-          <label class="wizard-field">
-            <span>언어시험 종류</span>
-            <select name="languageTest">
-              <option value="none">아직 없음</option>
-              <option value="ielts">IELTS General</option>
-              <option value="celpip">CELPIP General</option>
-              <option value="pte">PTE Core</option>
-              <option value="tef-tcf">TEF / TCF Canada</option>
-            </select>
-          </label>
-          <label class="wizard-field">
-            <span>실제 언어점수 상태</span>
-            <select name="languageScoreStatus">
-              <option value="none">아직 시험점수 없음</option>
-              <option value="booked">시험 예약 또는 준비 중</option>
-              <option value="official">공식 점수표가 있음</option>
+            <span>영어 상태</span>
+            <select name="languageProfile">
+              <option value="guess:unknown">시험은 안 봤고 지금은 잘 모르겠어요</option>
+              <option value="guess:clb6">시험은 안 봤고 지금은 CLB 6 이하 같아요</option>
+              <option value="guess:clb7">시험은 안 봤고 지금은 CLB 7 정도 같아요</option>
+              <option value="guess:clb8">시험은 안 봤고 지금은 CLB 8 정도 같아요</option>
+              <option value="target:clb7">공인 점수는 없지만 CLB 7까지는 딸 수 있을 것 같아요</option>
+              <option value="target:clb8">공인 점수는 없지만 CLB 8까지는 딸 수 있을 것 같아요</option>
+              <option value="target:clb9plus">공인 점수는 없지만 CLB 9 이상도 노려볼 수 있을 것 같아요</option>
+              <option value="official:clb6">공인 영어점수는 CLB 6 이하예요</option>
+              <option value="official:clb7">공인 영어점수는 CLB 7 정도예요</option>
+              <option value="official:clb8">공인 영어점수는 CLB 8 정도예요</option>
+              <option value="official:clb9plus">공인 영어점수는 CLB 9 이상이에요</option>
             </select>
           </label>
           <label class="wizard-field">
@@ -1311,6 +1299,31 @@ function renderClientScript({ page, updates }) {
           return hasCanadianWorkBase(answers.base) && answers.canadianJobSkill === "skilled";
         }
 
+        function normalizeLanguageAnswers(rawAnswers) {
+          const [evidence = "guess", english = "unknown"] = (rawAnswers.languageProfile ?? "guess:unknown").split(":");
+          const labelMap = {
+            "guess:unknown": "시험은 안 봤고 지금은 잘 모르겠어요",
+            "guess:clb6": "시험은 안 봤고 지금은 CLB 6 이하 같아요",
+            "guess:clb7": "시험은 안 봤고 지금은 CLB 7 정도 같아요",
+            "guess:clb8": "시험은 안 봤고 지금은 CLB 8 정도 같아요",
+            "target:clb7": "공인 점수는 없지만 CLB 7까지는 딸 수 있을 것 같아요",
+            "target:clb8": "공인 점수는 없지만 CLB 8까지는 딸 수 있을 것 같아요",
+            "target:clb9plus": "공인 점수는 없지만 CLB 9 이상도 노려볼 수 있을 것 같아요",
+            "official:clb6": "공인 영어점수는 CLB 6 이하예요",
+            "official:clb7": "공인 영어점수는 CLB 7 정도예요",
+            "official:clb8": "공인 영어점수는 CLB 8 정도예요",
+            "official:clb9plus": "공인 영어점수는 CLB 9 이상이에요"
+          };
+
+          return {
+            english,
+            languageScoreStatus: evidence === "official" ? "official" : evidence === "target" ? "booked" : "none",
+            languageTest: evidence === "guess" ? "none" : "english",
+            languageEvidence: evidence,
+            languageProfileLabelKo: labelMap[rawAnswers.languageProfile] ?? labelMap["guess:unknown"]
+          };
+        }
+
         function scoreInsight(insight, answers) {
           let score = 0;
           const policyReasons = [];
@@ -1402,12 +1415,9 @@ function renderClientScript({ page, updates }) {
           if (answers.languageScoreStatus === "official") {
             add(2, "실제 언어점수가 있어 프로필 판단 정확도가 높음");
           } else if (answers.languageScoreStatus === "booked") {
-            add(1, "언어시험이 다음 단계로 연결될 수 있음");
+            add(1, "목표 영어점수가 분명해 다음 단계 계획을 세우기 쉬움");
           } else if (answers.languageScoreStatus === "none" && answers.ee === "yes") {
             add(-2, "EE 방향이면 실제 언어점수가 먼저 필요함");
-          }
-          if (answers.languageTest === "tef-tcf" && answers.advantage === "french") {
-            add(2, "프랑스어 시험이 실제 강점으로 연결될 수 있음");
           }
           if (answers.targetOccupationPlan === "current-canada-job") {
             if (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0") {
@@ -1845,7 +1855,7 @@ function renderClientScript({ page, updates }) {
           const languagePoints = estimateLanguageCrsPoints(answers, withSpouse);
           const canadianPoints = estimateCanadianExperienceCrsPoints(answers, withSpouse);
           const transferabilityPoints = estimateSkillTransferabilityPoints(answers);
-          const frenchBonus = answers.advantage === "french" && answers.languageTest === "tef-tcf" ? 25 : 0;
+          const frenchBonus = 0;
           const score = agePoints + educationPoints + languagePoints + canadianPoints + transferabilityPoints + frenchBonus;
           const gap = latestCutoff ? score - Number(latestCutoff) : null;
           const notes = [];
@@ -1978,11 +1988,11 @@ function renderClientScript({ page, updates }) {
 
             addAction(
               delta,
-              answers.languageTest === "none" ? "언어시험 응시 후 공식 점수표 확보" : "공식 언어점수표까지 확보",
+              answers.languageEvidence === "guess" ? "언어시험 응시 후 공식 점수표 확보" : "공식 언어점수표까지 확보",
               "EE와 대부분의 주정부 경로는 공식 언어점수가 있어야 실제 비교와 프로필 판단이 정확해집니다."
             );
           } else if (answers.languageScoreStatus === "booked") {
-            addAction(6, "예약한 언어시험 결과까지 확보", "시험 예약 상태보다 실제 점수표가 있어야 점수와 경로 판단이 훨씬 선명해집니다.");
+            addAction(6, "생각하는 목표 점수를 실제 공인 점수로 확인", "목표 점수도 좋지만 실제 공인 점수표가 있어야 점수와 경로 판단이 훨씬 선명해집니다.");
           } else if (answers.languageScoreStatus === "official" && ["clb6", "clb7", "clb8"].includes(answers.english)) {
             const delta = answers.english === "clb8" ? 5 : answers.english === "clb7" ? 8 : 10;
             addAction(delta, "언어점수 CLB 9 이상 목표", "특히 EE와 점수형 주정부 경로는 CLB 9 전후에서 체감 차이가 커질 수 있습니다.");
@@ -2154,7 +2164,11 @@ function renderClientScript({ page, updates }) {
           }
 
           const formData = new FormData(quickStartForm);
-          const answers = Object.fromEntries(formData.entries());
+          const rawAnswers = Object.fromEntries(formData.entries());
+          const answers = {
+            ...rawAnswers,
+            ...normalizeLanguageAnswers(rawAnswers)
+          };
           const ranked = DASHBOARD_INSIGHTS
             .filter((insight) => insight.id !== "nunavut")
             .map((insight) => ({
@@ -2211,8 +2225,7 @@ function renderClientScript({ page, updates }) {
               const crsNoteText = crsSnapshot.notes.length > 0
                 ? crsSnapshot.notes.join(" · ")
                 : "현재 입력값 기준으로 바로 비교했습니다.";
-              const readinessLine = "언어시험: " + escapeHtmlClient(answers.languageTest)
-                + " / 점수상태: " + escapeHtmlClient(answers.languageScoreStatus)
+              const readinessLine = "영어 상태: " + escapeHtmlClient(answers.languageProfileLabelKo)
                 + " / ECA: " + escapeHtmlClient(answers.ecaStatus);
 
               return [

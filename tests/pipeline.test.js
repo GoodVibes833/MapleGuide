@@ -45,7 +45,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /나이/);
   assert.match(dashboardHtml, /최종 학력/);
   assert.match(dashboardHtml, /현재 직군/);
-  assert.match(dashboardHtml, /언어시험 종류/);
+  assert.match(dashboardHtml, /영어 상태/);
   assert.match(dashboardHtml, /ECA \/ 학력평가 상태/);
   assert.match(dashboardHtml, /학비·생활비 부담/);
   assert.match(dashboardHtml, /정착 선호/);
