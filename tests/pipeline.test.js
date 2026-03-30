@@ -51,6 +51,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /관심 지역 필터/);
   assert.match(dashboardHtml, /동그란 지역 버튼으로 여러 주를 같이 고를 수 있습니다/);
   assert.match(dashboardHtml, /quick-coin/);
+  assert.match(dashboardHtml, /British Columbia/);
+  assert.match(dashboardHtml, /Federal \/ EE/);
   assert.match(dashboardHtml, /선택된 지역 없음 · 전체 추천/);
   assert.match(dashboardHtml, /연방 \/ EE/);
   assert.match(dashboardHtml, /필수\*/);

@@ -66,6 +66,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /워홀·오픈퍼밋으로 현지 경력 쌓아 이민을 보려 해요/);
   assert.match(dashboardResponse.body, /관심 지역 필터/);
   assert.match(dashboardResponse.body, /quick-coin/);
+  assert.match(dashboardResponse.body, /British Columbia/);
   assert.match(dashboardResponse.body, /선택된 지역 없음 · 전체 추천/);
   assert.match(dashboardResponse.body, /필수\*/);
   assert.match(dashboardResponse.body, /최종 학력/);

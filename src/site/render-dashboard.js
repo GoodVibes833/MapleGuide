@@ -24,20 +24,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
 
 export const JURISDICTION_META = [
-  { id: "federal", labelKo: "연방 / EE", shortLabel: "EE", svgId: null },
-  { id: "yukon", labelKo: "유콘", shortLabel: "YT", svgId: "CA-YT" },
-  { id: "northwest-territories", labelKo: "노스웨스트 준주", shortLabel: "NT", svgId: "CA-NT" },
-  { id: "nunavut", labelKo: "누나붓", shortLabel: "NU", svgId: "CA-NU" },
-  { id: "british-columbia", labelKo: "브리티시컬럼비아", shortLabel: "BC", svgId: "CA-BC" },
-  { id: "alberta", labelKo: "알버타", shortLabel: "AB", svgId: "CA-AB" },
-  { id: "saskatchewan", labelKo: "사스카츄완", shortLabel: "SK", svgId: "CA-SK" },
-  { id: "manitoba", labelKo: "매니토바", shortLabel: "MB", svgId: "CA-MB" },
-  { id: "ontario", labelKo: "온타리오", shortLabel: "ON", svgId: "CA-ON" },
-  { id: "quebec", labelKo: "퀘벡", shortLabel: "QC", svgId: "CA-QC" },
-  { id: "new-brunswick", labelKo: "뉴브런즈윅", shortLabel: "NB", svgId: "CA-NB" },
-  { id: "prince-edward-island", labelKo: "프린스에드워드아일랜드", shortLabel: "PE", svgId: "CA-PE" },
-  { id: "nova-scotia", labelKo: "노바스코샤", shortLabel: "NS", svgId: "CA-NS" },
-  { id: "newfoundland-and-labrador", labelKo: "뉴펀들랜드 래브라도", shortLabel: "NL", svgId: "CA-NL" }
+  { id: "federal", labelKo: "연방 / EE", labelEn: "Federal / EE", shortLabel: "EE", svgId: null },
+  { id: "yukon", labelKo: "유콘", labelEn: "Yukon", shortLabel: "YT", svgId: "CA-YT" },
+  { id: "northwest-territories", labelKo: "노스웨스트 준주", labelEn: "Northwest Terr.", shortLabel: "NT", svgId: "CA-NT" },
+  { id: "nunavut", labelKo: "누나붓", labelEn: "Nunavut", shortLabel: "NU", svgId: "CA-NU" },
+  { id: "british-columbia", labelKo: "브리티시컬럼비아", labelEn: "British Columbia", shortLabel: "BC", svgId: "CA-BC" },
+  { id: "alberta", labelKo: "알버타", labelEn: "Alberta", shortLabel: "AB", svgId: "CA-AB" },
+  { id: "saskatchewan", labelKo: "사스카츄완", labelEn: "Saskatchewan", shortLabel: "SK", svgId: "CA-SK" },
+  { id: "manitoba", labelKo: "매니토바", labelEn: "Manitoba", shortLabel: "MB", svgId: "CA-MB" },
+  { id: "ontario", labelKo: "온타리오", labelEn: "Ontario", shortLabel: "ON", svgId: "CA-ON" },
+  { id: "quebec", labelKo: "퀘벡", labelEn: "Quebec", shortLabel: "QC", svgId: "CA-QC" },
+  { id: "new-brunswick", labelKo: "뉴브런즈윅", labelEn: "New Brunswick", shortLabel: "NB", svgId: "CA-NB" },
+  { id: "prince-edward-island", labelKo: "프린스에드워드아일랜드", labelEn: "Prince Edward Isl.", shortLabel: "PE", svgId: "CA-PE" },
+  { id: "nova-scotia", labelKo: "노바스코샤", labelEn: "Nova Scotia", shortLabel: "NS", svgId: "CA-NS" },
+  { id: "newfoundland-and-labrador", labelKo: "뉴펀들랜드 래브라도", labelEn: "Newfoundland & Labrador", shortLabel: "NL", svgId: "CA-NL" }
 ];
 
 function buildCanadaMapSvg({ idPrefix = "", className = "canada-map actual-map", ariaLabel = "캐나다 주 및 준주 지도" } = {}) {
@@ -76,11 +76,11 @@ function renderQuickFilterCoins() {
               type="button"
               class="quick-coin"
               data-quick-map-region="${escapeHtml(region.id)}"
-              aria-label="${escapeHtml(region.labelKo)} 선택"
-              title="${escapeHtml(region.labelKo)}"
+              aria-label="${escapeHtml(region.labelEn ?? region.labelKo)} 선택"
+              title="${escapeHtml(region.labelEn ?? region.labelKo)}"
             >
               <span class="quick-coin-abbr">${escapeHtml(region.shortLabel)}</span>
-              <span class="quick-coin-label">${escapeHtml(region.labelKo)}</span>
+              <span class="quick-coin-label">${escapeHtml(region.labelEn ?? region.labelKo)}</span>
             </button>
           `
         )
@@ -1437,7 +1437,10 @@ function renderClientScript({ page, updates }) {
           }
 
           const labels = [...activeQuickRegions]
-            .map((regionId) => MAP_REGION_DEFS.find((region) => region.id === regionId)?.labelKo ?? regionId)
+            .map((regionId) => {
+              const region = MAP_REGION_DEFS.find((entry) => entry.id === regionId);
+              return region?.labelEn ?? region?.labelKo ?? regionId;
+            })
             .join(" / ");
           quickRegionSelection.textContent = "선택된 지역: " + labels;
         }
@@ -3884,6 +3887,7 @@ function renderLayout({ title, page, body, updates }) {
           rgba(255, 255, 255, 0.9);
         color: var(--accent-deep);
         text-align: left;
+        white-space: nowrap;
         cursor: pointer;
         transition:
           transform 160ms ease,
@@ -3900,9 +3904,12 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .quick-coin.is-selected {
-        border-color: rgba(15, 61, 127, 0.22);
-        background: linear-gradient(135deg, rgba(47, 110, 196, 0.14), rgba(255, 255, 255, 0.96));
-        box-shadow: 0 12px 28px rgba(15, 61, 127, 0.14);
+        border-color: rgba(10, 44, 93, 0.88);
+        background: linear-gradient(135deg, #0a2c5d, #2f6ec4 72%, #4d8de1);
+        box-shadow:
+          0 14px 30px rgba(15, 61, 127, 0.24),
+          0 0 0 3px rgba(47, 110, 196, 0.18);
+        color: #fff9f5;
       }
 
       .quick-coin-abbr {
@@ -3920,10 +3927,21 @@ function renderLayout({ title, page, body, updates }) {
         flex: 0 0 auto;
       }
 
+      .quick-coin.is-selected .quick-coin-abbr {
+        background: rgba(255, 255, 255, 0.96);
+        color: var(--accent-deep);
+        box-shadow: inset 0 0 0 1px rgba(10, 44, 93, 0.08);
+      }
+
       .quick-coin-label {
-        font-size: 0.92rem;
+        font-size: 0.88rem;
         font-weight: 700;
-        line-height: 1.2;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .quick-coin.is-selected .quick-coin-label {
+        color: #fff9f5;
       }
 
       .wizard-filter-selection {
