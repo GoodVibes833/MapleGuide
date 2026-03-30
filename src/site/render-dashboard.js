@@ -3663,13 +3663,13 @@ function renderLayout({ title, page, body, updates }) {
 
       .home-latest-section {
         display: grid;
-        gap: 12px;
+        gap: 8px;
       }
 
       .update-flash-grid {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 10px;
+        gap: 6px;
       }
 
       .update-flash-card {
@@ -3683,8 +3683,8 @@ function renderLayout({ title, page, body, updates }) {
       .update-flash-summary {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 12px 16px;
+        gap: 8px;
+        padding: 7px 12px;
         cursor: pointer;
         list-style: none;
       }
@@ -3696,16 +3696,23 @@ function renderLayout({ title, page, body, updates }) {
       .update-flash-meta {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         flex: 0 0 auto;
         white-space: nowrap;
+      }
+
+      .update-flash-summary .tag,
+      .update-flash-summary .mini-flag {
+        min-height: 24px;
+        padding: 0 8px;
+        font-size: 0.72rem;
       }
 
       .update-flash-summary strong {
         flex: 1 1 auto;
         min-width: 0;
-        font-size: 1rem;
-        line-height: 1.2;
+        font-size: 0.91rem;
+        line-height: 1.1;
         font-weight: 800;
         white-space: nowrap;
         overflow: hidden;
@@ -3853,8 +3860,8 @@ function renderLayout({ title, page, body, updates }) {
 
       .wizard-filter-shell {
         display: grid;
-        gap: 12px;
-        padding: 18px;
+        gap: 10px;
+        padding: 14px;
         border: 1px solid rgba(15, 61, 127, 0.12);
         border-radius: var(--radius-lg);
         background: rgba(255, 255, 255, 0.78);
@@ -3869,13 +3876,13 @@ function renderLayout({ title, page, body, updates }) {
       .wizard-filter-map-frame {
         display: grid;
         place-items: center;
-        min-height: 156px;
+        min-height: 112px;
         border: 1px solid rgba(15, 61, 127, 0.1);
         border-radius: var(--radius-lg);
         background:
           radial-gradient(circle at top right, rgba(47, 110, 196, 0.1), transparent 30%),
           linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 249, 255, 0.8));
-        padding: 0 8px;
+        padding: 0 6px;
         overflow: hidden;
       }
 
@@ -3883,7 +3890,7 @@ function renderLayout({ title, page, body, updates }) {
         width: 100%;
         height: auto;
         max-height: none;
-        transform: scale(1.28) translateY(-56px);
+        transform: scale(1.34) translateY(-92px);
         transform-origin: center top;
       }
 
