@@ -242,6 +242,15 @@ function buildJurisdictionInsights(updates) {
 }
 
 function renderSituationSection(insights) {
+  const quickFilterButtons = [
+    '<button type="button" class="chip active" data-quick-region="all">전체</button>',
+    ...insights
+      .filter((insight) => insight.id !== "nunavut")
+      .map(
+        (insight) => `<button type="button" class="chip" data-quick-region="${escapeHtml(insight.id)}">${escapeHtml(insight.labelKo)}</button>`
+      )
+  ].join("");
+
   return `
     <section class="section panel">
       <div class="panel-head">
@@ -251,11 +260,21 @@ function renderSituationSection(insights) {
         </div>
         <p class="panel-note">질문 몇 개만 답하면 먼저 볼 지역을 바로 좁혀줍니다.</p>
       </div>
+      <div class="wizard-filter-bar">
+        <div class="wizard-filter-copy">
+          <strong>관심 지역 필터</strong>
+          <span>질문 답변 전에 미리 지역을 걸러서 볼 수 있습니다.</span>
+        </div>
+        <div class="wizard-filter-chips" id="quick-region-filters">
+          ${quickFilterButtons}
+        </div>
+      </div>
       <div class="wizard-layout">
         <form class="wizard-form" id="quick-start-form">
           <label class="wizard-field">
-            <span>가장 가까운 현재 상황</span>
+            <span class="wizard-field-label">가장 가까운 현재 상황 <em class="required-mark">필수*</em></span>
             <select name="path">
+              <option value="">선택하세요</option>
               <option value="unsure">아직 잘 모르겠어요</option>
               <option value="outside-worker">캐나다 밖에서 바로 EE/취업이민을 보고 있어요</option>
               <option value="working-holiday">워홀·오픈퍼밋으로 현지 경력 쌓아 이민을 보려 해요</option>
@@ -266,8 +285,9 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>현재 캐나다 체류 상태</span>
+            <span class="wizard-field-label">현재 캐나다 체류 상태 <em class="required-mark">필수*</em></span>
             <select name="base">
+              <option value="">선택하세요</option>
               <option value="outside">현재 캐나다 밖에 있어요</option>
               <option value="student">캐나다에서 학생 상태예요</option>
               <option value="working-holiday">워홀(IEC open work permit)로 일하고 있어요</option>
@@ -277,8 +297,9 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>나이</span>
+            <span class="wizard-field-label">나이 <em class="required-mark">필수*</em></span>
             <select name="age">
+              <option value="">선택하세요</option>
               <option value="18">18세</option>
               <option value="19">19세</option>
               <option value="20-29">20-29세</option>
@@ -301,16 +322,18 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>배우자 포함 여부</span>
+            <span class="wizard-field-label">배우자 포함 여부 <em class="required-mark">필수*</em></span>
             <select name="household">
+              <option value="">선택하세요</option>
               <option value="single">단독 지원 기준으로 볼게요</option>
               <option value="with-spouse">배우자와 함께 갈 가능성이 커요</option>
               <option value="unsure">아직 잘 모르겠어요</option>
             </select>
           </label>
           <label class="wizard-field">
-            <span>최종 학력</span>
+            <span class="wizard-field-label">최종 학력 <em class="required-mark">필수*</em></span>
             <select name="education">
+              <option value="">선택하세요</option>
               <option value="high-school">고등학교</option>
               <option value="one-year">1년 과정 컬리지/수료</option>
               <option value="two-year">2년 과정 컬리지</option>
@@ -322,8 +345,9 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>영어 상태</span>
+            <span class="wizard-field-label">영어 상태 <em class="required-mark">필수*</em></span>
             <select name="languageProfile">
+              <option value="">선택하세요</option>
               <option value="guess:unknown">시험은 안 봤고 지금은 잘 모르겠어요</option>
               <option value="guess:clb6">시험은 안 봤고 지금은 CLB 6 이하 같아요</option>
               <option value="guess:clb7">시험은 안 봤고 지금은 CLB 7 정도 같아요</option>
@@ -338,8 +362,9 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>해외 숙련 경력</span>
+            <span class="wizard-field-label">해외 숙련 경력 <em class="required-mark">필수*</em></span>
             <select name="foreignExp">
+              <option value="">선택하세요</option>
               <option value="0">없음</option>
               <option value="1">1년</option>
               <option value="2">2년</option>
@@ -349,8 +374,9 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>캐나다 경력</span>
+            <span class="wizard-field-label">캐나다 경력 <em class="required-mark">필수*</em></span>
             <select name="canadianExp">
+              <option value="">선택하세요</option>
               <option value="0">없음</option>
               <option value="1">1년</option>
               <option value="2">2년</option>
@@ -360,8 +386,9 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>캐나다 경력의 성격</span>
+            <span class="wizard-field-label">캐나다 경력의 성격 <em class="required-mark">필수*</em></span>
             <select name="canadianJobSkill">
+              <option value="">선택하세요</option>
               <option value="not-working">캐나다 경력은 없어요</option>
               <option value="skilled">캐나다 경력이 있고 TEER 0-3 쪽이에요</option>
               <option value="non-skilled">캐나다 경력은 있지만 TEER 4-5 또는 단순 서비스 쪽이에요</option>
@@ -371,6 +398,7 @@ function renderSituationSection(insights) {
           <label class="wizard-field">
             <span>Express Entry</span>
             <select name="ee">
+              <option value="">잘 모르겠어요</option>
               <option value="unsure">모르겠어요</option>
               <option value="yes">EE 프로필이 있거나 만들 예정이에요</option>
               <option value="no">EE 경로는 우선순위가 아니에요</option>
@@ -379,14 +407,16 @@ function renderSituationSection(insights) {
           <label class="wizard-field">
             <span>캐나다 잡오퍼</span>
             <select name="jobOffer">
+              <option value="">잘 모르겠어요</option>
               <option value="unsure">모르겠어요</option>
               <option value="yes">있거나 받을 가능성이 있어요</option>
               <option value="no">없어요</option>
             </select>
           </label>
           <label class="wizard-field">
-            <span>ECA / 학력평가 상태</span>
+            <span class="wizard-field-label">ECA / 학력평가 상태 <em class="required-mark">필수*</em></span>
             <select name="ecaStatus">
+              <option value="">선택하세요</option>
               <option value="canadian-degree">캐나다 학위라 ECA가 필요 없어요</option>
               <option value="completed">이민용 ECA 완료</option>
               <option value="in-progress">ECA 진행 중</option>
@@ -397,6 +427,7 @@ function renderSituationSection(insights) {
           <label class="wizard-field">
             <span>학비·생활비 부담</span>
             <select name="budget">
+              <option value="">잘 모르겠어요</option>
               <option value="tight">가능하면 비용 부담이 낮은 쪽이 좋아요</option>
               <option value="medium">보통이에요</option>
               <option value="flexible">비용보다 경로 적합성이 더 중요해요</option>
@@ -405,6 +436,7 @@ function renderSituationSection(insights) {
           <label class="wizard-field">
             <span>정착 선호</span>
             <select name="setting">
+              <option value="">아직 잘 모르겠어요</option>
               <option value="balanced">아직 정하지 못했어요</option>
               <option value="metro">대도시 접근성이 중요해요</option>
               <option value="regional">시골·지역 정착도 괜찮아요</option>
@@ -413,6 +445,7 @@ function renderSituationSection(insights) {
           <label class="wizard-field">
             <span>추가 강점</span>
             <select name="advantage">
+              <option value="">아직 잘 모르겠어요</option>
               <option value="none">없음</option>
               <option value="french">프랑스어</option>
               <option value="regional">지역·커뮤니티 경로도 가능</option>
@@ -423,6 +456,7 @@ function renderSituationSection(insights) {
           <label class="wizard-field">
             <span>현재 직군</span>
             <select name="occupation">
+              <option value="">아직 잘 모르겠어요</option>
               <option value="general">일반 전문직 / 사무직</option>
               <option value="stem">STEM / IT / 엔지니어링</option>
               <option value="healthcare-social">보건의료 / 사회서비스</option>
@@ -439,6 +473,7 @@ function renderSituationSection(insights) {
           <label class="wizard-field">
             <span>어떤 직군 기준으로 이민을 볼 생각인가요</span>
             <select name="targetOccupationPlan">
+              <option value="">아직 잘 모르겠어요</option>
               <option value="unsure">아직 잘 모르겠어요</option>
               <option value="current-canada-job">지금 캐나다에서 하는 일 기준으로 볼래요</option>
               <option value="previous-korea-job">한국에서 하던 경력 기준으로 볼래요</option>
@@ -448,6 +483,7 @@ function renderSituationSection(insights) {
           <label class="wizard-field">
             <span>한국 경력과 목표 직군의 연결성</span>
             <select name="foreignExpAlignment">
+              <option value="">아직 잘 모르겠어요</option>
               <option value="same-skilled">같은 NOC 또는 매우 비슷한 숙련 경력이에요</option>
               <option value="related-skilled">비슷한 분야지만 직무가 완전히 같진 않아요</option>
               <option value="unrelated">지금 목표 직군과 거의 관련 없어요</option>
@@ -457,6 +493,7 @@ function renderSituationSection(insights) {
           <label class="wizard-field">
             <span>한국 학사 / 전공 활용 계획</span>
             <select name="degreeCareerPlan">
+              <option value="">아직 모르겠어요</option>
               <option value="unsure">아직 모르겠어요</option>
               <option value="use-degree">전공을 살려 취업하는 것도 고려해요</option>
               <option value="not-use-degree">전공은 점수용으로만 보고 다른 일로 갈 가능성이 커요</option>
@@ -465,8 +502,8 @@ function renderSituationSection(insights) {
         </form>
         <div class="wizard-results" id="quick-start-results">
           <div class="wizard-empty">
-            <strong>질문에 답하면 먼저 볼 지역 5곳을 순서대로 추천합니다.</strong>
-            <span>정책 적합도와 생활 선호를 함께 반영하지만, 실제 법적 요건은 공식 원문 기준으로 다시 확인해야 합니다.</span>
+            <strong>필수* 항목부터 고르면 먼저 볼 지역 5곳을 추천합니다.</strong>
+            <span>지역 필터를 먼저 고른 뒤 필수 정보를 채우면 결과가 바로 좁혀집니다.</span>
           </div>
         </div>
       </div>
@@ -1279,11 +1316,13 @@ function renderClientScript({ page, updates }) {
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
         const quickStartResults = document.getElementById("quick-start-results");
+        const quickRegionButtons = Array.from(document.querySelectorAll("[data-quick-region]"));
         const mapSelectionLabel = document.getElementById("map-selection-label");
         const mapSelectionMeta = document.getElementById("map-selection-meta");
         const mapSelectionLink = document.getElementById("map-selection-link");
         const mapTooltip = document.getElementById("map-tooltip");
         const hoverableJumpLinks = Array.from(document.querySelectorAll("[data-jurisdiction-link]"));
+        let activeQuickRegion = "all";
         const defaultSelection = {
           label: "지역을 선택해 보세요",
           meta: "비교표와 상황별 카드를 먼저 보고 범위를 좁힌 뒤, 여기서 지역 상세 페이지로 이동하면 훨씬 덜 헷갈립니다.",
@@ -1306,6 +1345,48 @@ function renderClientScript({ page, updates }) {
 
         function hasCanadianWorkBase(base) {
           return ["working-holiday", "pgwp", "worker"].includes(base);
+        }
+
+        const REQUIRED_FIELD_LABELS = {
+          path: "가장 가까운 현재 상황",
+          base: "현재 캐나다 체류 상태",
+          age: "나이",
+          household: "배우자 포함 여부",
+          education: "최종 학력",
+          languageProfile: "영어 상태",
+          foreignExp: "해외 숙련 경력",
+          canadianExp: "캐나다 경력",
+          canadianJobSkill: "캐나다 경력의 성격",
+          ecaStatus: "ECA / 학력평가 상태"
+        };
+
+        function getMissingRequiredFields(rawAnswers) {
+          return Object.entries(REQUIRED_FIELD_LABELS)
+            .filter(([field]) => !rawAnswers[field])
+            .map(([, label]) => label);
+        }
+
+        function applyOptionalAnswerDefaults(rawAnswers) {
+          const defaults = {
+            ee: "unsure",
+            jobOffer: "unsure",
+            budget: "medium",
+            setting: "balanced",
+            advantage: "none",
+            occupation: "general",
+            targetOccupationPlan: "unsure",
+            foreignExpAlignment: "none",
+            degreeCareerPlan: "unsure"
+          };
+          const completed = { ...rawAnswers };
+
+          for (const [field, value] of Object.entries(defaults)) {
+            if (!completed[field]) {
+              completed[field] = value;
+            }
+          }
+
+          return completed;
         }
 
         function isWorkerIntent(path) {
@@ -1340,7 +1421,7 @@ function renderClientScript({ page, updates }) {
         }
 
         function normalizeLanguageAnswers(rawAnswers) {
-          const [evidence = "guess", english = "unknown"] = (rawAnswers.languageProfile ?? "guess:unknown").split(":");
+          const [evidence = "guess", english = "unknown"] = (rawAnswers.languageProfile || "guess:unknown").split(":");
           const labelMap = {
             "guess:unknown": "시험은 안 봤고 지금은 잘 모르겠어요",
             "guess:clb6": "시험은 안 봤고 지금은 CLB 6 이하 같아요",
@@ -2392,12 +2473,28 @@ function renderClientScript({ page, updates }) {
 
           const formData = new FormData(quickStartForm);
           const rawAnswers = Object.fromEntries(formData.entries());
+          const missingRequiredFields = getMissingRequiredFields(rawAnswers);
+
+          if (missingRequiredFields.length > 0) {
+            quickStartResults.innerHTML = [
+              '<div class="wizard-empty">',
+              '<strong>필수* 항목을 먼저 골라주세요.</strong>',
+              '<span>아직 선택하지 않은 항목: ' + escapeHtmlClient(missingRequiredFields.slice(0, 4).join(" / "))
+                + (missingRequiredFields.length > 4 ? " 외 " + (missingRequiredFields.length - 4) + "개" : "")
+                + '</span>',
+              '</div>'
+            ].join("");
+            return;
+          }
+
+          const completedRawAnswers = applyOptionalAnswerDefaults(rawAnswers);
           const answers = {
-            ...rawAnswers,
-            ...normalizeLanguageAnswers(rawAnswers)
+            ...completedRawAnswers,
+            ...normalizeLanguageAnswers(completedRawAnswers)
           };
           const ranked = DASHBOARD_INSIGHTS
             .filter((insight) => insight.id !== "nunavut")
+            .filter((insight) => activeQuickRegion === "all" || insight.id === activeQuickRegion)
             .map((insight) => ({
               insight,
               evaluation: scoreInsight(insight, answers)
@@ -2532,6 +2629,18 @@ function renderClientScript({ page, updates }) {
         if (quickStartForm) {
           quickStartForm.addEventListener("change", renderQuickStartResults);
           renderQuickStartResults();
+        }
+
+        if (quickRegionButtons.length > 0) {
+          quickRegionButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+              activeQuickRegion = button.dataset.quickRegion || "all";
+              quickRegionButtons.forEach((chip) => {
+                chip.classList.toggle("active", chip === button);
+              });
+              renderQuickStartResults();
+            });
+          });
         }
 
         const svgRegionEntries = MAP_REGION_DEFS
@@ -3596,6 +3705,33 @@ function renderLayout({ title, page, body, updates }) {
         align-items: start;
       }
 
+      .wizard-filter-bar {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .wizard-filter-copy {
+        display: grid;
+        gap: 4px;
+      }
+
+      .wizard-filter-copy strong {
+        color: var(--accent-deep);
+        font-size: 0.96rem;
+      }
+
+      .wizard-filter-copy span {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .wizard-filter-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
       .wizard-form,
       .wizard-results {
         display: grid;
@@ -3619,6 +3755,20 @@ function renderLayout({ title, page, body, updates }) {
         font-size: 0.92rem;
         font-weight: 700;
         color: var(--accent-deep);
+      }
+
+      .wizard-field-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .required-mark {
+        color: var(--accent);
+        font-style: normal;
+        font-size: 0.82rem;
+        font-weight: 800;
       }
 
       .wizard-field select {
