@@ -301,7 +301,6 @@ function renderSituationSection(insights) {
     <section class="section panel">
       <div class="panel-head">
         <div>
-          <p class="panel-kicker">Start Here</p>
           <h2>내 상황으로 먼저 찾기</h2>
         </div>
         <p class="panel-note">질문 몇 개만 답하면 먼저 볼 지역을 바로 좁혀줍니다.</p>
@@ -570,7 +569,6 @@ function renderComparisonTable(insights) {
       <details class="panel-collapsible">
         <summary class="panel-collapsible-summary">
           <div>
-            <p class="panel-kicker">Compare</p>
             <h2>캐나다 한눈에 비교</h2>
             <p class="panel-note">원할 때만 펼쳐서 보는 전체 비교표입니다.</p>
           </div>
@@ -754,8 +752,10 @@ function renderLatestUpdateCards(updates) {
           return `
             <details class="update-flash-card">
               <summary class="update-flash-summary">
-                <span class="update-flash-jurisdiction">${escapeHtml(getJurisdictionMeta(update.jurisdiction).labelKo)}</span>
-                <span class="update-flash-date">${escapeHtml(updateDate)}</span>
+                <span class="update-flash-meta">
+                  <span class="update-flash-jurisdiction">${escapeHtml(getJurisdictionMeta(update.jurisdiction).labelKo)}</span>
+                  <span class="update-flash-date">${escapeHtml(updateDate)}</span>
+                </span>
                 <strong>${escapeHtml(headline)}</strong>
                 <span class="update-flash-chevron" aria-hidden="true">▾</span>
               </summary>
@@ -816,7 +816,6 @@ function renderHomeHero(updates) {
     <section class="section home-latest-section" id="latest-updates">
       <div class="panel-head panel-head-tight">
         <div>
-          <p class="panel-kicker">Latest Changes</p>
           <h2>가장 최신 업데이트</h2>
         </div>
       </div>
@@ -865,7 +864,6 @@ function renderCanadaMapSection(updates, { minimal = false } = {}) {
       <details class="panel-collapsible">
         <summary class="panel-collapsible-summary">
           <div>
-            <p class="panel-kicker">Map Explorer</p>
             <h2>지역 탐색은 필요할 때만 열기</h2>
             <p class="panel-note">비교와 추천을 본 뒤, 마지막에 지도에서 지역 페이지로 들어가면 훨씬 덜 헷갈립니다.</p>
           </div>
@@ -2572,14 +2570,12 @@ function renderClientScript({ page, updates }) {
             '<section class="conclusion-summary-section">',
             '<div class="wizard-section-heading">',
             '<div>',
-            '<p class="panel-kicker">결론</p>',
             '<h3>지금은 이 방향이 먼저예요</h3>',
             '</div>',
             '</div>',
             '<article class="conclusion-summary-card">',
             '<div class="conclusion-summary-head">',
             '<div>',
-            '<p class="panel-kicker">Primary Direction</p>',
             '<h3>' + escapeHtmlClient(primaryDirection) + '</h3>',
             '</div>',
             '<span class="direction-summary-badge">' + escapeHtmlClient(topInsight.id === "federal" ? "Express Entry" : topInsight.labelKo) + '</span>',
@@ -2606,23 +2602,13 @@ function renderClientScript({ page, updates }) {
                 : '<span class="compare-pill">추천 1순위 ' + escapeHtmlClient(topInsight.labelKo) + '</span>'
                   + '<span class="compare-pill">선발 방식 ' + escapeHtmlClient(topInsight.selectionModel.badgeKo) + '</span>')
               + '</div>',
-            '<div class="direction-summary-grid">',
-            '<div class="direction-summary-block">',
-            '<span class="direction-summary-label">지금 가진 강점</span>',
-            '<ul class="direction-summary-list">'
-              + (strengths.length
-                ? strengths.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                : '<li>아직 강점 정리가 더 필요해요.</li>')
-              + '</ul>',
-            '</div>',
-            '<div class="direction-summary-block">',
-            '<span class="direction-summary-label">지금 먼저 할 것</span>',
-            '<ul class="direction-summary-list">'
-              + (nextItems.length
-                ? nextItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                : '<li>최신 공지와 스트림 구조를 먼저 확인해 보세요.</li>')
-              + '</ul>',
-            '</div>',
+            '<div class="summary-inline-rows">',
+            '<p class="summary-inline-row"><strong>지금 가진 강점</strong><span>'
+              + escapeHtmlClient(strengths.length ? strengths.join(" / ") : "아직 강점 정리가 더 필요해요.")
+              + '</span></p>',
+            '<p class="summary-inline-row"><strong>지금 먼저 할 것</strong><span>'
+              + escapeHtmlClient(nextItems.length ? nextItems.join(" / ") : "최신 공지와 스트림 구조를 먼저 확인해 보세요.")
+              + '</span></p>',
             '</div>',
             '</article>',
             '</section>'
@@ -2931,7 +2917,6 @@ function renderClientScript({ page, updates }) {
             '<article class="special-pathway-card">',
             '<div class="special-pathway-head">',
             '<div>',
-            '<p class="panel-kicker">특별 경로</p>',
             '<h3>' + escapeHtmlClient(entry.pathway.titleKo) + '</h3>',
             '</div>',
             '<span class="special-pathway-fit is-' + escapeHtmlClient(entry.fitTone) + '">' + escapeHtmlClient(entry.fitLabel) + '</span>',
@@ -2990,7 +2975,6 @@ function renderClientScript({ page, updates }) {
             '<details class="panel-collapsible compact-collapsible">',
             '<summary class="panel-collapsible-summary">',
             '<div>',
-            '<p class="panel-kicker">특별 경로</p>',
             '<h3>같이 보면 좋은 특별 경로</h3>',
             '<p class="panel-note">Trade, Atlantic, Rural, Francophone처럼 일반 연방/주정부 카드 밖에서 따로 봐야 하는 경로입니다.</p>',
             '</div>',
@@ -3007,33 +2991,23 @@ function renderClientScript({ page, updates }) {
         }
 
         function buildDirectionOverviewCardHtml(card) {
-          const currentList = card.currentItems.length > 0
-            ? card.currentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-            : '<li>아직 강점이 뚜렷하지 않아요.</li>';
-          const nextList = card.nextItems.length > 0
-            ? card.nextItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-            : '<li>추가 준비보다 최신 공지 추적이 더 중요해요.</li>';
-
           return [
             '<article class="direction-summary-card">',
             '<div class="direction-summary-head">',
             '<div>',
-            '<p class="panel-kicker">' + escapeHtmlClient(card.kicker) + '</p>',
             '<h3>' + escapeHtmlClient(card.title) + '</h3>',
             '</div>',
             '<span class="direction-summary-badge">' + escapeHtmlClient(card.badge) + '</span>',
             '</div>',
             '<p class="direction-summary-copy">' + escapeHtmlClient(card.copy) + '</p>',
             '<div class="direction-summary-pill-row">' + card.pills.map((pill) => '<span class="compare-pill">' + escapeHtmlClient(pill) + '</span>').join("") + '</div>',
-            '<div class="direction-summary-grid">',
-            '<div class="direction-summary-block">',
-            '<span class="direction-summary-label">현재 갖고 있는 것</span>',
-            '<ul class="direction-summary-list">' + currentList + '</ul>',
-            '</div>',
-            '<div class="direction-summary-block">',
-            '<span class="direction-summary-label">다음으로 더 필요한 것</span>',
-            '<ul class="direction-summary-list">' + nextList + '</ul>',
-            '</div>',
+            '<div class="summary-inline-rows">',
+            '<p class="summary-inline-row"><strong>현재 갖고 있는 것</strong><span>'
+              + escapeHtmlClient(card.currentItems.length > 0 ? card.currentItems.join(" / ") : "아직 강점이 뚜렷하지 않아요.")
+              + '</span></p>',
+            '<p class="summary-inline-row"><strong>다음으로 더 필요한 것</strong><span>'
+              + escapeHtmlClient(card.nextItems.length > 0 ? card.nextItems.join(" / ") : "추가 준비보다 최신 공지 추적이 더 중요해요.")
+              + '</span></p>',
             '</div>',
             '</article>'
           ].join("");
@@ -3102,7 +3076,6 @@ function renderClientScript({ page, updates }) {
             '<section class="direction-summary-section">',
             '<div class="wizard-section-heading">',
             '<div>',
-            '<p class="panel-kicker">큰 방향</p>',
             '<h3>연방 vs 주정부 먼저 정리</h3>',
             '</div>',
             '<p class="panel-note">연방은 점수와 컷오프를 직접 비교하고, 주정부는 주마다 다른 선발 방식과 요구 조건을 같이 봅니다.</p>',
@@ -3584,7 +3557,6 @@ function renderClientScript({ page, updates }) {
             + [
               '<div class="wizard-section-heading">',
               '<div>',
-              '<p class="panel-kicker">Recommendations</p>',
               '<h3>현재 조건에서 먼저 볼 지역</h3>',
               '</div>',
               '<p class="panel-note">추천 3곳만 먼저 보여주고, 자세한 설명은 카드 안에서 펼쳐서 볼 수 있게 정리했습니다.</p>',
@@ -3680,14 +3652,11 @@ function renderClientScript({ page, updates }) {
                     .map((item) => [
                       '<li class="compact-action-item">',
                       '<span class="improvement-delta is-' + escapeHtmlClient(item.scoreImpact?.tone ?? "neutral") + '">' + escapeHtmlClient(item.scoreImpact?.badge ?? "준비") + '</span>',
-                      '<div class="compact-action-copy">',
-                      '<strong>' + escapeHtmlClient(item.title) + '</strong>',
-                      '<p>' + escapeHtmlClient(item.scoreImpact?.label ?? item.detail) + '</p>',
-                      '</div>',
+                      '<span class="compact-action-text">' + escapeHtmlClient(item.title + " · " + (item.scoreImpact?.label ?? item.detail)) + '</span>',
                       '</li>'
                     ].join(""))
                     .join("")
-                : '<li class="compact-action-item"><span class="improvement-delta is-neutral">준비</span><div class="compact-action-copy"><strong>최신 공지 계속 확인</strong><p>draw, intake, 직군 우선순위 변화가 실제 체감에 더 크게 작용할 수 있어요.</p></div></li>';
+                : '<li class="compact-action-item"><span class="improvement-delta is-neutral">준비</span><span class="compact-action-text">최신 공지 계속 확인 · draw, intake, 직군 우선순위 변화가 실제 체감에 더 크게 작용할 수 있어요.</span></li>';
 
               return [
                 '<article class="wizard-result-card">',
@@ -3695,10 +3664,9 @@ function renderClientScript({ page, updates }) {
                 '<div class="wizard-card-title-stack">',
                 '<div class="card-topline">',
                 '<span class="status-badge status-approved">추천 ' + (index + 1) + "</span>",
-                '<span class="tag">' + escapeHtmlClient(insight.labelKo) + "</span>",
                 "</div>",
                 "<h3>" + escapeHtmlClient(insight.labelKo) + "</h3>",
-                '<p class="wizard-result-system">' + escapeHtmlClient(insight.system) + "</p>",
+                '<p class="wizard-card-subline">' + escapeHtmlClient(insight.system + " · " + selectionModel.badgeKo) + "</p>",
                 "</div>",
                 '<div class="wizard-card-mini-map" aria-hidden="true">' + getRecommendationMiniMapMarkup(insight.id) + "</div>",
                 "</div>",
@@ -3715,31 +3683,31 @@ function renderClientScript({ page, updates }) {
                     + '<span class="ee-gap-pill ' + (crsSnapshot.gap == null ? "is-neutral" : crsSnapshot.gap >= 0 ? "is-positive" : "is-negative") + '">현재 ' + escapeHtmlClient(crsSnapshot.gapLabel) + '점</span>'
                     + "</div>"
                   : ""),
-                '<div class="scenario-chip-row">',
-                '<span class="compare-pill">EE ' + escapeHtmlClient(insight.statuses.ee) + "</span>",
-                '<span class="compare-pill">잡오퍼 ' + escapeHtmlClient(insight.statuses.jobOffer) + "</span>",
-                '<span class="compare-pill">졸업자 ' + escapeHtmlClient(insight.statuses.graduate) + "</span>",
-                '<span class="compare-pill">비용 ' + escapeHtmlClient(insight.lifestyle.costLabelKo) + "</span>",
-                '<span class="compare-pill">지역정착 ' + escapeHtmlClient(insight.lifestyle.regionalLabelKo) + "</span>",
-                "</div>",
+                '<p class="summary-inline-row summary-inline-row-compact"><strong>빠른 요약</strong><span>'
+                  + escapeHtmlClient([
+                    "EE " + insight.statuses.ee,
+                    "잡오퍼 " + insight.statuses.jobOffer,
+                    "졸업자 " + insight.statuses.graduate,
+                    "비용 " + insight.lifestyle.costLabelKo,
+                    "지역정착 " + insight.lifestyle.regionalLabelKo
+                  ].join(" / "))
+                  + "</span></p>",
                 '<div class="result-summary-grid">',
-                '<section class="result-summary-block">',
-                '<strong>이 경로가 보는 핵심</strong>',
-                '<ul class="result-summary-list">'
-                  + (pathwayNeedItems.length
-                    ? pathwayNeedItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                    : pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join(""))
-                  + '</ul>',
-                '</section>',
-                '<section class="result-summary-block">',
-                '<strong>내가 이미 가진 것</strong>',
-                '<ul class="result-summary-list">'
-                  + (pathwayCurrentItems.length
-                    ? pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                    : '<li>강점 정리를 더 해보는 게 좋아요.</li>')
-                  + '</ul>',
-                '</section>',
-                '<section class="result-summary-block">',
+                '<p class="summary-inline-row"><strong>이 경로가 보는 핵심</strong><span>'
+                  + escapeHtmlClient(
+                    pathwayNeedItems.length
+                      ? pathwayNeedItems.join(" / ")
+                      : pathwayCurrentItems.join(" / ")
+                  )
+                  + '</span></p>',
+                '<p class="summary-inline-row"><strong>내가 이미 가진 것</strong><span>'
+                  + escapeHtmlClient(
+                    pathwayCurrentItems.length
+                      ? pathwayCurrentItems.join(" / ")
+                      : "강점 정리를 더 해보는 게 좋아요."
+                  )
+                  + '</span></p>',
+                '<section class="result-summary-block result-summary-block-actions">',
                 '<div class="improvement-head">',
                 '<strong>지금 할 것</strong>',
                 '<span class="improvement-total">' + escapeHtmlClient(
@@ -4785,12 +4753,19 @@ function renderLayout({ title, page, body, updates }) {
 
       .update-flash-summary {
         display: grid;
-        grid-template-columns: 116px 92px minmax(0, 1fr) 18px;
+        grid-template-columns: 184px minmax(0, 1fr) 18px;
         align-items: center;
         gap: 12px;
         padding: 8px 12px;
         cursor: pointer;
         list-style: none;
+      }
+
+      .update-flash-meta {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
       }
 
       .update-flash-summary::-webkit-details-marker {
@@ -4803,6 +4778,12 @@ function renderLayout({ title, page, body, updates }) {
         font-weight: 800;
         line-height: 1;
         white-space: nowrap;
+      }
+
+      .update-flash-jurisdiction::after {
+        content: "·";
+        margin-left: 8px;
+        color: rgba(15, 61, 127, 0.34);
       }
 
       .update-flash-date {
@@ -5116,6 +5097,12 @@ function renderLayout({ title, page, body, updates }) {
         gap: 14px;
       }
 
+      .wizard-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 12px;
+        row-gap: 12px;
+      }
+
       .wizard-section-heading {
         display: flex;
         align-items: flex-end;
@@ -5215,6 +5202,30 @@ function renderLayout({ title, page, body, updates }) {
         padding-left: 18px;
         color: var(--muted);
         line-height: 1.65;
+      }
+
+      .summary-inline-rows {
+        display: grid;
+        gap: 10px;
+      }
+
+      .summary-inline-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .summary-inline-row strong {
+        flex: 0 0 112px;
+        color: var(--accent-deep);
+        font-size: 0.86rem;
+      }
+
+      .summary-inline-row span {
+        flex: 1 1 auto;
       }
 
       .conclusion-summary-section {
@@ -5509,7 +5520,7 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .wizard-empty span,
-      .wizard-result-system {
+      .wizard-card-subline {
         color: var(--muted);
         line-height: 1.7;
       }
@@ -5527,6 +5538,12 @@ function renderLayout({ title, page, body, updates }) {
         line-height: 1.4;
       }
 
+      .wizard-card-subline {
+        margin: 4px 0 0;
+        font-size: 0.88rem;
+        line-height: 1.45;
+      }
+
       .wizard-result-lead {
         margin: 0;
         color: var(--text);
@@ -5536,8 +5553,16 @@ function renderLayout({ title, page, body, updates }) {
 
       .result-summary-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
+      }
+
+      .result-summary-block-actions {
+        grid-column: 1 / -1;
+      }
+
+      .summary-inline-row-compact {
+        margin-bottom: 2px;
       }
 
       .result-summary-block {
@@ -5576,18 +5601,7 @@ function renderLayout({ title, page, body, updates }) {
         align-items: start;
       }
 
-      .compact-action-copy {
-        display: grid;
-        gap: 3px;
-      }
-
-      .compact-action-copy strong {
-        color: var(--text);
-        font-size: 0.92rem;
-      }
-
-      .compact-action-copy p {
-        margin: 0;
+      .compact-action-text {
         color: var(--muted);
         font-size: 0.88rem;
         line-height: 1.55;
@@ -6693,6 +6707,10 @@ function renderLayout({ title, page, body, updates }) {
           grid-template-columns: 1fr;
         }
 
+        .wizard-form {
+          grid-template-columns: 1fr;
+        }
+
         .site-header {
           border-radius: 28px;
           padding: 18px;
@@ -6775,20 +6793,15 @@ function renderLayout({ title, page, body, updates }) {
         }
 
         .update-flash-summary {
-          grid-template-columns: 1fr auto 18px;
+          grid-template-columns: minmax(0, 1fr) 18px;
           grid-template-areas:
-            "jurisdiction date chevron"
-            "title title title";
+            "meta chevron"
+            "title title";
           row-gap: 8px;
         }
 
-        .update-flash-jurisdiction {
-          grid-area: jurisdiction;
-        }
-
-        .update-flash-date {
-          grid-area: date;
-          justify-self: end;
+        .update-flash-meta {
+          grid-area: meta;
         }
 
         .update-flash-summary strong {
