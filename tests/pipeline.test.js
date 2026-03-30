@@ -177,6 +177,12 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /이 지역의 EE-linked nomination 노리기/);
   assert.match(dashboardHtml, /캐나다 skilled 경력 .*년까지 늘리기/);
   assert.match(dashboardHtml, /지역을 다른 곳으로 넓혀보세요/);
+  assert.match(dashboardHtml, /가능한 플랜 A\/B\/C/);
+  assert.match(dashboardHtml, /영어·EE 점수 플랜/);
+  assert.match(dashboardHtml, /불어 점수 플랜/);
+  assert.match(dashboardHtml, /직무·고용주 연결 플랜/);
+  assert.match(dashboardHtml, /학교·졸업자 플랜/);
+  assert.match(dashboardHtml, /지역 정착 플랜/);
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
   assert.match(dashboardHtml, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
   assert.doesNotMatch(dashboardHtml, /Map Explorer/);

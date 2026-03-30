@@ -3502,6 +3502,238 @@ function renderClientScript({ page, updates, basePath = "" }) {
           }
         }
 
+        function describeReferenceScoreImpact(answers, actionId) {
+          function exactLift(overrides) {
+            const lift = estimateProjectedCrsLift(answers, overrides);
+
+            return lift > 0
+              ? "+" + lift + "점"
+              : "변화 없음";
+          }
+
+          switch (actionId) {
+            case "language-clb9":
+              return exactLift({
+                english: "clb9plus",
+                languageScoreStatus: "official",
+                languageEvidence: "official"
+              });
+            case "canadian-exp-next":
+              {
+                const nextCanadianYear = getNextCanadianExperienceYear(answers);
+                return nextCanadianYear
+                  ? exactLift({
+                      canadianJobSkill: "skilled",
+                      canadianExp: nextCanadianYear
+                    })
+                  : "변화 없음";
+              }
+            case "canadian-exp-1":
+              return exactLift({
+                canadianJobSkill: "skilled",
+                canadianExp: "1"
+              });
+            case "french":
+              return "최대 +50점";
+            case "pnp-nomination":
+              return "+600점";
+            default:
+              return "";
+          }
+        }
+
+        function getTaggedStreamNames(insight, tag, limit = 2) {
+          return (insight.streamRows ?? [])
+            .filter((stream) => Array.isArray(stream.tags) && stream.tags.includes(tag))
+            .slice(0, limit)
+            .map((stream) => stream.nameKo);
+        }
+
+        function getEnglishUpgradeTarget(answers) {
+          switch (answers.english) {
+            case "clb6":
+              return "CLB 6 -> CLB 9";
+            case "clb7":
+              return "CLB 7 -> CLB 9";
+            case "clb8":
+              return "CLB 8 -> CLB 9";
+            case "clb9plus":
+              return "현재 점수 유지";
+            default:
+              return "공인점수 확보 후 CLB 9";
+          }
+        }
+
+        function getOccupationPivotLabel(answers, insight) {
+          switch (answers.occupation) {
+            case "stem":
+              return "IT·엔지니어링 skilled 직무";
+            case "healthcare-social":
+              return "보건·사회서비스 직무";
+            case "trades":
+              return "trade·현장 skilled 직무";
+            case "education":
+              return "교육 직군";
+            case "transport":
+              return "운송·물류 직무";
+            case "hospitality":
+              return statusSupports(insight.statuses.jobOffer)
+                ? "현장 서비스직보다 supervisor·coordinator급"
+                : "호스피탈리티 경력을 skilled NOC로 정리";
+            case "business-admin":
+              return "행정·재무·오피스 skilled 직무";
+            case "general":
+              return "지금 경력과 가장 가까운 skilled NOC 1개";
+            default:
+              return "주력 NOC 1개";
+          }
+        }
+
+        function getStudyPlanLabel(insight) {
+          if (insight.id === "ontario") {
+            return "온타리오에서 PGWP 가능한 학위·졸업자 경로";
+          }
+          if (insight.id === "british-columbia") {
+            return "BC에서 학위 후 현지경력 연결";
+          }
+          if (insight.id === "alberta") {
+            return "알버타에서 학위 후 현지경력 연결";
+          }
+          return insight.labelKo + "에서 졸업자·현지경력 경로";
+        }
+
+        function buildAlternativePlans(answers, insight) {
+          const plans = [];
+
+          function addPlan(priority, plan) {
+            plans.push({ priority, ...plan });
+          }
+
+          const eeStreamNames = getTaggedStreamNames(insight, "EE 연계");
+          const frenchStreamNames = getTaggedStreamNames(insight, "프랑스어");
+          const graduateStreamNames = getTaggedStreamNames(insight, "졸업자");
+          const jobOfferStreamNames = getTaggedStreamNames(insight, "잡오퍼");
+          const regionalStreamNames = getTaggedStreamNames(insight, "지역/커뮤니티");
+          const healthStreamNames = getTaggedStreamNames(insight, "보건");
+          const tradeStreamNames = getTaggedStreamNames(insight, "기술직");
+
+          if ((insight.id === "federal" || statusSupports(insight.statuses.ee)) && (answers.english !== "clb9plus" || answers.ee !== "yes")) {
+            addPlan(10, {
+              type: "점수형",
+              title: "영어·EE 점수 플랜",
+              highlight: (describeReferenceScoreImpact(answers, "language-clb9") || "변화 확인") + " · " + getEnglishUpgradeTarget(answers),
+              summary: "영어를 CLB 9 이상으로 맞추고 EE 프로필까지 열어두면 연방과 EE-linked 주정부를 같이 노릴 수 있는 플랜입니다.",
+              streamLine: eeStreamNames.length > 0
+                ? "같이 볼 경로: " + eeStreamNames.join(" / ")
+                : "같이 볼 경로: Express Entry 또는 EE-linked stream",
+              steps: [
+                "IELTS/CELPIP를 다시 준비해 " + getEnglishUpgradeTarget(answers) + " 구간을 목표로 합니다.",
+                answers.ee === "yes"
+                  ? "EE 프로필을 최신 경력·학력·언어 기준으로 바로 업데이트합니다."
+                  : "EE 자격을 확인하고 프로필을 열어 점수형 경로를 같이 둡니다.",
+                eeStreamNames.length > 0
+                  ? "이 지역에서는 " + eeStreamNames.join(" / ") + "처럼 EE와 연결되는 stream을 같이 봅니다."
+                  : "연방 초청 라운드와 EE-linked nomination 기회를 같이 추적합니다."
+              ]
+            });
+          }
+
+          if (insight.id === "federal" || statusSupports(insight.statuses.french)) {
+            addPlan(8, {
+              type: "불어형",
+              title: "불어 점수 플랜",
+              highlight: (describeReferenceScoreImpact(answers, "french") || "변화 확인") + " · NCLC 7+",
+              summary: "불어 점수를 추가로 만들면 연방 EE와 일부 불어 중심 주정부 경로에서 생각보다 큰 차이를 만들 수 있습니다.",
+              streamLine: frenchStreamNames.length > 0
+                ? "같이 볼 경로: " + frenchStreamNames.join(" / ")
+                : "같이 볼 경로: French category 또는 francophone stream",
+              steps: [
+                "TEF Canada 또는 TCF Canada 준비를 시작하고 NCLC 7 이상, 가능하면 8-9 구간을 목표로 둡니다.",
+                "영어 점수와 함께 불어 점수표를 만들어 EE 프로필이나 불어 stream 비교에 바로 넣습니다.",
+                frenchStreamNames.length > 0
+                  ? frenchStreamNames.join(" / ") + " 같은 불어 경로를 같이 검토합니다."
+                  : "연방 French category, francophone pilot, 불어 우대 stream을 같이 검토합니다."
+              ]
+            });
+          }
+
+          if (statusSupports(insight.statuses.jobOffer) || statusSupports(insight.statuses.health) || statusSupports(insight.statuses.trades)) {
+            const focusStreams = healthStreamNames.length > 0
+              ? healthStreamNames
+              : tradeStreamNames.length > 0
+                ? tradeStreamNames
+                : jobOfferStreamNames;
+            const focusLabel = healthStreamNames.length > 0
+              ? "보건직"
+              : tradeStreamNames.length > 0
+                ? "기술직"
+                : "고용주 연결";
+            const occupationPivot = getOccupationPivotLabel(answers, insight);
+
+            addPlan(7, {
+              type: "직무형",
+              title: "직무·고용주 연결 플랜",
+              highlight: focusLabel + " · " + occupationPivot,
+              summary: "이 지역은 점수만 보는 곳이 아니라, 우선직군이나 고용주 연결이 붙을 때 실제 체감이 훨씬 좋아질 수 있습니다.",
+              streamLine: focusStreams.length > 0
+                ? "같이 볼 경로: " + focusStreams.join(" / ")
+                : "같이 볼 경로: 우선직군 또는 고용주 연결형 stream",
+              steps: [
+                "지금 경력을 기준으로 " + occupationPivot + " 쪽 NOC 1개를 정하고, 그 NOC가 이 지역 우선직군과 맞는지 먼저 확인합니다.",
+                statusSupports(insight.statuses.jobOffer)
+                  ? "이 지역 고용주 오퍼를 붙이거나 현재 고용 연결을 지역 기준으로 다시 정리합니다."
+                  : "이 지역에서 실제로 선호하는 sector·occupation 쪽으로 직무를 맞출 수 있는지 검토합니다.",
+                focusStreams.length > 0
+                  ? focusStreams.join(" / ") + " 중 어디가 가장 현실적인지 먼저 좁힙니다."
+                  : "점수보다 직무, 고용주, 노동시장 타깃을 먼저 맞춥니다."
+              ]
+            });
+          }
+
+          if (statusSupports(insight.statuses.graduate)) {
+            addPlan(6, {
+              type: "학교형",
+              title: "학교·졸업자 플랜",
+              highlight: "학교 -> 졸업자",
+              summary: "이 주에서 학교를 거쳐 졸업자/PGWP 경로로 들어가면, 바로 취업이민보다 더 선명한 루트가 나오는 경우가 있습니다.",
+              streamLine: graduateStreamNames.length > 0
+                ? "같이 볼 경로: " + graduateStreamNames.join(" / ")
+                : "같이 볼 경로: graduate 또는 현지경력 stream",
+              steps: [
+                getStudyPlanLabel(insight) + "를 기준으로, PGWP 가능한 과정인지부터 먼저 확인합니다.",
+                "학교를 간다면 학과보다도 졸업 후 남는 체류기간, 지역 고용시장, 현지경력 연결까지 같이 보고 고릅니다.",
+                "졸업 후 PGWP 또는 현지 취업으로 1년 안팎 경력을 만들고, 이 주 졸업자 경로를 다시 계산합니다.",
+                graduateStreamNames.length > 0
+                  ? graduateStreamNames.join(" / ") + "처럼 학위 기반 경로를 중심으로 봅니다."
+                  : "이 주의 graduate·local experience 경로를 중심으로 다시 봅니다."
+              ]
+            });
+          }
+
+          if (statusSupports(insight.statuses.regional) && answers.setting !== "regional") {
+            addPlan(5, {
+              type: "지역형",
+              title: "지역 정착 플랜",
+              highlight: "지역 열기",
+              summary: "대도시만 보지 않고 이 주의 지역·커뮤니티 경로까지 열어두면 nomination 기회가 더 넓어질 수 있습니다.",
+              streamLine: regionalStreamNames.length > 0
+                ? "같이 볼 경로: " + regionalStreamNames.join(" / ")
+                : "같이 볼 경로: rural/community 경로",
+              steps: [
+                "이 주 안에서도 커뮤니티 조건이 붙는 smaller city나 지역 경로가 있는지 먼저 확인합니다.",
+                "지역 정착 의사, 고용주 연결, 커뮤니티 참여 조건을 같이 준비합니다.",
+                regionalStreamNames.length > 0
+                  ? regionalStreamNames.join(" / ") + " 같은 지역 경로를 병행 검토합니다."
+                  : "지역 정착형 stream이나 community-driven 경로를 같이 검토합니다."
+              ]
+            });
+          }
+
+          return plans
+            .sort((left, right) => right.priority - left.priority)
+            .slice(0, 3);
+        }
+
         function buildImprovementPlan(answers, insight, immigrationChancePercent) {
           const actions = [];
 
@@ -3896,6 +4128,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
             const selectionModel = insight.selectionModel;
             const careerRecognitionItems = buildCareerRecognitionItems(answers, insight);
             const timeline = buildScenarioTimeline(answers, insight);
+            const alternativePlans = buildAlternativePlans(answers, insight);
             const pathwayGuideBundle = buildEvaluatedPathwayGuide(answers, insight, eeSnapshot);
             const pathwayCurrentItems = pathwayGuideBundle.evaluated
               .filter((criterion) => criterion.state === "has")
@@ -3927,6 +4160,22 @@ function renderClientScript({ page, updates, basePath = "" }) {
               + (insight.latestPublishedAt ? " · 최신 공지 " + escapeHtmlClient(insight.latestPublishedAt) : " · 최신 공지 없음");
             const timelineTitle = isFederalCard ? "연방으로 간다면 이런 순서" : "이 주라면 이런 순서로 준비";
             const timelineHtml = timeline.map((item) => "<li>" + escapeHtmlClient(item) + "</li>").join("");
+            const alternativePlanHtml = alternativePlans.length > 0
+              ? alternativePlans
+                  .map((plan, planIndex) => [
+                    '<article class="plan-variant-card">',
+                    '<div class="plan-variant-topline">',
+                    '<span class="compare-pill">플랜 ' + escapeHtmlClient(String.fromCharCode(65 + planIndex)) + " · " + escapeHtmlClient(plan.type) + '</span>',
+                    plan.highlight ? '<span class="plan-variant-highlight">' + escapeHtmlClient(plan.highlight) + '</span>' : "",
+                    '</div>',
+                    '<strong>' + escapeHtmlClient(plan.title) + '</strong>',
+                    '<p>' + escapeHtmlClient(plan.summary) + '</p>',
+                    plan.streamLine ? '<p class="plan-variant-stream">' + escapeHtmlClient(plan.streamLine) + '</p>' : "",
+                    '<ul class="reason-list">' + plan.steps.map((step) => '<li>' + escapeHtmlClient(step) + '</li>').join("") + '</ul>',
+                    '</article>'
+                  ].join(""))
+                  .join("")
+              : "";
             const careerRecognitionHtml = careerRecognitionItems.map((item) => "<li>" + escapeHtmlClient(item) + "</li>").join("");
             const crsNoteText = crsSnapshot.notes.length > 0
               ? crsSnapshot.notes.join(" · ")
@@ -4117,6 +4366,12 @@ function renderClientScript({ page, updates, basePath = "" }) {
               (isFederalCard ? '<p class="wizard-freshness">EE 각 액션 아래에는 CRS 직접 변화도 같이 표시합니다.</p>' : ""),
               '<ul class="improvement-list">' + improvementHtml + '</ul>',
               '</section>',
+              (alternativePlanHtml
+                ? '<section class="plan-variants-panel">'
+                  + '<div class="plan-variants-head"><strong>가능한 플랜 A/B/C</strong><p class="wizard-freshness">한 가지 길만 보지 말고, 점수형·불어형·직무형·학교형 중 어떤 방식이 더 현실적인지도 같이 비교해 보세요.</p></div>'
+                  + '<div class="plan-variant-grid">' + alternativePlanHtml + '</div>'
+                  + '</section>'
+                : ""),
               '<div class="reason-columns">',
               '<div><strong>정책 적합</strong><ul class="reason-list">' + policyReasonsHtml + "</ul></div>",
               '<div><strong>생활 선호</strong><ul class="reason-list">' + lifestyleReasonsHtml + "</ul></div>",
@@ -5940,6 +6195,66 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
       .result-summary-block strong {
         color: var(--accent-deep);
         font-size: 0.88rem;
+      }
+
+      .plan-variants-panel {
+        display: grid;
+        gap: 12px;
+      }
+
+      .plan-variants-head {
+        display: grid;
+        gap: 4px;
+      }
+
+      .plan-variant-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .plan-variant-card {
+        display: grid;
+        gap: 8px;
+        padding: 14px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.76);
+      }
+
+      .plan-variant-card strong {
+        color: var(--accent-deep);
+        font-size: 0.96rem;
+      }
+
+      .plan-variant-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .plan-variant-topline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .plan-variant-highlight {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: rgba(16, 128, 166, 0.1);
+        color: #13607c;
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .plan-variant-stream {
+        font-weight: 700;
+        color: var(--accent-deep);
       }
 
       .result-summary-list,
