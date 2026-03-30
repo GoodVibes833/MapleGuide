@@ -98,7 +98,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
   assert.match(dashboardHtml, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
   assert.match(dashboardHtml, /연방 \/ Express Entry/);
-  assert.match(dashboardHtml, /지역 탐색은 필요할 때만 열기/);
+  assert.match(dashboardHtml, /Map Explorer/);
   assert.match(dashboardHtml, /지역 탐색은 필요할 때만 열기/);
   assert.match(dashboardHtml, /MAP_REGION_DEFS/);
   assert.match(dashboardHtml, /id="CA-ON"/);
