@@ -27,6 +27,121 @@ const JURISDICTION_LIFESTYLE = {
   nunavut: { costLevel: 3, tuitionLevel: 2, metroLevel: 1, regionalLevel: 3 }
 };
 
+const JURISDICTION_SELECTION_MODELS = {
+  federal: {
+    badgeKo: "CRS 점수제",
+    detailKo: "자격이 되면 EE 풀에 들어가고 CRS 순위와 라운드 유형으로 초청되는 구조입니다.",
+    scoreViewKo: "컷오프와 직접 비교",
+    focusKo: "CRS · category-based selection",
+    intakeKo: "라운드 초청",
+    eeScoreLabelKo: "예상 CRS"
+  },
+  ontario: {
+    badgeKo: "EOI + EE NOI",
+    detailKo: "Employer/Graduate는 OINP EOI, EE 연계 스트림은 NOI 방식이라 stream별로 보는 법이 다릅니다.",
+    scoreViewKo: "일부는 점수, 일부는 stream 조건",
+    focusKo: "스트림 구분 · 직군 타깃",
+    intakeKo: "stream별 draw/NOI",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  "british-columbia": {
+    badgeKo: "등록점수 + 타깃 초청",
+    detailKo: "Skills Immigration는 등록 후 초청과 최소점수가 있고, 카테고리 타깃 초청이 함께 작동합니다.",
+    scoreViewKo: "최저점 공개",
+    focusKo: "등록점수 · 카테고리 타깃",
+    intakeKo: "초청 라운드",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  alberta: {
+    badgeKo: "EOI + 우선순위",
+    detailKo: "AAIP는 EOI나 EE를 보더라도 알버타 우선산업, 지역, 고용 연결을 함께 보는 혼합형에 가깝습니다.",
+    scoreViewKo: "점수 일부 공개",
+    focusKo: "우선산업 · 지역추천 · EE",
+    intakeKo: "EOI/우선 초청",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  saskatchewan: {
+    badgeKo: "요건형 + 일부 배정",
+    detailKo: "현재는 pathway별 자격과 sector allocation이 더 중요하고, 모든 경로를 한 점수제로 보면 안 됩니다.",
+    scoreViewKo: "항상 단일 점수제 아님",
+    focusKo: "pathway 자격 · sector allocation",
+    intakeKo: "경로별 상이",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  manitoba: {
+    badgeKo: "EOI 드로우",
+    detailKo: "EOI 점수와 주 연결성으로 랭킹되고, 드로우마다 전략적 초청 조건이 붙을 수 있습니다.",
+    scoreViewKo: "최저점 공개",
+    focusKo: "EOI 점수 · 주 연결성",
+    intakeKo: "EOI draw",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  quebec: {
+    badgeKo: "퀘벡 별도 체계",
+    detailKo: "연방 EE가 아니라 퀘벡 자체 selection program과 pilot 기준으로 봐야 하는 별도 시스템입니다.",
+    scoreViewKo: "CRS 직접 미사용",
+    focusKo: "PSTQ/파일럿 자격",
+    intakeKo: "별도 공고형",
+    eeScoreLabelKo: "연방 참고점수"
+  },
+  "new-brunswick": {
+    badgeKo: "경로별 별도 선발",
+    detailKo: "Skilled Worker, EE, Strategic Initiative, pilot마다 신청 구조와 타깃 조건이 달라 한 방식으로 보면 안 됩니다.",
+    scoreViewKo: "공개 기준 다양함",
+    focusKo: "고용주 · EE pathway · 파일럿",
+    intakeKo: "stream별 상이",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  "prince-edward-island": {
+    badgeKo: "EOI + 노동시장 우선",
+    detailKo: "PEI는 EOI 풀을 두고도 실제 초청은 보건·기술·수요직군 같은 노동시장 우선순위를 강하게 반영합니다.",
+    scoreViewKo: "드로우 결과 공개",
+    focusKo: "우선직군 · 고용주 · EOI",
+    intakeKo: "EOI draw",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  "nova-scotia": {
+    badgeKo: "통합 스트림 + 타깃 선발",
+    detailKo: "2026 통합 스트림 체계에서 stream 자격과 정책 우선순위가 함께 작동해 점수 하나로 설명되지 않습니다.",
+    scoreViewKo: "점수보다 stream 자격",
+    focusKo: "통합 스트림 · 타깃 초청",
+    intakeKo: "정책/stream 중심",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  "newfoundland-and-labrador": {
+    badgeKo: "2단계 EOI",
+    detailKo: "먼저 EOI를 제출하고 초청받은 뒤 정식 신청하는 구조라, 포털 초청 여부와 고용 연결이 중요합니다.",
+    scoreViewKo: "점수보다 초청 구조",
+    focusKo: "EOI 초청 · 포털 · 고용주",
+    intakeKo: "EOI 후 초청",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  yukon: {
+    badgeKo: "EOI intake + 우선점수",
+    detailKo: "정해진 intake 기간에 EOI를 받고 우선순위 점수로 초청하는 구조입니다.",
+    scoreViewKo: "우선점수형",
+    focusKo: "intake 시기 · 고용주 · 우선점수",
+    intakeKo: "기간제 intake",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  "northwest-territories": {
+    badgeKo: "EOI + intake 혼합",
+    detailKo: "Employer-Driven는 EOI selection process, 다른 stream은 intake 구조가 달라 혼합형으로 봐야 합니다.",
+    scoreViewKo: "stream별 다름",
+    focusKo: "Employer-Driven EOI · intake",
+    intakeKo: "혼합형",
+    eeScoreLabelKo: "EE 참고점수"
+  },
+  nunavut: {
+    badgeKo: "주정부 경로 없음",
+    detailKo: "누나붓 자체 nominee program이 없어 연방 경로나 다른 연방 프로그램을 먼저 봐야 합니다.",
+    scoreViewKo: "연방 기준 참고",
+    focusKo: "연방 경로",
+    intakeKo: "주정부 없음",
+    eeScoreLabelKo: "연방 참고점수"
+  }
+};
+
 function levelToLabel(level) {
   if (level <= 1) {
     return "낮음";
@@ -337,6 +452,7 @@ export function buildJurisdictionInsight(meta, profile, updates = []) {
     health: summarizePresence(tagCounts.get(STREAM_TAGS.health) ?? 0, total),
     trades: summarizePresence(tagCounts.get(STREAM_TAGS.trades) ?? 0, total)
   };
+  const selectionModel = JURISDICTION_SELECTION_MODELS[meta.id] ?? JURISDICTION_SELECTION_MODELS.federal;
 
   return {
     id: meta.id,
@@ -348,6 +464,7 @@ export function buildJurisdictionInsight(meta, profile, updates = []) {
     updateCount: updates.length,
     latestPublishedAt,
     statuses,
+    selectionModel,
     lifestyle,
     whoFor: buildWhoFor(meta, statuses, streams),
     firstChecks: buildFirstChecks(meta, statuses),

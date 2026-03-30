@@ -579,6 +579,7 @@ function renderComparisonTable(insights) {
             <tr>
               <th>지역</th>
               <th>운영 체계</th>
+              <th>선발 방식</th>
               <th>EE</th>
               <th>잡오퍼</th>
               <th>졸업자</th>
@@ -599,6 +600,7 @@ function renderComparisonTable(insights) {
                       </a>
                     </td>
                     <td>${escapeHtml(insight.system)}</td>
+                    <td><span class="compare-pill">${escapeHtml(insight.selectionModel.badgeKo)}</span></td>
                     <td><span class="compare-pill">${escapeHtml(insight.statuses.ee)}</span></td>
                     <td><span class="compare-pill">${escapeHtml(insight.statuses.jobOffer)}</span></td>
                     <td><span class="compare-pill">${escapeHtml(insight.statuses.graduate)}</span></td>
@@ -2215,6 +2217,7 @@ function renderClientScript({ page, updates }) {
           const hasOfficialLanguageScore = answers.languageScoreStatus === "official";
           const hasEeReadyEca = answers.ecaStatus === "completed" || answers.ecaStatus === "canadian-degree";
           const crsSnapshot = estimateCrsSnapshot(answers);
+          const scoreLabel = insight.selectionModel?.eeScoreLabelKo || "예상 CRS";
           const readinessPoints =
             (answers.age === "20-29" ? 4 : ["30", "31"].includes(answers.age) ? 3 : ["32", "33", "34"].includes(answers.age) ? 2 : ["35", "36", "37", "38", "39"].includes(answers.age) ? 1 : 0) +
             (answers.education === "doctorate" ? 4 : ["master", "professional"].includes(answers.education) ? 4 : answers.education === "two-plus" ? 3 : answers.education === "bachelor" ? 3 : answers.education === "two-year" ? 2 : answers.education === "one-year" ? 1 : 0) +
@@ -2230,7 +2233,7 @@ function renderClientScript({ page, updates }) {
           let comparison = "최신 EE 컷오프 데이터가 연결되면 여기서 함께 비교합니다.";
 
           if (latestCutoff && crsSnapshot.cutoff != null) {
-            comparison = "예상 CRS " + crsSnapshot.score + "점 · 최근 EE 컷오프 " + crsSnapshot.cutoff + "점 · 현재 " + crsSnapshot.gapLabel + "점";
+            comparison = scoreLabel + " " + crsSnapshot.score + "점 · 최근 EE 컷오프 " + crsSnapshot.cutoff + "점 · 현재 " + crsSnapshot.gapLabel + "점";
           }
 
           const explain = insight.statuses.ee === "핵심" || statusSupports(insight.statuses.ee)
@@ -2241,6 +2244,7 @@ function renderClientScript({ page, updates }) {
             band,
             comparison,
             explain,
+            scoreLabel,
             crsSnapshot
           };
         }
@@ -2707,6 +2711,7 @@ function renderClientScript({ page, updates }) {
               const improvementPlan = buildImprovementPlan(answers, insight, immigrationChancePercent);
               const eeSnapshot = getEESnapshot(answers, insight);
               const crsSnapshot = eeSnapshot.crsSnapshot;
+              const selectionModel = insight.selectionModel;
               const careerRecognitionItems = buildCareerRecognitionItems(answers, insight);
               const timeline = buildScenarioTimeline(answers, insight);
               const policyReasonsHtml = evaluation.policyReasons.length > 0
@@ -2762,13 +2767,25 @@ function renderClientScript({ page, updates }) {
                 "</div>",
                 '<div class="wizard-card-mini-map" aria-hidden="true">' + getRecommendationMiniMapMarkup(insight.id) + "</div>",
                 "</div>",
+                '<section class="selection-model-panel">',
+                '<div class="selection-model-head">',
+                '<strong>이 지역은 이렇게 뽑아요</strong>',
+                '<span class="selection-model-badge">' + escapeHtmlClient(selectionModel.badgeKo) + '</span>',
+                '</div>',
+                '<p class="selection-model-detail">' + escapeHtmlClient(selectionModel.detailKo) + '</p>',
+                '<div class="selection-model-grid">',
+                '<div class="selection-model-stat"><span>점수 읽는 법</span><strong>' + escapeHtmlClient(selectionModel.scoreViewKo) + '</strong></div>',
+                '<div class="selection-model-stat"><span>지금 먼저 볼 것</span><strong>' + escapeHtmlClient(selectionModel.focusKo) + '</strong></div>',
+                '<div class="selection-model-stat"><span>신청 흐름</span><strong>' + escapeHtmlClient(selectionModel.intakeKo) + '</strong></div>',
+                '</div>',
+                '</section>',
                 '<div class="fit-band-row">',
                 '<span class="fit-score">예상 적합도 ' + escapeHtmlClient(fitPercent) + '%</span>',
                 '<span class="chance-score">현재 진입 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
                 '<span class="compare-pill">EE 경쟁력 ' + escapeHtmlClient(eeSnapshot.band) + "</span>",
                 "</div>",
                 '<div class="ee-score-row">',
-                '<span class="ee-score-pill">예상 CRS ' + escapeHtmlClient(crsSnapshot.score) + '점</span>',
+                '<span class="ee-score-pill">' + escapeHtmlClient(eeSnapshot.scoreLabel) + ' ' + escapeHtmlClient(crsSnapshot.score) + '점</span>',
                 '<span class="ee-cutoff-pill">최근 EE 컷오프 ' + escapeHtmlClient(crsSnapshot.cutoff ?? "대기") + '점</span>',
                 '<span class="ee-gap-pill ' + (crsSnapshot.gap == null ? "is-neutral" : crsSnapshot.gap >= 0 ? "is-positive" : "is-negative") + '">현재 ' + escapeHtmlClient(crsSnapshot.gapLabel) + '점</span>',
                 "</div>",
@@ -4288,6 +4305,75 @@ function renderLayout({ title, page, body, updates }) {
         stroke: var(--accent-deep) !important;
       }
 
+      .selection-model-panel {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .selection-model-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .selection-model-head strong {
+        color: var(--accent-deep);
+        font-size: 0.96rem;
+      }
+
+      .selection-model-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(15, 61, 127, 0.08);
+        color: var(--accent-deep);
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+      }
+
+      .selection-model-detail {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .selection-model-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .selection-model-stat {
+        display: grid;
+        gap: 4px;
+        min-height: 74px;
+        padding: 12px 14px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.82);
+      }
+
+      .selection-model-stat span {
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      .selection-model-stat strong {
+        color: var(--text);
+        font-size: 0.92rem;
+        line-height: 1.35;
+      }
+
       .fit-band-row {
         display: flex;
         flex-wrap: wrap;
@@ -5181,6 +5267,10 @@ function renderLayout({ title, page, body, updates }) {
         .wizard-card-mini-map {
           justify-self: start;
           width: 112px;
+        }
+
+        .selection-model-grid {
+          grid-template-columns: 1fr;
         }
       }
     </style>
