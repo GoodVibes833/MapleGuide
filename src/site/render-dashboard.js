@@ -276,6 +276,14 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
+            <span>배우자 포함 여부</span>
+            <select name="household">
+              <option value="single">단독 지원 기준으로 볼게요</option>
+              <option value="with-spouse">배우자와 함께 갈 가능성이 커요</option>
+              <option value="unsure">아직 잘 모르겠어요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
             <span>최종 학력</span>
             <select name="education">
               <option value="high-school">고등학교</option>
@@ -509,49 +517,66 @@ function renderComparisonTable(insights) {
   `;
 }
 
-function renderHomeHero(insights) {
-  const activeCount = insights.filter((insight) => insight.updateCount > 0).length;
-  const eeInsight = insights.find((insight) => insight.id === "federal");
+function renderLatestUpdateCards(updates) {
+  const latestUpdates = [...updates]
+    .sort((left, right) => (right.publishedAt ?? right.fetchedAt).localeCompare(left.publishedAt ?? left.fetchedAt))
+    .slice(0, 4);
+
+  if (latestUpdates.length === 0) {
+    return `
+      <div class="empty-state">
+        아직 표시할 최신 업데이트가 없습니다. 소스를 새로고침하면 가장 최근 변경이 여기 먼저 보입니다.
+      </div>
+    `;
+  }
 
   return `
-    <section class="hero hero-home">
-      <div class="hero-copy">
-        <p class="eyebrow">Beginner First</p>
-        <h1>캐나다 이민을 더 쉽게 찾는 시작 화면</h1>
-        <p class="hero-text">
-          긴 설명보다 질문 몇 개로 먼저 범위를 좁히고, 그다음 비교표와 지도에서 지역을 고르도록 바꿨습니다.
-        </p>
+    <div class="update-flash-grid">
+      ${latestUpdates
+        .map((update) => {
+          const leadLine = update.translation.metricLinesKo?.[0] ?? update.translation.summaryKo;
+          const updateDate = update.publishedAt ?? update.fetchedAt.slice(0, 10);
+
+          return `
+            <article class="update-flash-card">
+              <div class="card-topline">
+                <span class="tag">${escapeHtml(getJurisdictionMeta(update.jurisdiction).labelKo)}</span>
+                <span class="mini-flag">${escapeHtml(updateDate)}</span>
+              </div>
+              <h3>${escapeHtml(update.translation.titleKo)}</h3>
+              <p>${escapeHtml(leadLine)}</p>
+              <div class="card-footer">
+                <span>${escapeHtml(update.program.toUpperCase())}</span>
+                <div class="card-links">
+                  <a href="${escapeHtml(getJurisdictionHref(update.jurisdiction))}">지역 보기</a>
+                  <a href="${escapeHtml(update.sourceUrl)}" target="_blank" rel="noreferrer">원문</a>
+                </div>
+              </div>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderHomeHero(updates) {
+
+  return `
+    <section class="section home-latest-section">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">Latest Changes</p>
+          <h2>가장 최신 업데이트</h2>
+        </div>
         <div class="hero-actions">
-          <a class="btn tone-blue" href="#situations">상황별로 시작하기</a>
+          <a class="btn tone-blue" href="#situations">내 상황 먼저 보기</a>
           <a class="btn ghost" href="#compare-table">전체 비교 보기</a>
           <button id="refresh-feed" class="btn tone-red">새 정보 새로고침</button>
         </div>
       </div>
-      <aside class="hero-panel">
-        <p class="panel-label">Current Scope</p>
-        <h2>지금 바로 비교 가능한 범위</h2>
-        <dl class="hero-stats" aria-label="홈 상태">
-          <div>
-            <dt>비교 가능한 지역</dt>
-            <dd>${insights.length}</dd>
-          </div>
-          <div>
-            <dt>업데이트 추적 중</dt>
-            <dd>${activeCount}</dd>
-          </div>
-          <div>
-            <dt>연방 EE</dt>
-            <dd>${eeInsight?.updateCount ?? 0}건</dd>
-          </div>
-          <div>
-            <dt>주 상세 페이지</dt>
-            <dd>지역별 구조 제공</dd>
-          </div>
-        </dl>
-        <p class="hero-panel-note">
-          질문 결과는 공식 구조를 비교하기 쉽게 정규화한 안내 레이어입니다. 최종 조건은 각 지역 공식 링크에서 확인하세요.
-        </p>
-      </aside>
+      <p class="hero-panel-note">들어오자마자 최신 변경부터 보고, 아래에서 내 상황과 바로 비교할 수 있게 바꿨습니다.</p>
+      ${renderLatestUpdateCards(updates)}
     </section>
   `;
 }
@@ -682,7 +707,7 @@ function renderDashboardPage({ updates }) {
   const insights = buildJurisdictionInsights(updates);
 
   return `
-    ${renderHomeHero(insights)}
+    ${renderHomeHero(updates)}
     <div id="situations">
       ${renderSituationSection(insights)}
     </div>
@@ -1534,6 +1559,186 @@ function renderClientScript({ page, updates }) {
           return Math.max(12, Math.min(88, chance));
         }
 
+        function estimateAgeCrsPoints(answers, withSpouse) {
+          const points = withSpouse
+            ? {
+                "18": 90,
+                "19": 95,
+                "20-29": 100,
+                "30": 95,
+                "31": 90,
+                "32": 85,
+                "33": 80,
+                "34": 75,
+                "35": 70,
+                "36": 65,
+                "37": 60,
+                "38": 55,
+                "39": 50,
+                "40": 45,
+                "41": 35,
+                "42": 25,
+                "43": 15,
+                "44": 5,
+                "45+": 0
+              }
+            : {
+                "18": 99,
+                "19": 105,
+                "20-29": 110,
+                "30": 105,
+                "31": 99,
+                "32": 94,
+                "33": 88,
+                "34": 83,
+                "35": 77,
+                "36": 72,
+                "37": 66,
+                "38": 61,
+                "39": 55,
+                "40": 50,
+                "41": 39,
+                "42": 28,
+                "43": 17,
+                "44": 6,
+                "45+": 0
+              };
+
+          return points[answers.age] ?? 0;
+        }
+
+        function estimateEducationCrsPoints(answers, withSpouse) {
+          if (!["completed", "canadian-degree"].includes(answers.ecaStatus)) {
+            return 0;
+          }
+
+          const points = withSpouse
+            ? {
+                "high-school": 28,
+                "one-year": 84,
+                "two-year": 91,
+                "bachelor": 112,
+                "two-plus": 119,
+                "master": 126,
+                "professional": 126,
+                "doctorate": 140
+              }
+            : {
+                "high-school": 30,
+                "one-year": 90,
+                "two-year": 98,
+                "bachelor": 120,
+                "two-plus": 128,
+                "master": 135,
+                "professional": 135,
+                "doctorate": 150
+              };
+
+          return points[answers.education] ?? 0;
+        }
+
+        function estimateLanguageCrsPoints(answers, withSpouse) {
+          const points = withSpouse
+            ? {
+                unknown: 0,
+                clb6: 32,
+                clb7: 64,
+                clb8: 88,
+                clb9plus: 116
+              }
+            : {
+                unknown: 0,
+                clb6: 36,
+                clb7: 68,
+                clb8: 92,
+                clb9plus: 124
+              };
+
+          return points[answers.english] ?? 0;
+        }
+
+        function estimateCanadianExperienceCrsPoints(answers, withSpouse) {
+          if (!hasSkilledCanadianTrack(answers)) {
+            return 0;
+          }
+
+          const points = withSpouse
+            ? { "0": 0, "1": 35, "2": 46, "3": 56, "4": 63, "5": 70 }
+            : { "0": 0, "1": 40, "2": 53, "3": 64, "4": 72, "5": 80 };
+
+          return points[answers.canadianExp] ?? 0;
+        }
+
+        function estimateSkillTransferabilityPoints(answers) {
+          const hasEducation = ["completed", "canadian-degree"].includes(answers.ecaStatus);
+          const educationStrong = ["bachelor", "two-plus", "master", "professional", "doctorate"].includes(answers.education);
+          const educationMedium = ["one-year", "two-year"].includes(answers.education);
+          const hasMediumLanguage = ["clb7", "clb8"].includes(answers.english);
+          const hasStrongLanguage = answers.english === "clb9plus";
+          const foreignYears = Number.parseInt(answers.foreignExp, 10) || 0;
+          const canadianYears = hasSkilledCanadianTrack(answers) ? Number.parseInt(answers.canadianExp, 10) || 0 : 0;
+          let total = 0;
+
+          if (hasEducation) {
+            if (educationStrong && hasStrongLanguage) {
+              total += 50;
+            } else if (educationStrong && hasMediumLanguage) {
+              total += 25;
+            } else if (educationMedium && hasStrongLanguage) {
+              total += 25;
+            } else if (educationMedium && hasMediumLanguage) {
+              total += 13;
+            }
+          }
+
+          if (foreignYears > 0) {
+            if (hasStrongLanguage) {
+              total += foreignYears >= 3 ? 50 : 25;
+            } else if (hasMediumLanguage) {
+              total += foreignYears >= 3 ? 25 : 13;
+            }
+          }
+
+          if (foreignYears > 0 && canadianYears > 0) {
+            total += foreignYears >= 3 ? 25 : 13;
+          }
+
+          return Math.min(100, total);
+        }
+
+        function estimateCrsSnapshot(answers) {
+          const latestCutoff = getLatestEECutoff();
+          const withSpouse = answers.household === "with-spouse";
+          const assumedSingle = answers.household !== "with-spouse";
+          const agePoints = estimateAgeCrsPoints(answers, withSpouse);
+          const educationPoints = estimateEducationCrsPoints(answers, withSpouse);
+          const languagePoints = estimateLanguageCrsPoints(answers, withSpouse);
+          const canadianPoints = estimateCanadianExperienceCrsPoints(answers, withSpouse);
+          const transferabilityPoints = estimateSkillTransferabilityPoints(answers);
+          const frenchBonus = answers.advantage === "french" && answers.languageTest === "tef-tcf" ? 25 : 0;
+          const score = agePoints + educationPoints + languagePoints + canadianPoints + transferabilityPoints + frenchBonus;
+          const gap = latestCutoff ? score - Number(latestCutoff) : null;
+          const notes = [];
+
+          if (assumedSingle && answers.household === "unsure") {
+            notes.push("배우자 없음 기준 추정");
+          }
+          if (answers.languageScoreStatus !== "official") {
+            notes.push("공식 언어점수 전 추정");
+          }
+          if (!["completed", "canadian-degree"].includes(answers.ecaStatus)) {
+            notes.push("ECA 미완료라 학력점수 보수 반영");
+          }
+
+          return {
+            score,
+            cutoff: latestCutoff ? Number(latestCutoff) : null,
+            gap,
+            gapLabel: gap == null ? "비교 대기" : (gap >= 0 ? "+" + gap : String(gap)),
+            notes
+          };
+        }
+
         function getLatestEECutoff() {
           const eeRound = UPDATES.find((update) => update.sourceId === "ee-rounds");
           return eeRound?.metrics?.cutoffScore ?? null;
@@ -1543,6 +1748,7 @@ function renderClientScript({ page, updates }) {
           const latestCutoff = getLatestEECutoff();
           const hasOfficialLanguageScore = answers.languageScoreStatus === "official";
           const hasEeReadyEca = answers.ecaStatus === "completed" || answers.ecaStatus === "canadian-degree";
+          const crsSnapshot = estimateCrsSnapshot(answers);
           const readinessPoints =
             (answers.age === "20-29" ? 4 : ["30", "31"].includes(answers.age) ? 3 : ["32", "33", "34"].includes(answers.age) ? 2 : ["35", "36", "37", "38", "39"].includes(answers.age) ? 1 : 0) +
             (answers.education === "doctorate" ? 4 : ["master", "professional"].includes(answers.education) ? 4 : answers.education === "two-plus" ? 3 : answers.education === "bachelor" ? 3 : answers.education === "two-year" ? 2 : answers.education === "one-year" ? 1 : 0) +
@@ -1551,21 +1757,14 @@ function renderClientScript({ page, updates }) {
             (["4", "5"].includes(answers.canadianExp) ? 4 : answers.canadianExp === "3" ? 4 : answers.canadianExp === "2" ? 3 : answers.canadianExp === "1" ? 2 : 0) +
             (answers.advantage === "french" ? 2 : 0);
 
-          const band = readinessPoints >= 14 ? "상" : readinessPoints >= 9 ? "중" : "하";
+          const band = crsSnapshot.gap == null ? (readinessPoints >= 14 ? "상" : readinessPoints >= 9 ? "중" : "하")
+            : crsSnapshot.gap >= 0 ? "컷오프 이상"
+            : crsSnapshot.gap >= -20 ? "근접"
+            : "차이 있음";
           let comparison = "최신 EE 컷오프 데이터가 연결되면 여기서 함께 비교합니다.";
 
-          if (latestCutoff) {
-            if (!hasOfficialLanguageScore && !hasEeReadyEca) {
-              comparison = "최근 EE 컷오프 " + latestCutoff + "와 직접 비교하려면 공식 언어점수와 ECA 상태를 더 확인해야 합니다.";
-            } else if (!hasOfficialLanguageScore) {
-              comparison = "최근 EE 컷오프 " + latestCutoff + "와 더 정확히 비교하려면 공식 언어점수표가 필요합니다.";
-            } else if (!hasEeReadyEca) {
-              comparison = "최근 EE 컷오프 " + latestCutoff + "와 더 정확히 비교하려면 ECA 완료 여부를 더 확인해야 합니다.";
-            } else if (answers.english === "unknown") {
-              comparison = "최근 EE 컷오프 " + latestCutoff + "를 참고 중입니다. 현재는 CLB 구간 입력이 없어 보수적으로 추정합니다.";
-            } else {
-              comparison = "최근 EE 컷오프 " + latestCutoff + "를 기준으로 현재 입력값으로 대략 비교 중입니다.";
-            }
+          if (latestCutoff && crsSnapshot.cutoff != null) {
+            comparison = "예상 CRS " + crsSnapshot.score + "점 · 최근 EE 컷오프 " + crsSnapshot.cutoff + "점 · 현재 " + crsSnapshot.gapLabel + "점";
           }
 
           const explain = insight.statuses.ee === "핵심" || statusSupports(insight.statuses.ee)
@@ -1575,7 +1774,8 @@ function renderClientScript({ page, updates }) {
           return {
             band,
             comparison,
-            explain
+            explain,
+            crsSnapshot
           };
         }
 
@@ -1846,6 +2046,7 @@ function renderClientScript({ page, updates }) {
               const immigrationChancePercent = estimateImmigrationChancePercent(answers, evaluation, insight);
               const improvementPlan = buildImprovementPlan(answers, insight, immigrationChancePercent);
               const eeSnapshot = getEESnapshot(answers, insight);
+              const crsSnapshot = eeSnapshot.crsSnapshot;
               const careerRecognitionItems = buildCareerRecognitionItems(answers, insight);
               const timeline = buildScenarioTimeline(answers, insight);
               const policyReasonsHtml = evaluation.policyReasons.length > 0
@@ -1877,6 +2078,9 @@ function renderClientScript({ page, updates }) {
                   '</li>'
                 ].join(""))
                 .join("");
+              const crsNoteText = crsSnapshot.notes.length > 0
+                ? crsSnapshot.notes.join(" · ")
+                : "현재 입력값 기준으로 바로 비교했습니다.";
               const readinessLine = "언어시험: " + escapeHtmlClient(answers.languageTest)
                 + " / 점수상태: " + escapeHtmlClient(answers.languageScoreStatus)
                 + " / ECA: " + escapeHtmlClient(answers.ecaStatus);
@@ -1894,6 +2098,11 @@ function renderClientScript({ page, updates }) {
                 '<span class="chance-score">이민 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
                 '<span class="compare-pill">EE 경쟁력 ' + escapeHtmlClient(eeSnapshot.band) + "</span>",
                 "</div>",
+                '<div class="ee-score-row">',
+                '<span class="ee-score-pill">예상 CRS ' + escapeHtmlClient(crsSnapshot.score) + '점</span>',
+                '<span class="ee-cutoff-pill">최근 EE 컷오프 ' + escapeHtmlClient(crsSnapshot.cutoff ?? "대기") + '점</span>',
+                '<span class="ee-gap-pill ' + (crsSnapshot.gap == null ? "is-neutral" : crsSnapshot.gap >= 0 ? "is-positive" : "is-negative") + '">현재 ' + escapeHtmlClient(crsSnapshot.gapLabel) + '점</span>',
+                "</div>",
                 '<div class="scenario-chip-row">',
                 '<span class="compare-pill">EE ' + escapeHtmlClient(insight.statuses.ee) + "</span>",
                 '<span class="compare-pill">잡오퍼 ' + escapeHtmlClient(insight.statuses.jobOffer) + "</span>",
@@ -1903,7 +2112,9 @@ function renderClientScript({ page, updates }) {
                 "</div>",
                 '<p class="wizard-freshness">정책 반영 기준: ' + freshnessText + "</p>",
                 '<p class="wizard-freshness">서류 준비 상태: ' + readinessLine + "</p>",
-                '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.explain) + " " + escapeHtmlClient(eeSnapshot.comparison) + "</p>",
+                '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.explain) + "</p>",
+                '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.comparison) + "</p>",
+                '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + "</p>",
                 '<section class="career-check-panel">',
                 '<strong>경력 인정 체크</strong>',
                 '<ul class="reason-list career-check-list">' + careerRecognitionHtml + '</ul>',
@@ -2817,6 +3028,38 @@ function renderLayout({ title, page, body, updates }) {
         line-height: 1.7;
       }
 
+      .home-latest-section {
+        display: grid;
+        gap: 16px;
+      }
+
+      .update-flash-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .update-flash-card {
+        display: grid;
+        gap: 10px;
+        padding: 18px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: rgba(255, 255, 255, 0.76);
+      }
+
+      .update-flash-card h3 {
+        margin: 0;
+        font-size: 1.08rem;
+        line-height: 1.45;
+      }
+
+      .update-flash-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
       .hero-home .hero-copy,
       .hero-home .hero-panel {
         min-height: 100%;
@@ -2992,6 +3235,13 @@ function renderLayout({ title, page, body, updates }) {
         align-items: center;
       }
 
+      .ee-score-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
       .fit-score {
         display: inline-flex;
         align-items: center;
@@ -3013,6 +3263,50 @@ function renderLayout({ title, page, body, updates }) {
         color: var(--green);
         border: 1px solid rgba(33, 95, 79, 0.16);
         font-weight: 800;
+      }
+
+      .ee-score-pill,
+      .ee-cutoff-pill,
+      .ee-gap-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        font-weight: 800;
+      }
+
+      .ee-score-pill {
+        background: rgba(217, 230, 248, 0.76);
+        color: var(--accent-deep);
+      }
+
+      .ee-cutoff-pill {
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        color: var(--text);
+      }
+
+      .ee-gap-pill {
+        border: 1px solid transparent;
+      }
+
+      .ee-gap-pill.is-positive {
+        background: var(--green-soft);
+        color: var(--green);
+        border-color: rgba(33, 95, 79, 0.14);
+      }
+
+      .ee-gap-pill.is-negative {
+        background: rgba(242, 228, 203, 0.72);
+        color: #7a5515;
+        border-color: rgba(122, 85, 21, 0.12);
+      }
+
+      .ee-gap-pill.is-neutral {
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--muted);
+        border-color: rgba(15, 61, 127, 0.12);
       }
 
       .career-check-panel {
@@ -3660,6 +3954,10 @@ function renderLayout({ title, page, body, updates }) {
         .map-layout,
         .decision-grid,
         .wizard-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .update-flash-grid {
           grid-template-columns: 1fr;
         }
 
