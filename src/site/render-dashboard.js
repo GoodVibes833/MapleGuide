@@ -2217,7 +2217,11 @@ function renderClientScript({ page, updates }) {
           const hasOfficialLanguageScore = answers.languageScoreStatus === "official";
           const hasEeReadyEca = answers.ecaStatus === "completed" || answers.ecaStatus === "canadian-degree";
           const crsSnapshot = estimateCrsSnapshot(answers);
-          const scoreLabel = insight.selectionModel?.eeScoreLabelKo || "예상 CRS";
+          const isFederal = insight.id === "federal";
+          const supportsEePath = insight.statuses.ee === "핵심" || statusSupports(insight.statuses.ee);
+          const scoreLabel = isFederal
+            ? (insight.selectionModel?.eeScoreLabelKo || "예상 CRS")
+            : "연방 EE 참고점수";
           const readinessPoints =
             (answers.age === "20-29" ? 4 : ["30", "31"].includes(answers.age) ? 3 : ["32", "33", "34"].includes(answers.age) ? 2 : ["35", "36", "37", "38", "39"].includes(answers.age) ? 1 : 0) +
             (answers.education === "doctorate" ? 4 : ["master", "professional"].includes(answers.education) ? 4 : answers.education === "two-plus" ? 3 : answers.education === "bachelor" ? 3 : answers.education === "two-year" ? 2 : answers.education === "one-year" ? 1 : 0) +
@@ -2236,16 +2240,20 @@ function renderClientScript({ page, updates }) {
             comparison = scoreLabel + " " + crsSnapshot.score + "점 · 최근 EE 컷오프 " + crsSnapshot.cutoff + "점 · 현재 " + crsSnapshot.gapLabel + "점";
           }
 
-          const explain = insight.statuses.ee === "핵심" || statusSupports(insight.statuses.ee)
-            ? "이 지역은 EE와 함께 보기에 적합합니다."
-            : "이 지역은 EE보다 다른 경로가 먼저일 수 있습니다.";
+          const explain = isFederal
+            ? "연방 Express Entry 컷오프와 직접 비교하는 영역입니다."
+            : supportsEePath
+              ? "이 숫자는 이 주 자체 선발점수가 아니라, 연방 EE나 EE-linked 주정부 경로를 같이 볼 때 참고하는 점수입니다."
+              : "이 지역은 주 자체 경로가 먼저이고, 연방 EE 점수는 보조 참고만 가능합니다.";
 
           return {
             band,
             comparison,
             explain,
             scoreLabel,
-            crsSnapshot
+            crsSnapshot,
+            isFederal,
+            supportsEePath
           };
         }
 
@@ -2294,19 +2302,24 @@ function renderClientScript({ page, updates }) {
             return null;
           }
 
+          const scorePlanLabel = insight.id === "federal" ? "예상 CRS" : "연방 EE 참고점수";
+          const noDirectScoreLabel = insight.id === "federal"
+            ? "CRS 직접 변화 없음"
+            : "연방 EE 점수 직접 변화 없음";
+
           function exactLift(overrides) {
             const lift = estimateProjectedCrsLift(answers, overrides);
             return lift > 0
               ? {
                   lift,
                   badge: "+" + lift + "점",
-                  label: "완료 시 예상 CRS +" + lift + "점",
+                  label: "완료 시 " + scorePlanLabel + " +" + lift + "점",
                   tone: "positive"
                 }
               : {
                   lift: 0,
                   badge: "변화 없음",
-                  label: "CRS 직접 변화 없음",
+                  label: noDirectScoreLabel,
                   tone: "neutral"
                 };
           }
@@ -2315,7 +2328,7 @@ function renderClientScript({ page, updates }) {
             case "language-proof":
               return answers.english === "unknown"
                 ? { lift: null, badge: "계산 대기", label: "실제 점수표가 나와야 계산 가능", tone: "neutral" }
-                : { lift: 0, badge: "변화 없음", label: "현재 추정 CRS와 동일", tone: "neutral" };
+                : { lift: 0, badge: "변화 없음", label: "현재 추정 " + scorePlanLabel + "와 동일", tone: "neutral" };
             case "language-clb9":
               return exactLift({
                 english: "clb9plus",
@@ -2332,7 +2345,7 @@ function renderClientScript({ page, updates }) {
             case "korea-primary-noc":
             case "korea-noc-detail":
             case "regional-setting":
-              return { lift: 0, badge: "변화 없음", label: "CRS 직접 변화 없음", tone: "neutral" };
+              return { lift: 0, badge: "변화 없음", label: noDirectScoreLabel, tone: "neutral" };
             case "teer-upgrade":
               {
                 const futureLift = estimateProjectedCrsLift({
@@ -2348,7 +2361,7 @@ function renderClientScript({ page, updates }) {
                       lift: null,
                       futureLift,
                       badge: "1년 후 +" + futureLift + "점",
-                      label: "새 skilled 경력 1년이 쌓이면 예상 CRS +" + futureLift + "점",
+                      label: "새 skilled 경력 1년이 쌓이면 " + scorePlanLabel + " +" + futureLift + "점",
                       tone: "deferred"
                     }
                   : { lift: null, badge: "나중에 반영", label: "경력 누적 후 점수 반영", tone: "deferred" };
@@ -2357,13 +2370,13 @@ function renderClientScript({ page, updates }) {
             case "study-route":
               return { lift: null, badge: "나중에 반영", label: "경력 누적 후 점수 반영", tone: "deferred" };
             case "job-offer":
-              return { lift: 0, badge: "변화 없음", label: "EE 잡오퍼 점수 없음", tone: "neutral" };
+              return { lift: 0, badge: "변화 없음", label: "연방 EE 추가점수 없음", tone: "neutral" };
             case "pnp-nomination":
               return {
                 lift: null,
                 futureLift: 600,
                 badge: "+600점",
-                label: "EE-linked nomination 되면 CRS +600점",
+                label: "EE-linked nomination 되면 " + scorePlanLabel + " +600점",
                 tone: "deferred"
               };
             case "canadian-exp-next":
@@ -2375,7 +2388,7 @@ function renderClientScript({ page, updates }) {
                       canadianJobSkill: "skilled",
                       canadianExp: nextCanadianYear
                     })
-                  : { lift: 0, badge: "변화 없음", label: "CRS 직접 변화 없음", tone: "neutral" };
+                  : { lift: 0, badge: "변화 없음", label: noDirectScoreLabel, tone: "neutral" };
               }
             case "canadian-exp-1":
               return exactLift({
@@ -2390,7 +2403,7 @@ function renderClientScript({ page, updates }) {
             case "foreign-exp-1":
               return exactLift({ foreignExp: "1" });
             case "french":
-              return { lift: null, futureLift: 50, badge: "최대 +50점", label: "NCLC 7+면 최대 +50점", tone: "deferred" };
+              return { lift: null, futureLift: 50, badge: "최대 +50점", label: "NCLC 7+면 " + scorePlanLabel + " 최대 +50점", tone: "deferred" };
             case "expand-regions":
               return { lift: 0, badge: "선택 확장", label: "점수는 그대로, 선택지는 확장", tone: "neutral" };
             default:
@@ -2751,8 +2764,32 @@ function renderClientScript({ page, updates }) {
               const crsNoteText = crsSnapshot.notes.length > 0
                 ? crsSnapshot.notes.join(" · ")
                 : "현재 입력값 기준으로 바로 비교했습니다.";
+              const scorePlanLabel = eeSnapshot.isFederal ? "예상 CRS" : "연방 EE 참고점수";
               const readinessLine = "영어 상태: " + escapeHtmlClient(answers.languageProfileLabelKo)
                 + " / ECA: " + escapeHtmlClient(answers.ecaStatus);
+              const eeConnectionPillLabel = eeSnapshot.isFederal
+                ? "연방 EE 경쟁력 " + eeSnapshot.band
+                : eeSnapshot.supportsEePath
+                  ? "연방 EE 연결 " + insight.statuses.ee
+                  : "주정부 중심";
+              const eeReferenceHtml = eeSnapshot.supportsEePath && !eeSnapshot.isFederal
+                ? [
+                    '<section class="ee-reference-panel">',
+                    '<div class="ee-reference-head">',
+                    '<strong>연방 EE 참고</strong>',
+                    '<span class="ee-reference-badge">이 주 자체 점수 아님</span>',
+                    '</div>',
+                    '<p class="ee-reference-copy">' + escapeHtmlClient(eeSnapshot.explain) + '</p>',
+                    '<div class="ee-score-row">',
+                    '<span class="ee-score-pill">' + escapeHtmlClient(eeSnapshot.scoreLabel) + ' ' + escapeHtmlClient(crsSnapshot.score) + '점</span>',
+                    '<span class="ee-cutoff-pill">최근 EE 컷오프 ' + escapeHtmlClient(crsSnapshot.cutoff ?? "대기") + '점</span>',
+                    '<span class="ee-gap-pill ' + (crsSnapshot.gap == null ? "is-neutral" : crsSnapshot.gap >= 0 ? "is-positive" : "is-negative") + '">현재 ' + escapeHtmlClient(crsSnapshot.gapLabel) + '점</span>',
+                    '</div>',
+                    '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.comparison) + '</p>',
+                    '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + '</p>',
+                    '</section>'
+                  ].join("")
+                : "";
 
               return [
                 '<article class="wizard-result-card">',
@@ -2782,13 +2819,15 @@ function renderClientScript({ page, updates }) {
                 '<div class="fit-band-row">',
                 '<span class="fit-score">예상 적합도 ' + escapeHtmlClient(fitPercent) + '%</span>',
                 '<span class="chance-score">현재 진입 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
-                '<span class="compare-pill">EE 경쟁력 ' + escapeHtmlClient(eeSnapshot.band) + "</span>",
+                '<span class="compare-pill">' + escapeHtmlClient(eeConnectionPillLabel) + "</span>",
                 "</div>",
-                '<div class="ee-score-row">',
-                '<span class="ee-score-pill">' + escapeHtmlClient(eeSnapshot.scoreLabel) + ' ' + escapeHtmlClient(crsSnapshot.score) + '점</span>',
-                '<span class="ee-cutoff-pill">최근 EE 컷오프 ' + escapeHtmlClient(crsSnapshot.cutoff ?? "대기") + '점</span>',
-                '<span class="ee-gap-pill ' + (crsSnapshot.gap == null ? "is-neutral" : crsSnapshot.gap >= 0 ? "is-positive" : "is-negative") + '">현재 ' + escapeHtmlClient(crsSnapshot.gapLabel) + '점</span>',
-                "</div>",
+                (eeSnapshot.isFederal
+                  ? '<div class="ee-score-row">'
+                    + '<span class="ee-score-pill">' + escapeHtmlClient(eeSnapshot.scoreLabel) + ' ' + escapeHtmlClient(crsSnapshot.score) + '점</span>'
+                    + '<span class="ee-cutoff-pill">최근 EE 컷오프 ' + escapeHtmlClient(crsSnapshot.cutoff ?? "대기") + '점</span>'
+                    + '<span class="ee-gap-pill ' + (crsSnapshot.gap == null ? "is-neutral" : crsSnapshot.gap >= 0 ? "is-positive" : "is-negative") + '">현재 ' + escapeHtmlClient(crsSnapshot.gapLabel) + '점</span>'
+                    + "</div>"
+                  : ""),
                 '<div class="scenario-chip-row">',
                 '<span class="compare-pill">EE ' + escapeHtmlClient(insight.statuses.ee) + "</span>",
                 '<span class="compare-pill">잡오퍼 ' + escapeHtmlClient(insight.statuses.jobOffer) + "</span>",
@@ -2798,9 +2837,12 @@ function renderClientScript({ page, updates }) {
                 "</div>",
                 '<p class="wizard-freshness">정책 반영 기준: ' + freshnessText + "</p>",
                 '<p class="wizard-freshness">서류 준비 상태: ' + readinessLine + "</p>",
-                '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.explain) + "</p>",
-                '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.comparison) + "</p>",
-                '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + "</p>",
+                (eeSnapshot.isFederal
+                  ? '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.explain) + "</p>"
+                    + '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.comparison) + "</p>"
+                    + '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + "</p>"
+                  : ""),
+                eeReferenceHtml,
                 '<section class="career-check-panel">',
                 '<strong>경력 인정 체크</strong>',
                 '<ul class="reason-list career-check-list">' + careerRecognitionHtml + '</ul>',
@@ -2810,21 +2852,27 @@ function renderClientScript({ page, updates }) {
                 '<strong>가능성 올리는 다음 액션</strong>',
                 '<span class="improvement-total">' + escapeHtmlClient(
                   improvementPlan.projectedScoreLift > 0
-                    ? "예상 CRS " + improvementPlan.baseScore + "점 → " + improvementPlan.projectedScore + "점"
+                    ? scorePlanLabel + " " + improvementPlan.baseScore + "점 → " + improvementPlan.projectedScore + "점"
                     : improvementPlan.bestFutureScoreLift > 0
                       ? "지금 " + improvementPlan.baseScore + "점 · 나중에 최대 " + (improvementPlan.baseScore + improvementPlan.bestFutureScoreLift) + "점"
-                      : "예상 CRS " + improvementPlan.baseScore + "점 유지"
+                      : scorePlanLabel + " " + improvementPlan.baseScore + "점 유지"
                 ) + '</span>',
                 '</div>',
                 '<p class="wizard-freshness">' + escapeHtmlClient(
                   improvementPlan.projectedScoreLift > 0
-                    ? "직접 점수에 반영되는 액션은 CRS 기준으로 먼저 정렬했습니다. 점수는 안 오르지만 경로를 넓히는 액션도 같이 남겼습니다."
+                    ? (eeSnapshot.isFederal
+                      ? "직접 점수에 반영되는 액션은 CRS 기준으로 먼저 정렬했습니다. 점수는 안 오르지만 경로를 넓히는 액션도 같이 남겼습니다."
+                      : "직접 점수에 반영되는 액션은 연방 EE 기준으로 먼저 정렬했습니다. 주 자체 선발은 위 선발 방식 박스를 같이 보세요.")
                     : improvementPlan.bestFutureScoreLift > 0
                       ? "바로 오르는 점수는 없지만, 아래처럼 시간이 필요한 액션은 나중에 실제 CRS 상승으로 이어질 수 있습니다."
                       : "점수는 안 오르지만 경로를 넓히거나 서류를 정리하는 액션을 먼저 보여줍니다."
                 ) + '</p>',
                 (insight.id === "federal" || statusSupports(insight.statuses.ee))
-                  ? '<p class="wizard-freshness">EE가 연결된 지역은 각 액션 아래에 CRS 직접 변화도 같이 표시합니다.</p>'
+                  ? '<p class="wizard-freshness">' + escapeHtmlClient(
+                    eeSnapshot.isFederal
+                      ? "EE가 연결된 지역은 각 액션 아래에 CRS 직접 변화도 같이 표시합니다."
+                      : "EE가 연결된 지역은 각 액션 아래에 연방 EE 점수 변화도 같이 표시합니다."
+                  ) + '</p>'
                   : "",
                 '<ul class="improvement-list">' + improvementHtml + '</ul>',
                 '</section>',
@@ -4386,6 +4434,47 @@ function renderLayout({ title, page, body, updates }) {
         flex-wrap: wrap;
         gap: 10px;
         align-items: center;
+      }
+
+      .ee-reference-panel {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: linear-gradient(180deg, rgba(217, 230, 248, 0.5), rgba(255, 255, 255, 0.9));
+      }
+
+      .ee-reference-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .ee-reference-head strong {
+        color: var(--accent-deep);
+        font-size: 0.96rem;
+      }
+
+      .ee-reference-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        color: var(--accent-deep);
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .ee-reference-copy {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
       }
 
       .fit-score {

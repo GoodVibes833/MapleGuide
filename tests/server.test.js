@@ -84,7 +84,9 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /mini-region-map/);
   assert.match(dashboardResponse.body, /선발 방식/);
   assert.match(dashboardResponse.body, /이 지역은 이렇게 뽑아요/);
-  assert.match(dashboardResponse.body, /완료 시 예상 CRS \+/);
+  assert.match(dashboardResponse.body, /연방 EE 참고/);
+  assert.match(dashboardResponse.body, /이 주 자체 점수 아님/);
+  assert.match(dashboardResponse.body, /scorePlanLabel = eeSnapshot\.isFederal \? "예상 CRS" : "연방 EE 참고점수"/);
   assert.match(dashboardResponse.body, /캐나다 한눈에 비교/);
 
   const ontarioRegionResponse = await invoke(handler, {

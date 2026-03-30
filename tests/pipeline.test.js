@@ -68,7 +68,6 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /정착 선호/);
   assert.match(dashboardHtml, /먼저 볼 지역 5곳/);
   assert.match(dashboardHtml, /예상 적합도/);
-  assert.match(dashboardHtml, /완료 시 예상 CRS \+/);
   assert.match(dashboardHtml, /입력한 캐나다 skilled 경력은 CRS에 반영했습니다/);
   assert.match(dashboardHtml, /update-flash-chevron/);
   assert.match(dashboardHtml, /업데이트 더보기/);
@@ -76,6 +75,9 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /mini-region-map/);
   assert.match(dashboardHtml, /선발 방식/);
   assert.match(dashboardHtml, /이 지역은 이렇게 뽑아요/);
+  assert.match(dashboardHtml, /연방 EE 참고/);
+  assert.match(dashboardHtml, /이 주 자체 점수 아님/);
+  assert.match(dashboardHtml, /scorePlanLabel = eeSnapshot\.isFederal \? "예상 CRS" : "연방 EE 참고점수"/);
   assert.match(dashboardHtml, /EOI \+ 노동시장 우선/);
   assert.match(dashboardHtml, /최저 CRS는 492점이고 4,200명에게 초청장이 나왔습니다/);
   assert.match(dashboardHtml, /언어점수 CLB 9 이상 목표/);
