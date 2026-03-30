@@ -35,6 +35,28 @@ npm run dev
 - `http://127.0.0.1:3000/`
 - `http://127.0.0.1:3000/region/ontario`
 
+## GitHub Pages 배포
+
+이 저장소에는 GitHub Pages 배포 workflow가 포함되어 있습니다.
+
+- workflow 파일: `.github/workflows/deploy-pages.yml`
+- 동작:
+  - `main` push 시 배포
+  - 수동 실행 가능
+  - 6시간마다 최신 공지 재수집 후 재배포
+
+한 번만 할 일:
+
+1. GitHub 저장소 `Settings > Pages`로 이동합니다.
+2. `Build and deployment`의 source를 `GitHub Actions`로 설정합니다.
+3. 첫 배포가 끝나면 Pages URL을 친구에게 공유하면 됩니다.
+
+참고:
+
+- GitHub Pages 경로 아래에서도 링크가 깨지지 않도록 `--base-path` 대응이 들어 있습니다.
+- 배포 workflow는 fixture가 아니라 실제 수집(`npm run fetch`)으로 사이트를 생성합니다.
+- 로컬에서 Pages 경로를 흉내 내고 싶다면 `npm run demo -- --base-path /MapleGuide`처럼 실행할 수 있습니다.
+
 ## 실제 운영 구조
 
 1. `src/config/sources.js`에서 공식 소스를 관리합니다.

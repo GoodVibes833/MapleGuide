@@ -121,6 +121,33 @@ function renderQuickFilterCoins() {
 
 export const KNOWN_JURISDICTION_IDS = new Set(JURISDICTION_META.map((region) => region.id));
 
+function normalizeBasePath(basePath = "") {
+  if (!basePath || basePath === "/") {
+    return "";
+  }
+
+  const trimmed = String(basePath).trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return withLeadingSlash.replace(/\/+$/, "");
+}
+
+function withBasePath(basePath, pathname = "/") {
+  const normalizedBasePath = normalizeBasePath(basePath);
+  if (!normalizedBasePath) {
+    return pathname;
+  }
+
+  if (!pathname || pathname === "/") {
+    return `${normalizedBasePath}/`;
+  }
+
+  return `${normalizedBasePath}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
+}
+
 function getJurisdictionMeta(jurisdictionId) {
   return JURISDICTION_META.find((region) => region.id === jurisdictionId) ?? {
     id: jurisdictionId,
@@ -130,8 +157,8 @@ function getJurisdictionMeta(jurisdictionId) {
   };
 }
 
-function getJurisdictionHref(jurisdictionId) {
-  return `/region/${jurisdictionId}`;
+function getJurisdictionHref(jurisdictionId, basePath = "") {
+  return withBasePath(basePath, `/region/${jurisdictionId}`);
 }
 
 function getSourceDefinitionsForJurisdiction(jurisdictionId) {
@@ -192,14 +219,15 @@ function serializeForScript(value) {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-function renderNav(page) {
-  const latestHref = page === "dashboard" ? "#latest-updates" : "/#latest-updates";
-  const situationsHref = page === "dashboard" ? "#situations" : "/#situations";
-  const compareHref = page === "dashboard" ? "#compare-table" : "/#compare-table";
+function renderNav(page, basePath = "") {
+  const homeHref = withBasePath(basePath, "/");
+  const latestHref = page === "dashboard" ? "#latest-updates" : `${homeHref}#latest-updates`;
+  const situationsHref = page === "dashboard" ? "#situations" : `${homeHref}#situations`;
+  const compareHref = page === "dashboard" ? "#compare-table" : `${homeHref}#compare-table`;
 
   return `
     <header class="site-header">
-      <a class="brand" href="/" aria-label="MapleGuide 홈">
+      <a class="brand" href="${homeHref}" aria-label="MapleGuide 홈">
         <span class="brand-mark">MP</span>
         <span class="brand-copy">
           <strong>MapleGuide</strong>
@@ -227,7 +255,7 @@ function renderMetricList(update) {
   return metricLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("");
 }
 
-function renderDashboardCards(updates, { showRegionLink = false } = {}) {
+function renderDashboardCards(updates, { showRegionLink = false, basePath = "" } = {}) {
   return updates
     .map(
       (update) => `
@@ -246,7 +274,7 @@ function renderDashboardCards(updates, { showRegionLink = false } = {}) {
           <div class="card-footer">
             <span>${escapeHtml(update.publishedAt ?? update.fetchedAt.slice(0, 10))}</span>
             <div class="card-links">
-              ${showRegionLink ? `<a href="${escapeHtml(getJurisdictionHref(update.jurisdiction))}">지역 페이지</a>` : ""}
+              ${showRegionLink ? `<a href="${escapeHtml(getJurisdictionHref(update.jurisdiction, basePath))}">지역 페이지</a>` : ""}
               <a href="${escapeHtml(update.sourceUrl)}" target="_blank" rel="noreferrer">원문 보기</a>
             </div>
           </div>
@@ -562,7 +590,7 @@ function renderSituationSection(insights) {
   `;
 }
 
-function renderComparisonTable(insights) {
+function renderComparisonTable(insights, basePath = "") {
   const rows = insights.filter((insight) => insight.id !== "nunavut");
 
   return `
@@ -601,7 +629,7 @@ function renderComparisonTable(insights) {
                 (insight) => `
                   <tr>
                     <td>
-                      <a class="table-link" href="${escapeHtml(getJurisdictionHref(insight.id))}">
+                      <a class="table-link" href="${escapeHtml(getJurisdictionHref(insight.id, basePath))}">
                         ${escapeHtml(insight.labelKo)}
                       </a>
                     </td>
@@ -626,7 +654,7 @@ function renderComparisonTable(insights) {
   `;
 }
 
-function renderLatestUpdateCards(updates) {
+function renderLatestUpdateCards(updates, basePath = "") {
   const sortedUpdates = [...updates].sort((left, right) =>
     (right.publishedAt ?? right.fetchedAt).localeCompare(left.publishedAt ?? left.fetchedAt)
   );
@@ -772,7 +800,7 @@ function renderLatestUpdateCards(updates) {
                 <div class="card-footer">
                   <span>${escapeHtml(update.program.toUpperCase())}</span>
                   <div class="card-links">
-                    <a href="${escapeHtml(getJurisdictionHref(update.jurisdiction))}">지역 보기</a>
+                    <a href="${escapeHtml(getJurisdictionHref(update.jurisdiction, basePath))}">지역 보기</a>
                     <a href="${escapeHtml(update.sourceUrl)}" target="_blank" rel="noreferrer">원문</a>
                   </div>
                 </div>
@@ -810,7 +838,7 @@ function renderLatestUpdateCards(updates) {
   `;
 }
 
-function renderHomeHero(updates) {
+function renderHomeHero(updates, basePath = "") {
 
   return `
     <section class="section home-latest-section" id="latest-updates">
@@ -820,12 +848,12 @@ function renderHomeHero(updates) {
           <h2>가장 최신 업데이트</h2>
         </div>
       </div>
-      ${renderLatestUpdateCards(updates)}
+      ${renderLatestUpdateCards(updates, basePath)}
     </section>
   `;
 }
 
-function renderCanadaMapSection(updates, { minimal = false } = {}) {
+function renderCanadaMapSection(updates, { minimal = false, basePath = "" } = {}) {
   const regions = buildJurisdictionStats(updates);
   const federalCount = regions.find((region) => region.id === "federal")?.updateCount ?? 0;
 
@@ -835,7 +863,7 @@ function renderCanadaMapSection(updates, { minimal = false } = {}) {
         <div class="map-landing-shell">
           <a
             class="map-floating-chip"
-            href="${getJurisdictionHref("federal")}"
+            href="${getJurisdictionHref("federal", basePath)}"
             data-jurisdiction-link="federal"
           >
             <strong>EE / Federal</strong>
@@ -880,7 +908,7 @@ function renderCanadaMapSection(updates, { minimal = false } = {}) {
           <div class="federal-jump-row">
             <a
               class="map-index-item federal-jump"
-              href="${getJurisdictionHref("federal")}"
+              href="${getJurisdictionHref("federal", basePath)}"
               data-jurisdiction-link="federal"
             >
               <strong>연방 / Express Entry</strong>
@@ -905,7 +933,7 @@ function renderCanadaMapSection(updates, { minimal = false } = {}) {
             <p id="map-selection-meta" class="map-selection-meta">
               비교표로 감을 잡았다면 여기서 지역을 고르세요. 호버로 최근 공지 현황을 보고, 클릭하면 EE 또는 각 주 상세 페이지로 이동합니다.
             </p>
-            <a class="btn ghost" id="map-selection-link" href="${getJurisdictionHref("federal")}">연방 / EE 먼저 보기</a>
+            <a class="btn ghost" id="map-selection-link" href="${getJurisdictionHref("federal", basePath)}">연방 / EE 먼저 보기</a>
           </div>
 
           <div class="map-index">
@@ -916,7 +944,7 @@ function renderCanadaMapSection(updates, { minimal = false } = {}) {
                   (region) => `
                     <a
                       class="map-index-item"
-                      href="${escapeHtml(getJurisdictionHref(region.id))}"
+                      href="${escapeHtml(getJurisdictionHref(region.id, basePath))}"
                       data-jurisdiction-link="${escapeHtml(region.id)}"
                     >
                       <strong>${escapeHtml(region.labelKo)}</strong>
@@ -935,7 +963,7 @@ function renderCanadaMapSection(updates, { minimal = false } = {}) {
                     (region) => `
                       <a
                         class="standby-chip"
-                        href="${escapeHtml(getJurisdictionHref(region.id))}"
+                        href="${escapeHtml(getJurisdictionHref(region.id, basePath))}"
                         data-jurisdiction-link="${escapeHtml(region.id)}"
                       >
                         ${escapeHtml(region.labelKo)}
@@ -953,18 +981,18 @@ function renderCanadaMapSection(updates, { minimal = false } = {}) {
   `;
 }
 
-function renderDashboardPage({ updates }) {
+function renderDashboardPage({ updates, basePath = "" }) {
   const insights = buildJurisdictionInsights(updates);
 
   return `
-    ${renderHomeHero(updates)}
+    ${renderHomeHero(updates, basePath)}
     <div id="situations">
       ${renderSituationSection(insights)}
     </div>
     <div id="compare-table">
-      ${renderComparisonTable(insights)}
+      ${renderComparisonTable(insights, basePath)}
     </div>
-    ${renderCanadaMapSection(updates)}
+    ${renderCanadaMapSection(updates, { basePath })}
   `;
 }
 
@@ -1317,7 +1345,7 @@ function renderJurisdictionOverview(meta, profile) {
   `;
 }
 
-function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports = [] }) {
+function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports = [], basePath = "" }) {
   const meta = getJurisdictionMeta(jurisdictionId);
   const profile = getJurisdictionProfile(jurisdictionId);
   const regionUpdates = getUpdatesForJurisdiction(updates, jurisdictionId);
@@ -1338,7 +1366,7 @@ function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports 
     <section class="hero hero-region">
       <div class="hero-copy">
         <nav class="crumbs" aria-label="Breadcrumb">
-          <a href="/">지도 허브</a>
+          <a href="${withBasePath(basePath, "/")}">지도 허브</a>
           <span>/</span>
           <span>${escapeHtml(meta.labelKo)}</span>
         </nav>
@@ -1346,7 +1374,7 @@ function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports 
         <h1>${escapeHtml(meta.labelKo)}</h1>
         <p class="hero-text">${escapeHtml(heroText)}</p>
         <div class="hero-actions">
-          <a class="btn ghost" href="/">지도 허브로 돌아가기</a>
+          <a class="btn ghost" href="${withBasePath(basePath, "/")}">지도 허브로 돌아가기</a>
           ${sourceDefs[0]
             ? `<a class="btn tone-blue" href="${escapeHtml(sourceDefs[0].url)}" target="_blank" rel="noreferrer">대표 공식 소스</a>`
             : ""}
@@ -1373,7 +1401,7 @@ function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports 
             <dd>${escapeHtml(latestDate)}</dd>
           </div>
         </dl>
-        <a class="panel-link" href="/region/federal">연방 / EE 보기</a>
+        <a class="panel-link" href="${getJurisdictionHref("federal", basePath)}">연방 / EE 보기</a>
       </aside>
     </section>
 
@@ -1401,7 +1429,7 @@ function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports 
         <p class="panel-note">원문 링크와 한국어 요약을 함께 제공합니다.</p>
       </div>
       ${regionUpdates.length > 0
-        ? `<section class="news-grid">${renderDashboardCards(regionUpdates)}</section>`
+        ? `<section class="news-grid">${renderDashboardCards(regionUpdates, { basePath })}</section>`
         : `
           <div class="empty-state">
             아직 표시할 카드가 없습니다. 이 지역은 소스 연결 또는 파서 안정화가 끝나면 메인 지도에서 바로 들어와 볼 수 있도록 준비해두었습니다.
@@ -1411,10 +1439,11 @@ function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports 
   `;
 }
 
-function renderClientScript({ page, updates }) {
+function renderClientScript({ page, updates, basePath = "" }) {
   return `
     <script>
       const PAGE = ${JSON.stringify(page)};
+      const BASE_PATH = ${serializeForScript(normalizeBasePath(basePath))};
       const UPDATES = ${serializeForScript(updates)};
       const MAP_REGION_DEFS = ${serializeForScript(JURISDICTION_META)};
       const MINI_REGION_MAPS = ${serializeForScript(MINI_REGION_MAP_SVGS)};
@@ -1442,7 +1471,7 @@ function renderClientScript({ page, updates }) {
         const defaultSelection = {
           label: "지역을 선택해 보세요",
           meta: "비교표와 상황별 카드를 먼저 보고 범위를 좁힌 뒤, 여기서 지역 상세 페이지로 이동하면 훨씬 덜 헷갈립니다.",
-          href: "/region/federal",
+          href: (BASE_PATH || "") + "/region/federal",
           linkText: "연방 / EE 먼저 보기"
         };
 
@@ -3815,7 +3844,7 @@ function renderClientScript({ page, updates }) {
                 "</div>",
                 '<div><strong>대략적인 진행 시나리오</strong><ul class="reason-list">' + timelineHtml + "</ul></div>",
                 '</details>',
-                '<a class="btn ghost" href="/region/' + encodeURIComponent(insight.id) + '">이 지역 먼저 보기</a>',
+                '<a class="btn ghost" href="' + ((BASE_PATH || "") + '/region/' + encodeURIComponent(insight.id)) + '">이 지역 먼저 보기</a>',
                 "</article>"
               ].join("");
             })
@@ -3924,7 +3953,7 @@ function renderClientScript({ page, updates }) {
         let activeEntry = null;
 
         function regionHref(jurisdictionId) {
-          return "/region/" + encodeURIComponent(jurisdictionId);
+          return (BASE_PATH || "") + "/region/" + encodeURIComponent(jurisdictionId);
         }
 
         function setSelectionCard(jurisdictionId) {
@@ -4075,7 +4104,7 @@ function renderClientScript({ page, updates }) {
   `;
 }
 
-function renderLayout({ title, page, body, updates }) {
+function renderLayout({ title, page, body, updates, basePath = "" }) {
   return `<!doctype html>
 <html lang="ko">
   <head>
@@ -6830,10 +6859,10 @@ function renderLayout({ title, page, body, updates }) {
   </head>
   <body>
     <div class="page-shell">
-      ${renderNav(page)}
+      ${renderNav(page, basePath)}
       ${body}
     </div>
-    ${renderClientScript({ page, updates })}
+    ${renderClientScript({ page, updates, basePath })}
   </body>
 </html>`;
 }
@@ -6843,7 +6872,8 @@ export function renderDashboard({
   updates,
   reports = [],
   page = "dashboard",
-  jurisdictionId = null
+  jurisdictionId = null,
+  basePath = ""
 }) {
   if (page === "jurisdiction") {
     const meta = getJurisdictionMeta(jurisdictionId ?? "federal");
@@ -6855,9 +6885,11 @@ export function renderDashboard({
         jurisdictionId: meta.id,
         generatedAt,
         updates,
-        reports
+        reports,
+        basePath
       }),
-      updates
+      updates,
+      basePath
     });
   }
 
@@ -6867,8 +6899,10 @@ export function renderDashboard({
     body: renderDashboardPage({
       generatedAt,
       updates,
-      reports
+      reports,
+      basePath
     }),
-    updates
+    updates,
+    basePath
   });
 }

@@ -59,7 +59,8 @@ async function removeIfExists(filePath) {
 export async function runPipeline({
   useFixtures = false,
   sourceIds = null,
-  outputDir = path.join(process.cwd(), "out")
+  outputDir = path.join(process.cwd(), "out"),
+  basePath = ""
 } = {}) {
   const selectedSources = Array.isArray(sourceIds) && sourceIds.length > 0
     ? sources.filter((source) => sourceIds.includes(source.id))
@@ -111,6 +112,7 @@ export async function runPipeline({
 
   await mkdir(outputDir, { recursive: true });
   await writeFile(path.join(outputDir, "feed.json"), JSON.stringify(payload, null, 2));
+  await writeFile(path.join(outputDir, ".nojekyll"), "");
   await removeIfExists(path.join(outputDir, "instagram-drafts.json"));
   await removeIfExists(path.join(outputDir, "instagram-queue.json"));
   await removeIfExists(path.join(outputDir, "instagram-export.json"));
@@ -118,7 +120,8 @@ export async function runPipeline({
   const dashboardHtml = renderDashboard({
     generatedAt,
     updates,
-    reports
+    reports,
+    basePath
   });
   await writeFile(path.join(outputDir, "index.html"), dashboardHtml);
   await writeFile(path.join(outputDir, "dashboard.html"), dashboardHtml);
@@ -133,7 +136,8 @@ export async function runPipeline({
         updates,
         reports,
         page: "jurisdiction",
-        jurisdictionId: jurisdiction.id
+        jurisdictionId: jurisdiction.id,
+        basePath
       })
     );
   }

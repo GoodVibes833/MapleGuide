@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { extractTables } from "../src/core/html.js";
@@ -123,4 +123,23 @@ test("fixture pipeline writes feed and dashboard", async () => {
   );
   assert.match(federalRegionPage, /Canadian Experience Class/);
   assert.match(federalRegionPage, /Category-based selection/);
+});
+
+test("fixture pipeline supports a GitHub Pages base path", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "mapleguide-pages-"));
+  await runPipeline({ useFixtures: true, outputDir, basePath: "/MapleGuide" });
+
+  const indexHtml = await readFile(path.join(outputDir, "index.html"), "utf8");
+  assert.match(indexHtml, /href="\/MapleGuide\/"/);
+  assert.match(indexHtml, /href="\/MapleGuide\/region\/ontario"/);
+  assert.ok(indexHtml.includes('const BASE_PATH = "/MapleGuide";'));
+
+  const regionHtml = await readFile(
+    path.join(outputDir, "region", "ontario", "index.html"),
+    "utf8"
+  );
+  assert.match(regionHtml, /href="\/MapleGuide\/"/);
+  assert.match(regionHtml, /href="\/MapleGuide\/region\/federal"/);
+
+  await access(path.join(outputDir, ".nojekyll"));
 });

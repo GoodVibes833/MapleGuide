@@ -6,7 +6,8 @@ function parseArgs(argv) {
   const options = {
     useFixtures: false,
     outputDir: path.join(process.cwd(), "out"),
-    sourceIds: null
+    sourceIds: null,
+    basePath: process.env.PAGES_BASE_PATH ?? ""
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -27,6 +28,12 @@ function parseArgs(argv) {
         .split(",")
         .map((item) => item.trim())
         .filter(Boolean);
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--base-path" && argv[index + 1]) {
+      options.basePath = argv[index + 1];
       index += 1;
     }
   }
