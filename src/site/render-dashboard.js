@@ -22,7 +22,6 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
-const QUICK_FILTER_MAP_PREFIX = "quick-filter-";
 
 export const JURISDICTION_META = [
   { id: "federal", labelKo: "연방 / EE", shortLabel: "EE", svgId: null },
@@ -65,11 +64,51 @@ function buildCanadaMapSvg({ idPrefix = "", className = "canada-map actual-map",
 }
 
 const CANADA_MAP_SVG = buildCanadaMapSvg();
-const QUICK_FILTER_MAP_SVG = buildCanadaMapSvg({
-  idPrefix: QUICK_FILTER_MAP_PREFIX,
-  className: "canada-map actual-map quick-filter-map",
-  ariaLabel: "관심 지역 선택 지도"
-});
+
+const QUICK_FILTER_LAYOUT = {
+  yukon: { left: "5%", top: "6%", width: "12%" },
+  "northwest-territories": { left: "19%", top: "4%", width: "18%" },
+  nunavut: { left: "44%", top: "2%", width: "24%" },
+  "british-columbia": { left: "2%", top: "40%", width: "13%" },
+  alberta: { left: "16%", top: "40%", width: "12%" },
+  saskatchewan: { left: "29%", top: "40%", width: "12%" },
+  manitoba: { left: "42%", top: "40%", width: "12%" },
+  ontario: { left: "55%", top: "38%", width: "16%" },
+  quebec: { left: "72%", top: "36%", width: "16%" },
+  "new-brunswick": { left: "77%", top: "66%", width: "10%" },
+  "prince-edward-island": { left: "87%", top: "64%", width: "6%" },
+  "nova-scotia": { left: "85%", top: "78%", width: "11%" },
+  "newfoundland-and-labrador": { left: "90%", top: "48%", width: "10%" }
+};
+
+function renderQuickFilterMap() {
+  return `
+    <div class="quick-filter-map-schematic" role="group" aria-label="관심 지역 선택 지도">
+      ${JURISDICTION_META
+        .filter((region) => region.id !== "federal")
+        .map((region) => {
+          const layout = QUICK_FILTER_LAYOUT[region.id];
+          if (!layout) {
+            return "";
+          }
+
+          return `
+            <button
+              type="button"
+              class="quick-map-button"
+              data-quick-map-region="${escapeHtml(region.id)}"
+              aria-label="${escapeHtml(region.labelKo)} 선택"
+              title="${escapeHtml(region.labelKo)}"
+              style="left:${layout.left}; top:${layout.top}; width:${layout.width};"
+            >
+              ${escapeHtml(region.shortLabel)}
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
 
 export const KNOWN_JURISDICTION_IDS = new Set(JURISDICTION_META.map((region) => region.id));
 
@@ -275,7 +314,7 @@ function renderSituationSection(insights) {
             <button type="button" class="chip" data-quick-region-clear>전체 보기</button>
           </div>
           <div class="wizard-filter-map-frame">
-            ${QUICK_FILTER_MAP_SVG}
+            ${renderQuickFilterMap()}
           </div>
           <div class="wizard-filter-selection" id="quick-region-selection">선택된 지역 없음 · 전체 추천</div>
         </div>
@@ -2686,57 +2725,30 @@ function renderClientScript({ page, updates }) {
           renderQuickStartResults();
         }
 
-        const quickFilterMapEntries = MAP_REGION_DEFS
-          .filter((region) => region.svgId)
-          .map((region) => {
-            const regionNode = document.getElementById("${QUICK_FILTER_MAP_PREFIX}" + region.svgId);
-            const labelNode = document.getElementById("${QUICK_FILTER_MAP_PREFIX}" + region.svgId + " Label");
-
-            if (!regionNode) {
-              return null;
-            }
-
-            regionNode.classList.add("map-region", "quick-filter-region", "is-available");
-            regionNode.dataset.quickMapRegion = region.id;
-            regionNode.setAttribute("tabindex", "0");
-            regionNode.setAttribute("role", "button");
-            regionNode.setAttribute("aria-label", region.labelKo + " 선택");
-
-            if (labelNode) {
-              labelNode.classList.add("map-region-label", "quick-filter-label");
-            }
+        const quickFilterMapEntries = Array.from(document.querySelectorAll("[data-quick-map-region]"))
+          .map((regionNode) => {
+            const regionId = regionNode.dataset.quickMapRegion;
 
             function syncSelectedState() {
-              const selected = activeQuickRegions.has(region.id);
+              const selected = activeQuickRegions.has(regionId);
               regionNode.classList.toggle("is-selected", selected);
-              if (labelNode) {
-                labelNode.classList.toggle("is-selected", selected);
-              }
             }
 
             function onToggle() {
-              toggleQuickRegion(region.id);
+              toggleQuickRegion(regionId);
               syncSelectedState();
               updateQuickRegionSummary();
               renderQuickStartResults();
             }
 
             regionNode.addEventListener("click", onToggle);
-            regionNode.addEventListener("keydown", (event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onToggle();
-              }
-            });
-
             syncSelectedState();
 
             return {
-              regionId: region.id,
+              regionId,
               syncSelectedState
             };
-          })
-          .filter(Boolean);
+          });
 
         if (quickRegionFederalButton) {
           quickRegionFederalButton.addEventListener("click", () => {
@@ -3878,7 +3890,7 @@ function renderLayout({ title, page, body, updates }) {
       .wizard-filter-map-frame {
         position: relative;
         width: min(100%, 620px);
-        height: 68px;
+        height: 92px;
         border: 1px solid rgba(15, 61, 127, 0.1);
         border-radius: var(--radius-lg);
         background:
@@ -3888,38 +3900,42 @@ function renderLayout({ title, page, body, updates }) {
         overflow: hidden;
       }
 
-      .quick-filter-map {
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: -132px;
+      .quick-filter-map-schematic {
+        position: relative;
         width: 100%;
-        height: auto;
-        max-height: none;
-        transform: scale(1.16);
-        transform-origin: center top;
-        pointer-events: none;
+        height: 100%;
       }
 
-      .quick-filter-map .quick-filter-region,
-      .quick-filter-map path.quick-filter-region {
-        pointer-events: auto;
+      .quick-map-button {
+        position: absolute;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 18px;
+        padding: 0 6px;
+        border: 1px solid rgba(15, 61, 127, 0.16);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.84);
+        color: var(--accent-deep);
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition:
+          transform 160ms ease,
+          background 160ms ease,
+          box-shadow 160ms ease;
       }
 
-      .quick-filter-region path,
-      path.quick-filter-region {
-        fill: rgba(255, 255, 255, 0.82);
-        stroke: rgba(15, 61, 127, 0.18);
+      .quick-map-button:hover,
+      .quick-map-button:focus-visible {
+        transform: translateY(-1px);
       }
 
-      .quick-filter-region.is-selected path,
-      path.quick-filter-region.is-selected {
-        fill: rgba(47, 110, 196, 0.28);
-        stroke: rgba(15, 61, 127, 0.56);
-      }
-
-      .quick-filter-label.is-selected {
-        fill: var(--accent-strong);
+      .quick-map-button.is-selected {
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #fff9f5;
+        box-shadow: 0 10px 20px rgba(15, 61, 127, 0.16);
       }
 
       .wizard-filter-selection {
