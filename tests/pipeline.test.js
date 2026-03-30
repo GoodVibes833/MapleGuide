@@ -149,8 +149,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /ECA \/ 학력평가 상태/);
   assert.match(dashboardHtml, /학비·생활비 부담/);
   assert.match(dashboardHtml, /정착 선호/);
-  assert.match(dashboardHtml, /먼저 볼 지역 3곳/);
-  assert.match(dashboardHtml, /지금은 이 방향이 먼저예요/);
+  assert.match(dashboardHtml, /현재 조건에서 먼저 볼 추천 순위/);
+  assert.match(dashboardHtml, /연방이든 주정부든, 지금 조건에서 먼저 볼 곳부터 1순위부터 정리했습니다/);
   assert.match(dashboardHtml, /주정부가 먼저|연방 EE가 먼저/);
   assert.match(dashboardHtml, /예상 적합도/);
   assert.match(dashboardHtml, /입력한 캐나다 skilled 경력은 CRS에 반영했습니다/);
@@ -164,13 +164,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /이 주 자체 점수 아님/);
   assert.match(dashboardHtml, /scorePlanLabel = eeSnapshot\.isFederal \? "예상 CRS" : "연방 EE 참고점수"/);
   assert.match(dashboardHtml, /EOI \+ 노동시장 우선/);
-  assert.match(dashboardHtml, /SPECIAL_PATHWAYS/);
-  assert.match(dashboardHtml, /같이 보면 좋은 특별 경로/);
-  assert.match(dashboardHtml, /Atlantic Immigration Program/);
-  assert.match(dashboardHtml, /Rural Community Immigration Pilot/);
-  assert.match(dashboardHtml, /뉴펀들랜드 2단계 EOI/);
-  assert.match(dashboardHtml, /Trade, Atlantic, Rural, Francophone처럼 일반 연방\/주정부 카드 밖에서 따로 봐야 하는 경로입니다/);
-  assert.match(dashboardHtml, /추천 3곳만 먼저 보여주고, 자세한 설명은 카드 안에서 펼쳐서 볼 수 있게 정리했습니다/);
+  assert.match(dashboardHtml, /왜 이 순위인가/);
+  assert.match(dashboardHtml, /이 경로가 실제로 보는 것/);
   assert.match(dashboardHtml, /자세히 보기/);
   assert.match(dashboardHtml, /최저 CRS는 492점이고 4,200명에게 초청장이 나왔습니다/);
   assert.match(dashboardHtml, /언어점수 CLB 9 이상 목표/);

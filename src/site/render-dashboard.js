@@ -3603,20 +3603,13 @@ function renderClientScript({ page, updates, basePath = "" }) {
               return right.insight.updateCount - left.insight.updateCount;
             })
             .slice(0, 3);
-          const conclusionOverviewHtml = buildConclusionSummaryHtml(answers, ranked);
-          const directionOverviewHtml = buildDirectionOverviewHtml(answers, allEvaluated);
-          const specialPathwaysHtml = buildSpecialPathwaySectionHtml(answers);
-
-          quickStartResults.innerHTML = conclusionOverviewHtml
-            + directionOverviewHtml
-            + specialPathwaysHtml
-            + [
+          quickStartResults.innerHTML = [
               '<div class="wizard-section-heading">',
               '<div>',
               '<p class="panel-kicker">Recommendations</p>',
-              '<h3>현재 조건에서 먼저 볼 지역</h3>',
+              '<h3>현재 조건에서 먼저 볼 추천 순위</h3>',
               '</div>',
-              '<p class="panel-note">추천 3곳만 먼저 보여주고, 자세한 설명은 카드 안에서 펼쳐서 볼 수 있게 정리했습니다.</p>',
+              '<p class="panel-note">연방이든 주정부든, 지금 조건에서 먼저 볼 곳부터 1순위부터 정리했습니다.</p>',
               '</div>'
             ].join("")
             + ranked
@@ -3640,6 +3633,14 @@ function renderClientScript({ page, updates, basePath = "" }) {
                 .slice(0, 3);
               const topActionItems = improvementPlan.items.slice(0, 2);
               const leadSummary = buildRecommendationLeadSummary(insight, evaluation, eeSnapshot);
+              const routeTypeLabel = insight.id === "federal" ? "연방" : "주정부";
+              const routeSummaryLabel = routeTypeLabel + " 경로 · " + selectionModel.badgeKo;
+              const whyRankItems = [
+                ...evaluation.policyReasons.slice(0, 2),
+                insight.id === "federal"
+                  ? "연방은 EE 점수와 최근 컷오프를 바로 비교하는 방식이에요."
+                  : "이 지역은 " + selectionModel.focusKo + "을 먼저 보는 편이에요."
+              ].filter(Boolean).slice(0, 3);
               const policyReasonsHtml = evaluation.policyReasons.length > 0
                 ? evaluation.policyReasons
                     .map((reason) => "<li>" + escapeHtmlClient(reason) + "</li>")
@@ -3724,10 +3725,10 @@ function renderClientScript({ page, updates, basePath = "" }) {
                 '<div class="wizard-card-title-stack">',
                 '<div class="card-topline">',
                 '<span class="status-badge status-approved">추천 ' + (index + 1) + "</span>",
-                '<span class="tag">' + escapeHtmlClient(insight.labelKo) + "</span>",
+                '<span class="tag">' + escapeHtmlClient(routeTypeLabel) + "</span>",
                 "</div>",
                 "<h3>" + escapeHtmlClient(insight.labelKo) + "</h3>",
-                '<p class="wizard-result-system">' + escapeHtmlClient(insight.system) + "</p>",
+                '<p class="wizard-result-system">' + escapeHtmlClient(routeSummaryLabel) + "</p>",
                 "</div>",
                 '<div class="wizard-card-mini-map" aria-hidden="true">' + getRecommendationMiniMapMarkup(insight.id) + "</div>",
                 "</div>",
@@ -3753,11 +3754,9 @@ function renderClientScript({ page, updates, basePath = "" }) {
                 "</div>",
                 '<div class="result-summary-grid">',
                 '<section class="result-summary-block">',
-                '<strong>이 경로가 보는 핵심</strong>',
+                '<strong>왜 이 순위인가</strong>',
                 '<ul class="result-summary-list">'
-                  + (pathwayNeedItems.length
-                    ? pathwayNeedItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                    : pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join(""))
+                  + whyRankItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
                   + '</ul>',
                 '</section>',
                 '<section class="result-summary-block">',
@@ -3786,6 +3785,14 @@ function renderClientScript({ page, updates, basePath = "" }) {
                 '<summary>자세히 보기</summary>',
                 '<p class="wizard-freshness">정책 반영 기준: ' + freshnessText + "</p>",
                 '<p class="wizard-freshness">서류 준비 상태: ' + readinessLine + "</p>",
+                '<section class="result-summary-block detail-summary-block">',
+                '<strong>이 경로가 실제로 보는 것</strong>',
+                '<ul class="result-summary-list">'
+                  + (pathwayNeedItems.length
+                    ? pathwayNeedItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+                    : pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join(""))
+                  + '</ul>',
+                '</section>',
                 '<section class="selection-model-panel">',
                 '<div class="selection-model-head">',
                 '<strong>이 지역은 이렇게 뽑아요</strong>',
