@@ -1,0 +1,13 @@
+{
+  "name": "canada-immigration-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "node src/cli.js --fixtures",
+    "fetch": "node src/cli.js",
+    "dev": "node src/server.js --fixtures",
+    "serve": "node src/server.js",
+    "test": "node --test"
+  }
+}

@@ -1,0 +1,3788 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { escapeHtml } from "../core/html.js";
+import { getJurisdictionProfile } from "../config/jurisdiction-profiles.js";
+import { sources } from "../config/sources.js";
+import {
+  buildJurisdictionInsight,
+  deriveStreamTags,
+  flattenProfileStreams
+} from "./jurisdiction-ux.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
+
+export const JURISDICTION_META = [
+  { id: "federal", labelKo: "연방 / EE", shortLabel: "EE", svgId: null },
+  { id: "yukon", labelKo: "유콘", shortLabel: "YT", svgId: "CA-YT" },
+  { id: "northwest-territories", labelKo: "노스웨스트 준주", shortLabel: "NT", svgId: "CA-NT" },
+  { id: "nunavut", labelKo: "누나붓", shortLabel: "NU", svgId: "CA-NU" },
+  { id: "british-columbia", labelKo: "브리티시컬럼비아", shortLabel: "BC", svgId: "CA-BC" },
+  { id: "alberta", labelKo: "알버타", shortLabel: "AB", svgId: "CA-AB" },
+  { id: "saskatchewan", labelKo: "사스카츄완", shortLabel: "SK", svgId: "CA-SK" },
+  { id: "manitoba", labelKo: "매니토바", shortLabel: "MB", svgId: "CA-MB" },
+  { id: "ontario", labelKo: "온타리오", shortLabel: "ON", svgId: "CA-ON" },
+  { id: "quebec", labelKo: "퀘벡", shortLabel: "QC", svgId: "CA-QC" },
+  { id: "new-brunswick", labelKo: "뉴브런즈윅", shortLabel: "NB", svgId: "CA-NB" },
+  { id: "prince-edward-island", labelKo: "프린스에드워드아일랜드", shortLabel: "PE", svgId: "CA-PE" },
+  { id: "nova-scotia", labelKo: "노바스코샤", shortLabel: "NS", svgId: "CA-NS" },
+  { id: "newfoundland-and-labrador", labelKo: "뉴펀들랜드 래브라도", shortLabel: "NL", svgId: "CA-NL" }
+];
+
+function loadCanadaMapSvg() {
+  const rawSvg = readFileSync(CANADA_MAP_ASSET_PATH, "utf8");
+
+  return rawSvg
+    .replace(/<\?xml[\s\S]*?\?>\s*/i, "")
+    .replace(/<!--[\s\S]*?-->\s*/g, "")
+    .replace(/<metadata[\s\S]*?<\/metadata>\s*/i, "")
+    .replace(/<sodipodi:namedview[\s\S]*?\/>\s*/i, "")
+    .replace(/\swidth="[^"]*"/i, "")
+    .replace(/\sheight="[^"]*"/i, "")
+    .replace(
+      /<svg/i,
+      '<svg class="canada-map actual-map" viewBox="0 0 1320 1145" role="img" aria-label="캐나다 주 및 준주 지도" preserveAspectRatio="xMidYMid meet"'
+    );
+}
+
+const CANADA_MAP_SVG = loadCanadaMapSvg();
+
+export const KNOWN_JURISDICTION_IDS = new Set(JURISDICTION_META.map((region) => region.id));
+
+function getJurisdictionMeta(jurisdictionId) {
+  return JURISDICTION_META.find((region) => region.id === jurisdictionId) ?? {
+    id: jurisdictionId,
+    labelKo: jurisdictionId,
+    shortLabel: jurisdictionId.slice(0, 2).toUpperCase(),
+    svgId: null
+  };
+}
+
+function getJurisdictionHref(jurisdictionId) {
+  return `/region/${jurisdictionId}`;
+}
+
+function getSourceDefinitionsForJurisdiction(jurisdictionId) {
+  return sources.filter((source) => source.jurisdiction === jurisdictionId);
+}
+
+function getUpdatesForJurisdiction(updates, jurisdictionId) {
+  return updates.filter((update) => update.jurisdiction === jurisdictionId);
+}
+
+function getReportMap(reports = []) {
+  return new Map(reports.map((report) => [report.sourceId, report]));
+}
+
+function getLatestUpdateDate(updates, fallbackDate) {
+  return updates[0]?.publishedAt ?? fallbackDate.slice(0, 10);
+}
+
+function getProgramList(updates) {
+  return [...new Set(updates.map((update) => update.program))];
+}
+
+function describeSourceReport(report) {
+  if (!report) {
+    return {
+      badgeClass: "status-draft",
+      badgeLabel: "대기",
+      detail: "아직 수집 이력이 없습니다."
+    };
+  }
+
+  if (!report.ok) {
+    return {
+      badgeClass: "status-rejected",
+      badgeLabel: "점검 필요",
+      detail: report.error ?? "수집 중 오류가 발생했습니다."
+    };
+  }
+
+  const detailParts = [`최근 확인 ${report.fetchedAt.slice(0, 10)}`];
+
+  if (typeof report.updateCount === "number") {
+    detailParts.push(`감지 ${report.updateCount}건`);
+  }
+
+  if (report.mode) {
+    detailParts.push(report.mode);
+  }
+
+  return {
+    badgeClass: "status-approved",
+    badgeLabel: "정상",
+    detail: detailParts.join(" · ")
+  };
+}
+
+function serializeForScript(value) {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+function renderNav(page) {
+  const dashboardClass = page === "dashboard" || page === "jurisdiction" ? "is-active" : "";
+
+  return `
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Canada Immigration Monitor 홈">
+        <span class="brand-mark">CI</span>
+        <span class="brand-copy">
+          <strong>Canada Immigration Monitor</strong>
+          <span>캐나다 이민 업데이트 허브</span>
+        </span>
+      </a>
+      <nav class="site-nav" aria-label="주요 메뉴">
+        <a class="${dashboardClass}" href="/">업데이트 허브</a>
+      </nav>
+    </header>
+  `;
+}
+
+function renderMetricList(update) {
+  const metricLines = update.translation.metricLinesKo?.length
+    ? update.translation.metricLinesKo
+    : update.translation.bulletsKo?.length
+      ? update.translation.bulletsKo
+      : Object.entries(update.metrics).map(([key, value]) => `${key}: ${value}`);
+
+  return metricLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("");
+}
+
+function renderDashboardCards(updates, { showRegionLink = false } = {}) {
+  return updates
+    .map(
+      (update) => `
+        <article
+          class="news-card"
+          data-program="${escapeHtml(update.program)}"
+          data-jurisdiction="${escapeHtml(update.jurisdiction)}"
+        >
+          <div class="card-topline">
+            <span class="eyebrow">${escapeHtml(update.jurisdiction.toUpperCase())}</span>
+            <span class="tag">${escapeHtml(update.program.toUpperCase())}</span>
+          </div>
+          <h2>${escapeHtml(update.translation.titleKo)}</h2>
+          <p class="summary">${escapeHtml(update.translation.summaryKo)}</p>
+          <ul class="fact-list">${renderMetricList(update)}</ul>
+          <div class="card-footer">
+            <span>${escapeHtml(update.publishedAt ?? update.fetchedAt.slice(0, 10))}</span>
+            <div class="card-links">
+              ${showRegionLink ? `<a href="${escapeHtml(getJurisdictionHref(update.jurisdiction))}">지역 페이지</a>` : ""}
+              <a href="${escapeHtml(update.sourceUrl)}" target="_blank" rel="noreferrer">원문 보기</a>
+            </div>
+          </div>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function buildJurisdictionStats(updates) {
+  const stats = new Map();
+
+  for (const meta of JURISDICTION_META) {
+    stats.set(meta.id, {
+      ...meta,
+      updateCount: 0,
+      latestDate: null,
+      programs: new Set()
+    });
+  }
+
+  for (const update of updates) {
+    if (!stats.has(update.jurisdiction)) {
+      continue;
+    }
+
+    const entry = stats.get(update.jurisdiction);
+    entry.updateCount += 1;
+    entry.programs.add(update.program);
+    if (!entry.latestDate || (update.publishedAt ?? "") > entry.latestDate) {
+      entry.latestDate = update.publishedAt ?? entry.latestDate;
+    }
+  }
+
+  return JURISDICTION_META.map((meta) => {
+    const entry = stats.get(meta.id);
+    return {
+      ...entry,
+      programs: [...entry.programs]
+    };
+  });
+}
+
+function buildJurisdictionInsights(updates) {
+  return JURISDICTION_META.map((meta) =>
+    buildJurisdictionInsight(meta, getJurisdictionProfile(meta.id), getUpdatesForJurisdiction(updates, meta.id))
+  );
+}
+
+function renderSituationSection(insights) {
+  return `
+    <section class="section panel">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">Start Here</p>
+          <h2>내 상황으로 먼저 찾기</h2>
+        </div>
+        <p class="panel-note">질문 몇 개만 답하면 먼저 볼 지역을 바로 좁혀줍니다.</p>
+      </div>
+      <div class="wizard-layout">
+        <form class="wizard-form" id="quick-start-form">
+          <label class="wizard-field">
+            <span>가장 가까운 현재 상황</span>
+            <select name="path">
+              <option value="unsure">아직 잘 모르겠어요</option>
+              <option value="worker">해외 경력으로 취업 이민을 보고 있어요</option>
+              <option value="graduate">캐나다 유학 후 이민을 보고 있어요</option>
+              <option value="business">사업·창업 경로를 보고 있어요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>현재 캐나다 체류 상태</span>
+            <select name="base">
+              <option value="outside">현재 캐나다 밖에 있어요</option>
+              <option value="student">캐나다에서 학생 상태예요</option>
+              <option value="working-holiday">워홀(IEC open work permit)로 일하고 있어요</option>
+              <option value="pgwp">PGWP 또는 졸업 후 취업 상태예요</option>
+              <option value="worker">캐나다에서 일반 취업 상태예요</option>
+              <option value="unsure">설명하기 애매해요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>나이</span>
+            <select name="age">
+              <option value="18">18세</option>
+              <option value="19">19세</option>
+              <option value="20-29">20-29세</option>
+              <option value="30">30세</option>
+              <option value="31">31세</option>
+              <option value="32">32세</option>
+              <option value="33">33세</option>
+              <option value="34">34세</option>
+              <option value="35">35세</option>
+              <option value="36">36세</option>
+              <option value="37">37세</option>
+              <option value="38">38세</option>
+              <option value="39">39세</option>
+              <option value="40">40세</option>
+              <option value="41">41세</option>
+              <option value="42">42세</option>
+              <option value="43">43세</option>
+              <option value="44">44세</option>
+              <option value="45+">45세 이상</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>최종 학력</span>
+            <select name="education">
+              <option value="high-school">고등학교</option>
+              <option value="one-year">1년 과정 컬리지/수료</option>
+              <option value="two-year">2년 과정 컬리지</option>
+              <option value="bachelor">학사 또는 3년 이상 학위</option>
+              <option value="two-plus">2개 이상 학위/자격</option>
+              <option value="master">석사</option>
+              <option value="professional">전문직 학위</option>
+              <option value="doctorate">박사</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>영어 수준</span>
+            <select name="english">
+              <option value="unknown">아직 시험 전/모름</option>
+              <option value="clb6">CLB 6 이하</option>
+              <option value="clb7">CLB 7</option>
+              <option value="clb8">CLB 8</option>
+              <option value="clb9plus">CLB 9 이상</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>언어시험 종류</span>
+            <select name="languageTest">
+              <option value="none">아직 없음</option>
+              <option value="ielts">IELTS General</option>
+              <option value="celpip">CELPIP General</option>
+              <option value="pte">PTE Core</option>
+              <option value="tef-tcf">TEF / TCF Canada</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>실제 언어점수 상태</span>
+            <select name="languageScoreStatus">
+              <option value="none">아직 시험점수 없음</option>
+              <option value="booked">시험 예약 또는 준비 중</option>
+              <option value="official">공식 점수표가 있음</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>해외 숙련 경력</span>
+            <select name="foreignExp">
+              <option value="0">없음</option>
+              <option value="1">1년</option>
+              <option value="2">2년</option>
+              <option value="3">3년</option>
+              <option value="4">4년</option>
+              <option value="5">5년 이상</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>캐나다 경력</span>
+            <select name="canadianExp">
+              <option value="0">없음</option>
+              <option value="1">1년</option>
+              <option value="2">2년</option>
+              <option value="3">3년</option>
+              <option value="4">4년</option>
+              <option value="5">5년 이상</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>현재 캐나다 일의 성격</span>
+            <select name="canadianJobSkill">
+              <option value="not-working">아직 캐나다에서 일하지 않아요</option>
+              <option value="skilled">TEER 0-3 쪽 직무예요</option>
+              <option value="non-skilled">TEER 4-5 또는 단순 서비스 쪽이에요</option>
+              <option value="mixed">여러 일이라 딱 나누기 어려워요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>Express Entry</span>
+            <select name="ee">
+              <option value="unsure">모르겠어요</option>
+              <option value="yes">EE 프로필이 있거나 만들 예정이에요</option>
+              <option value="no">EE 경로는 우선순위가 아니에요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>캐나다 잡오퍼</span>
+            <select name="jobOffer">
+              <option value="unsure">모르겠어요</option>
+              <option value="yes">있거나 받을 가능성이 있어요</option>
+              <option value="no">없어요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>ECA / 학력평가 상태</span>
+            <select name="ecaStatus">
+              <option value="canadian-degree">캐나다 학위라 ECA가 필요 없어요</option>
+              <option value="completed">이민용 ECA 완료</option>
+              <option value="in-progress">ECA 진행 중</option>
+              <option value="needed">해외 학력인데 아직 안 했어요</option>
+              <option value="unsure">잘 모르겠어요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>학비·생활비 부담</span>
+            <select name="budget">
+              <option value="tight">가능하면 비용 부담이 낮은 쪽이 좋아요</option>
+              <option value="medium">보통이에요</option>
+              <option value="flexible">비용보다 경로 적합성이 더 중요해요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>정착 선호</span>
+            <select name="setting">
+              <option value="balanced">아직 정하지 못했어요</option>
+              <option value="metro">대도시 접근성이 중요해요</option>
+              <option value="regional">시골·지역 정착도 괜찮아요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>추가 강점</span>
+            <select name="advantage">
+              <option value="none">없음</option>
+              <option value="french">프랑스어</option>
+              <option value="regional">지역·커뮤니티 경로도 가능</option>
+              <option value="health">보건의료 직군</option>
+              <option value="trades">기술직·trade 직군</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>현재 직군</span>
+            <select name="occupation">
+              <option value="general">일반 전문직 / 사무직</option>
+              <option value="stem">STEM / IT / 엔지니어링</option>
+              <option value="healthcare-social">보건의료 / 사회서비스</option>
+              <option value="trades">기술직 / trade / 현장직</option>
+              <option value="education">교육직</option>
+              <option value="transport">운송·물류</option>
+              <option value="physician-canada">의사 + 캐나다 경력</option>
+              <option value="senior-manager-canada">시니어 매니저 + 캐나다 경력</option>
+              <option value="researcher-canada">연구자 + 캐나다 경력</option>
+              <option value="hospitality">관광·호스피탈리티·서비스</option>
+              <option value="business-admin">비즈니스·재무·행정</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>어떤 직군 기준으로 이민을 볼 생각인가요</span>
+            <select name="targetOccupationPlan">
+              <option value="unsure">아직 잘 모르겠어요</option>
+              <option value="current-canada-job">지금 캐나다에서 하는 일 기준으로 볼래요</option>
+              <option value="previous-korea-job">한국에서 하던 경력 기준으로 볼래요</option>
+              <option value="degree-field">한국 전공을 살린 직군으로 가면 그쪽으로 볼래요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>한국 경력과 목표 직군의 연결성</span>
+            <select name="foreignExpAlignment">
+              <option value="same-skilled">같은 NOC 또는 매우 비슷한 숙련 경력이에요</option>
+              <option value="related-skilled">비슷한 분야지만 직무가 완전히 같진 않아요</option>
+              <option value="unrelated">지금 목표 직군과 거의 관련 없어요</option>
+              <option value="none">해외 숙련 경력은 거의 없어요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>한국 학사 / 전공 활용 계획</span>
+            <select name="degreeCareerPlan">
+              <option value="unsure">아직 모르겠어요</option>
+              <option value="use-degree">전공을 살려 취업하는 것도 고려해요</option>
+              <option value="not-use-degree">전공은 점수용으로만 보고 다른 일로 갈 가능성이 커요</option>
+            </select>
+          </label>
+        </form>
+        <div class="wizard-results" id="quick-start-results">
+          <div class="wizard-empty">
+            <strong>질문에 답하면 먼저 볼 지역 5곳을 순서대로 추천합니다.</strong>
+            <span>정책 적합도와 생활 선호를 함께 반영하지만, 실제 법적 요건은 공식 원문 기준으로 다시 확인해야 합니다.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderComparisonTable(insights) {
+  const rows = insights.filter((insight) => insight.id !== "nunavut");
+
+  return `
+    <section class="section panel">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">Compare</p>
+          <h2>캐나다 한눈에 비교</h2>
+        </div>
+        <p class="panel-note">공식 구조를 초보자용 비교 항목으로 정규화한 표입니다.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>지역</th>
+              <th>운영 체계</th>
+              <th>EE</th>
+              <th>잡오퍼</th>
+              <th>졸업자</th>
+              <th>사업/창업</th>
+              <th>프랑스어</th>
+              <th>지역 경로</th>
+              <th>먼저 볼 사람</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map(
+                (insight) => `
+                  <tr>
+                    <td>
+                      <a class="table-link" href="${escapeHtml(getJurisdictionHref(insight.id))}">
+                        ${escapeHtml(insight.labelKo)}
+                      </a>
+                    </td>
+                    <td>${escapeHtml(insight.system)}</td>
+                    <td><span class="compare-pill">${escapeHtml(insight.statuses.ee)}</span></td>
+                    <td><span class="compare-pill">${escapeHtml(insight.statuses.jobOffer)}</span></td>
+                    <td><span class="compare-pill">${escapeHtml(insight.statuses.graduate)}</span></td>
+                    <td><span class="compare-pill">${escapeHtml(insight.statuses.entrepreneur)}</span></td>
+                    <td><span class="compare-pill">${escapeHtml(insight.statuses.french)}</span></td>
+                    <td><span class="compare-pill">${escapeHtml(insight.statuses.regional)}</span></td>
+                    <td>${escapeHtml(insight.whoFor.join(" / "))}</td>
+                  </tr>
+                `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderHomeHero(insights) {
+  const activeCount = insights.filter((insight) => insight.updateCount > 0).length;
+  const eeInsight = insights.find((insight) => insight.id === "federal");
+
+  return `
+    <section class="hero hero-home">
+      <div class="hero-copy">
+        <p class="eyebrow">Beginner First</p>
+        <h1>캐나다 이민을 한눈에 이해하는 시작 화면</h1>
+        <p class="hero-text">
+          긴 설명보다 질문 몇 개로 먼저 범위를 좁히고, 그다음 비교표와 지도에서 지역을 고르도록 바꿨습니다.
+        </p>
+        <div class="hero-actions">
+          <a class="btn tone-blue" href="#situations">상황별로 시작하기</a>
+          <a class="btn ghost" href="#compare-table">전체 비교 보기</a>
+          <button id="refresh-feed" class="btn tone-red">새 정보 새로고침</button>
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <p class="panel-label">Current Scope</p>
+        <h2>지금 바로 비교 가능한 범위</h2>
+        <dl class="hero-stats" aria-label="홈 상태">
+          <div>
+            <dt>비교 가능한 지역</dt>
+            <dd>${insights.length}</dd>
+          </div>
+          <div>
+            <dt>업데이트 추적 중</dt>
+            <dd>${activeCount}</dd>
+          </div>
+          <div>
+            <dt>연방 EE</dt>
+            <dd>${eeInsight?.updateCount ?? 0}건</dd>
+          </div>
+          <div>
+            <dt>주 상세 페이지</dt>
+            <dd>지역별 구조 제공</dd>
+          </div>
+        </dl>
+        <p class="hero-panel-note">
+          질문 결과는 공식 구조를 비교하기 쉽게 정규화한 안내 레이어입니다. 최종 조건은 각 지역 공식 링크에서 확인하세요.
+        </p>
+      </aside>
+    </section>
+  `;
+}
+
+function renderCanadaMapSection(updates, { minimal = false } = {}) {
+  const regions = buildJurisdictionStats(updates);
+  const federalCount = regions.find((region) => region.id === "federal")?.updateCount ?? 0;
+
+  if (minimal) {
+    return `
+      <section class="map-landing" aria-label="캐나다 지도 탐색">
+        <div class="map-landing-shell">
+          <a
+            class="map-floating-chip"
+            href="${getJurisdictionHref("federal")}"
+            data-jurisdiction-link="federal"
+          >
+            <strong>EE / Federal</strong>
+            <span>${federalCount}건</span>
+          </a>
+          <div class="map-frame map-frame-landing">
+            ${CANADA_MAP_SVG}
+          </div>
+          <div class="map-tooltip" id="map-tooltip" hidden></div>
+        </div>
+        <p class="map-attribution">
+          Map base adapted from
+          <a href="https://commons.wikimedia.org/wiki/File:Canada_labelled_map.svg" target="_blank" rel="noreferrer">Wikimedia Commons</a>
+          under CC BY-SA 2.5.
+        </p>
+      </section>
+    `;
+  }
+
+  const activeRegions = regions
+    .filter((region) => region.id !== "federal" && region.updateCount > 0)
+    .sort((left, right) => right.updateCount - left.updateCount || left.labelKo.localeCompare(right.labelKo));
+  const standbyRegions = regions.filter((region) => region.id !== "federal" && region.updateCount === 0).slice(0, 5);
+
+  return `
+    <section class="section map-section">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">Map Explorer</p>
+          <h2>비교를 마쳤다면 지도에서 지역 고르기</h2>
+        </div>
+        <p class="panel-note">상황별 카드와 비교표로 범위를 좁힌 뒤, 마지막에 지역 페이지로 들어가면 훨씬 덜 헷갈립니다.</p>
+      </div>
+
+      <div class="map-layout">
+        <div class="map-shell">
+          <div class="federal-jump-row">
+            <a
+              class="map-index-item federal-jump"
+              href="${getJurisdictionHref("federal")}"
+              data-jurisdiction-link="federal"
+            >
+              <strong>연방 / Express Entry</strong>
+              <span>${regions.find((region) => region.id === "federal")?.updateCount ?? 0}건 · express-entry</span>
+            </a>
+          </div>
+          <div class="map-frame">
+            ${CANADA_MAP_SVG}
+          </div>
+          <div class="map-tooltip" id="map-tooltip" hidden></div>
+          <p class="map-attribution">
+            Map base adapted from
+            <a href="https://commons.wikimedia.org/wiki/File:Canada_labelled_map.svg" target="_blank" rel="noreferrer">Wikimedia Commons</a>
+            under CC BY-SA 2.5.
+          </p>
+        </div>
+
+        <aside class="map-sidebar">
+          <div class="map-focus-card">
+            <p class="panel-label">Hover Preview</p>
+            <h3 id="map-selection-label">지역을 선택해 보세요</h3>
+            <p id="map-selection-meta" class="map-selection-meta">
+              비교표로 감을 잡았다면 여기서 지역을 고르세요. 호버로 최근 공지 현황을 보고, 클릭하면 EE 또는 각 주 상세 페이지로 이동합니다.
+            </p>
+            <a class="btn ghost" id="map-selection-link" href="${getJurisdictionHref("federal")}">연방 / EE 먼저 보기</a>
+          </div>
+
+          <div class="map-index">
+            <div class="map-index-group">
+              <p class="panel-kicker">Active Regions</p>
+              ${activeRegions
+                .map(
+                  (region) => `
+                    <a
+                      class="map-index-item"
+                      href="${escapeHtml(getJurisdictionHref(region.id))}"
+                      data-jurisdiction-link="${escapeHtml(region.id)}"
+                    >
+                      <strong>${escapeHtml(region.labelKo)}</strong>
+                      <span>${region.updateCount}건 · ${escapeHtml(region.programs.join(", "))}</span>
+                    </a>
+                  `
+                )
+                .join("")}
+            </div>
+
+            <div class="map-index-group subtle">
+              <p class="panel-kicker">Standby</p>
+              <div class="map-standby-list">
+                ${standbyRegions
+                  .map(
+                    (region) => `
+                      <a
+                        class="standby-chip"
+                        href="${escapeHtml(getJurisdictionHref(region.id))}"
+                        data-jurisdiction-link="${escapeHtml(region.id)}"
+                      >
+                        ${escapeHtml(region.labelKo)}
+                      </a>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  `;
+}
+
+function renderDashboardPage({ updates }) {
+  const insights = buildJurisdictionInsights(updates);
+
+  return `
+    ${renderHomeHero(insights)}
+    <div id="situations">
+      ${renderSituationSection(insights)}
+    </div>
+    <div id="compare-table">
+      ${renderComparisonTable(insights)}
+    </div>
+    ${renderCanadaMapSection(updates)}
+  `;
+}
+
+function renderSourceCards(sourceDefs, reportMap) {
+  if (sourceDefs.length === 0) {
+    return `
+      <div class="empty-state">
+        이 지역은 아직 공식 소스를 연결하는 중입니다. 먼저 메인 지도에서 다른 지역을 둘러보거나,
+        원문 구조가 안정적인 주부터 순차적으로 확장할 수 있습니다.
+      </div>
+    `;
+  }
+
+  return `
+    <div class="source-grid">
+      ${sourceDefs
+        .map((source) => {
+          const report = reportMap.get(source.id);
+          const status = describeSourceReport(report);
+
+          return `
+            <article class="source-card">
+              <div class="card-topline">
+                <span class="status-badge ${escapeHtml(status.badgeClass)}">${escapeHtml(status.badgeLabel)}</span>
+                <span class="tag">${escapeHtml(source.program.toUpperCase())}</span>
+              </div>
+              <h3>${escapeHtml(source.name)}</h3>
+              <p class="summary">${escapeHtml(status.detail)}</p>
+              <div class="source-meta">
+                <span>수집 방식: ${escapeHtml(source.fetchMode ?? source.adapter)}</span>
+                <span>이벤트: ${escapeHtml(source.eventType)}</span>
+              </div>
+              <div class="card-footer">
+                <span>${escapeHtml(source.jurisdiction)}</span>
+                <div class="card-links">
+                  <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">공식 원문</a>
+                </div>
+              </div>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderQuickFacts(profile) {
+  if (!profile?.quickFacts?.length) {
+    return "";
+  }
+
+  return `
+    <div class="overview-grid" aria-label="공식 페이지 핵심 포인트">
+      ${profile.quickFacts
+        .map(
+          (fact) => `
+            <article class="overview-card">
+              <span>${escapeHtml(fact.labelKo)}</span>
+              <strong>${escapeHtml(fact.valueKo)}</strong>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderStreamTagRow(stream) {
+  const tags = deriveStreamTags(stream);
+
+  if (tags.length === 0) {
+    return "";
+  }
+
+  return `
+    <div class="stream-tag-row">
+      ${tags.map((tag) => `<span class="stream-tag">${escapeHtml(tag)}</span>`).join("")}
+    </div>
+  `;
+}
+
+function renderBeginnerGlossary(profile) {
+  const streams = flattenProfileStreams(profile);
+  const glossaryDefinitions = {
+    "EE 연계": "연방 Express Entry 프로필이 먼저 있어야 하거나 EE 풀과 연결되는 경로입니다.",
+    "잡오퍼": "해당 주 고용주의 오퍼 또는 현재 고용 상태가 핵심인 경로입니다.",
+    "졸업자": "주로 캐나다 또는 해당 주 학위 취득자를 대상으로 하는 경로입니다.",
+    "사업/창업": "근로자 이민이 아니라 사업 설립·인수·운영을 보는 경로입니다.",
+    "프랑스어": "프랑스어 능력이 핵심 조건이거나 우선 요소인 경로입니다.",
+    "보건": "보건의료 직군 또는 보건기관 고용과 연결된 경로입니다.",
+    "기술직": "trade 또는 특정 기술직군을 중심으로 한 경로입니다.",
+    "지역/커뮤니티": "특정 지역, 농촌, 참여 커뮤니티 기준이 붙는 경로입니다.",
+    "현지경력": "해당 주 또는 캐나다 내 근무 경험이 중요한 경로입니다."
+  };
+  const tagOrder = Object.keys(glossaryDefinitions);
+  const tags = tagOrder.filter((tag) =>
+    streams.some((stream) => deriveStreamTags(stream).includes(tag))
+  );
+
+  if (tags.length === 0) {
+    return "";
+  }
+
+  return `
+    <div class="glossary-panel">
+      <div class="panel-head panel-head-tight">
+        <div>
+          <p class="panel-kicker">How To Read</p>
+          <h3>처음 보는 사람을 위한 읽는 법</h3>
+        </div>
+        <p class="panel-note">아래 태그는 각 스트림 카드에 같이 표시됩니다.</p>
+      </div>
+      <div class="glossary-grid">
+        ${tags
+          .map(
+            (tag) => `
+              <article class="glossary-card">
+                <span class="stream-tag">${escapeHtml(tag)}</span>
+                <p>${escapeHtml(glossaryDefinitions[tag])}</p>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderStreamGroups(profile) {
+  if (!profile?.streamGroups?.length) {
+    return `
+      <div class="empty-state">
+        이 지역의 스트림 구조 요약은 준비 중입니다. 아래 공식 소스와 최신 업데이트 카드부터 먼저 확인할 수 있습니다.
+      </div>
+    `;
+  }
+
+  return `
+    <div class="stream-group-list">
+      ${profile.streamGroups
+        .map(
+          (group) => `
+            <section class="stream-group">
+              <div class="stream-group-head">
+                <div>
+                  <p class="panel-kicker">Category</p>
+                  <h3>${escapeHtml(group.titleKo)}</h3>
+                </div>
+                <p class="stream-group-copy">${group.streams.length}개 스트림</p>
+              </div>
+              <div class="stream-card-grid">
+                ${group.streams
+                  .map(
+                    (stream) => `
+                      <article class="stream-card">
+                        <h4>${escapeHtml(stream.nameKo)}</h4>
+                        ${renderStreamTagRow(stream)}
+                        <p class="stream-meta">
+                          <strong>공식 분류</strong>
+                          <span>${escapeHtml(group.titleKo)}</span>
+                        </p>
+                        <p class="stream-meta">
+                          <strong>대상</strong>
+                          <span>${escapeHtml(stream.audienceKo)}</span>
+                        </p>
+                        <a
+                          class="panel-link stream-link"
+                          href="${escapeHtml(stream.officialUrl)}"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          공식 설명 보기
+                        </a>
+                      </article>
+                    `
+                  )
+                  .join("")}
+              </div>
+            </section>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderProfileNotes(profile) {
+  if (!profile?.notesKo?.length) {
+    return "";
+  }
+
+  return `
+    <div class="profile-note-panel">
+      <p class="panel-kicker">Official Notes</p>
+      <ul class="note-list">
+        ${profile.notesKo.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}
+      </ul>
+    </div>
+  `;
+}
+
+function renderRegionDecisionSection(insight) {
+  return `
+    <section class="section panel">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">5-Second Summary</p>
+          <h2>이 지역을 볼지 말지 먼저 판단</h2>
+        </div>
+        <p class="panel-note">복잡한 설명 대신 먼저 판단에 필요한 항목만 모았습니다.</p>
+      </div>
+      <div class="overview-grid" aria-label="지역 판단 요약">
+        <article class="overview-card">
+          <span>운영 체계</span>
+          <strong>${escapeHtml(insight.system)}</strong>
+        </article>
+        <article class="overview-card">
+          <span>EE 연계</span>
+          <strong>${escapeHtml(insight.statuses.ee)}</strong>
+        </article>
+        <article class="overview-card">
+          <span>잡오퍼 성격</span>
+          <strong>${escapeHtml(insight.statuses.jobOffer)}</strong>
+        </article>
+        <article class="overview-card">
+          <span>졸업자 경로</span>
+          <strong>${escapeHtml(insight.statuses.graduate)}</strong>
+        </article>
+        <article class="overview-card">
+          <span>사업/창업</span>
+          <strong>${escapeHtml(insight.statuses.entrepreneur)}</strong>
+        </article>
+        <article class="overview-card">
+          <span>프랑스어</span>
+          <strong>${escapeHtml(insight.statuses.french)}</strong>
+        </article>
+      </div>
+      <div class="decision-grid">
+        <article class="decision-card">
+          <p class="panel-kicker">Who Should Start Here</p>
+          <h3>이런 사람이 먼저 보면 좋습니다</h3>
+          <ul class="note-list">
+            ${insight.whoFor.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ul>
+        </article>
+        <article class="decision-card">
+          <p class="panel-kicker">Check First</p>
+          <h3>처음 들어오면 먼저 확인할 것</h3>
+          <ul class="note-list">
+            ${insight.firstChecks.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ul>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function renderKeyStreams(insight) {
+  if (insight.keyStreams.length === 0) {
+    return "";
+  }
+
+  return `
+    <section class="section panel">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">Start With</p>
+          <h2>먼저 읽어야 할 대표 경로</h2>
+        </div>
+        <p class="panel-note">전체 스트림을 보기 전에 대표 경로부터 훑어보면 이해가 빨라집니다.</p>
+      </div>
+      <div class="stream-card-grid">
+        ${insight.keyStreams
+          .map(
+            (stream) => `
+              <article class="stream-card">
+                <h4>${escapeHtml(stream.nameKo)}</h4>
+                ${renderStreamTagRow(stream)}
+                <p class="stream-meta">
+                  <strong>공식 분류</strong>
+                  <span>${escapeHtml(stream.groupTitleKo)}</span>
+                </p>
+                <p class="stream-meta">
+                  <strong>대상</strong>
+                  <span>${escapeHtml(stream.audienceKo)}</span>
+                </p>
+                <a
+                  class="panel-link stream-link"
+                  href="${escapeHtml(stream.officialUrl)}"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  공식 설명 보기
+                </a>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderJurisdictionOverview(meta, profile) {
+  if (!profile) {
+    return `
+      <section class="section panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">Program Structure</p>
+            <h2>이 지역 프로그램 구조</h2>
+          </div>
+          <p class="panel-note">공식 기준 요약을 준비 중입니다.</p>
+        </div>
+        <div class="empty-state">
+          ${escapeHtml(meta.labelKo)}의 스트림 구조 요약은 아직 정리 중입니다. 아래 공식 소스와 최신 업데이트를 먼저 확인해 주세요.
+        </div>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="section panel">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">Program Structure</p>
+          <h2>이 지역 프로그램 구조</h2>
+        </div>
+        <p class="panel-note">공식 기준 확인일 ${escapeHtml(profile.verifiedOn)}</p>
+      </div>
+      <div class="section-intro">
+        <p>
+          이 페이지는 ${escapeHtml(meta.labelKo)}의 공식 이민 구조를 초보자도 바로 읽을 수 있게
+          운영 체계 → 큰 카테고리 → 스트림 대상 → 공식 링크 순서로 정리했습니다.
+        </p>
+        <a
+          class="source-link"
+          href="${escapeHtml(profile.officialOverviewUrl)}"
+          target="_blank"
+          rel="noreferrer"
+        >
+          ${escapeHtml(profile.officialOverviewLabel)}
+        </a>
+      </div>
+      ${renderQuickFacts(profile)}
+      ${renderBeginnerGlossary(profile)}
+      ${renderStreamGroups(profile)}
+      ${renderProfileNotes(profile)}
+    </section>
+  `;
+}
+
+function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports = [] }) {
+  const meta = getJurisdictionMeta(jurisdictionId);
+  const profile = getJurisdictionProfile(jurisdictionId);
+  const regionUpdates = getUpdatesForJurisdiction(updates, jurisdictionId);
+  const insight = buildJurisdictionInsight(meta, profile, regionUpdates);
+  const sourceDefs = getSourceDefinitionsForJurisdiction(jurisdictionId);
+  const reportMap = getReportMap(reports);
+  const latestDate = getLatestUpdateDate(regionUpdates, generatedAt);
+  const programs = getProgramList(regionUpdates);
+  const okSourceCount = sourceDefs.filter((source) => reportMap.get(source.id)?.ok).length;
+  const statusSummary = regionUpdates.length > 0
+    ? `현재 최신 공지 ${regionUpdates.length}건을 추적 중이고 최근 발표일은 ${latestDate}입니다.`
+    : sourceDefs.length > 0
+      ? "공식 소스는 연결되어 있으며, 카드형 업데이트는 순차적으로 채워지고 있습니다."
+      : "공식 소스와 카드형 업데이트를 같은 구조로 순차 연결하고 있습니다.";
+  const heroText = `${meta.labelKo} 페이지에서는 이 지역의 프로그램 구조, 연결된 공식 소스, 최신 공지를 한 화면에서 정리합니다. ${statusSummary}`;
+
+  return `
+    <section class="hero hero-region">
+      <div class="hero-copy">
+        <nav class="crumbs" aria-label="Breadcrumb">
+          <a href="/">지도 허브</a>
+          <span>/</span>
+          <span>${escapeHtml(meta.labelKo)}</span>
+        </nav>
+        <p class="eyebrow">Jurisdiction Brief</p>
+        <h1>${escapeHtml(meta.labelKo)}</h1>
+        <p class="hero-text">${escapeHtml(heroText)}</p>
+        <div class="hero-actions">
+          <button id="refresh-feed" class="btn tone-red">새 정보 새로고침</button>
+          <a class="btn ghost" href="/">지도 허브로 돌아가기</a>
+          ${sourceDefs[0]
+            ? `<a class="btn tone-blue" href="${escapeHtml(sourceDefs[0].url)}" target="_blank" rel="noreferrer">대표 공식 소스</a>`
+            : ""}
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <p class="panel-label">Region Snapshot</p>
+        <h2>지금 이 지역에서 볼 것</h2>
+        <dl class="hero-stats" aria-label="${escapeHtml(meta.labelKo)} 상태">
+          <div>
+            <dt>업데이트 카드</dt>
+            <dd>${regionUpdates.length}</dd>
+          </div>
+          <div>
+            <dt>연결 소스</dt>
+            <dd>${okSourceCount}/${sourceDefs.length}</dd>
+          </div>
+          <div>
+            <dt>프로그램</dt>
+            <dd>${programs.length > 0 ? escapeHtml(programs.join(", ")) : "준비 중"}</dd>
+          </div>
+          <div>
+            <dt>최근 발표일</dt>
+            <dd>${escapeHtml(latestDate)}</dd>
+          </div>
+        </dl>
+        <a class="panel-link" href="/region/federal">연방 / EE 보기</a>
+      </aside>
+    </section>
+
+    ${renderRegionDecisionSection(insight)}
+    ${renderKeyStreams(insight)}
+    ${renderJurisdictionOverview(meta, profile)}
+
+    <section class="section panel">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">Official Sources</p>
+          <h2>연결된 공식 소스</h2>
+        </div>
+        <p class="panel-note">지역 상세 페이지에서는 공지 카드와 함께 연결 상태도 바로 확인할 수 있게 했습니다.</p>
+      </div>
+      ${renderSourceCards(sourceDefs, reportMap)}
+    </section>
+
+    <section class="section panel">
+      <div class="panel-head">
+        <div>
+          <p class="panel-kicker">Latest Updates</p>
+          <h2>${escapeHtml(meta.labelKo)} 업데이트</h2>
+        </div>
+        <p class="panel-note">원문 링크와 한국어 요약을 함께 제공합니다.</p>
+      </div>
+      ${regionUpdates.length > 0
+        ? `<section class="news-grid">${renderDashboardCards(regionUpdates)}</section>`
+        : `
+          <div class="empty-state">
+            아직 표시할 카드가 없습니다. 이 지역은 소스 연결 또는 파서 안정화가 끝나면 메인 지도에서 바로 들어와 볼 수 있도록 준비해두었습니다.
+          </div>
+        `}
+    </section>
+  `;
+}
+
+function renderClientScript({ page, updates }) {
+  return `
+    <script>
+      const PAGE = ${JSON.stringify(page)};
+      const UPDATES = ${serializeForScript(updates)};
+      const MAP_REGION_DEFS = ${serializeForScript(JURISDICTION_META)};
+      const DASHBOARD_INSIGHTS = ${serializeForScript(
+        page === "dashboard" ? buildJurisdictionInsights(updates) : []
+      )};
+
+      async function postJson(url, payload) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error("Request failed");
+        }
+
+        return response.json();
+      }
+
+      if (PAGE === "dashboard" || PAGE === "jurisdiction") {
+        const refreshButton = document.getElementById("refresh-feed");
+
+        if (refreshButton) {
+          refreshButton.addEventListener("click", async () => {
+            refreshButton.disabled = true;
+            refreshButton.textContent = "새로고침 중...";
+            try {
+              await postJson("/api/refresh", {});
+              window.location.reload();
+            } catch (error) {
+              alert("로컬 서버에서 실행 중일 때만 새로고침 API를 사용할 수 있습니다.");
+              refreshButton.disabled = false;
+              refreshButton.textContent = "새 정보 새로고침";
+            }
+          });
+        }
+      }
+
+      if (PAGE === "dashboard") {
+        const quickStartForm = document.getElementById("quick-start-form");
+        const quickStartResults = document.getElementById("quick-start-results");
+        const mapSelectionLabel = document.getElementById("map-selection-label");
+        const mapSelectionMeta = document.getElementById("map-selection-meta");
+        const mapSelectionLink = document.getElementById("map-selection-link");
+        const mapTooltip = document.getElementById("map-tooltip");
+        const hoverableJumpLinks = Array.from(document.querySelectorAll("[data-jurisdiction-link]"));
+        const defaultSelection = {
+          label: "지역을 선택해 보세요",
+          meta: "비교표와 상황별 카드를 먼저 보고 범위를 좁힌 뒤, 여기서 지역 상세 페이지로 이동하면 훨씬 덜 헷갈립니다.",
+          href: "/region/federal",
+          linkText: "연방 / EE 먼저 보기"
+        };
+
+        function escapeHtmlClient(value) {
+          return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        }
+
+        function statusSupports(status) {
+          return !["없음", "낮음", "해당 없음"].includes(status);
+        }
+
+        function hasCanadianWorkBase(base) {
+          return ["working-holiday", "pgwp", "worker"].includes(base);
+        }
+
+        function hasSkilledCanadianTrack(answers) {
+          return hasCanadianWorkBase(answers.base) && answers.canadianJobSkill === "skilled";
+        }
+
+        function scoreInsight(insight, answers) {
+          let score = 0;
+          const policyReasons = [];
+          const lifestyleReasons = [];
+
+          function add(points, reason) {
+            score += points;
+            policyReasons.push(reason);
+          }
+
+          function addLifestyle(points, reason) {
+            score += points;
+            lifestyleReasons.push(reason);
+          }
+
+          if (answers.path === "worker" && (statusSupports(insight.statuses.ee) || statusSupports(insight.statuses.jobOffer))) {
+            add(2, "취업형 경로로 볼 수 있는 주");
+          }
+          if (answers.path === "graduate" && statusSupports(insight.statuses.graduate)) {
+            add(4, "졸업자 경로가 있는 지역");
+          }
+          if (answers.path === "business" && statusSupports(insight.statuses.entrepreneur)) {
+            add(4, "사업·창업 경로가 있는 지역");
+          }
+          if (answers.base === "student" && statusSupports(insight.statuses.graduate)) {
+            add(3, "현재 학생 상태와 연결되는 졸업자 경로가 있음");
+          }
+          if (hasCanadianWorkBase(answers.base) && statusSupports(insight.statuses.localExperience)) {
+            add(3, "현재 캐나다 근무 경험을 활용할 수 있는 편");
+          }
+          if (answers.base === "working-holiday") {
+            if (answers.canadianJobSkill === "skilled") {
+              add(2, "워홀이어도 현재 캐나다 skilled 경력이면 연결 가능한 경로가 있음");
+            } else if (answers.canadianJobSkill === "non-skilled") {
+              add(-2, "워홀 자체보다 현재 캐나다 일이 skilled 경력인지가 더 중요함");
+            }
+          }
+          if (answers.base === "pgwp" && statusSupports(insight.statuses.graduate)) {
+            add(2, "PGWP 이후 연결하기 쉬운 졸업자/현지경력 경로가 있음");
+          }
+
+          if (answers.age === "20-29") {
+            add(3, "연령대가 경제이민 점수 구조에 가장 유리한 편");
+          } else if (["30", "31"].includes(answers.age)) {
+            add(2, "연령대가 아직 강점으로 작동하는 편");
+          } else if (["32", "33", "34"].includes(answers.age)) {
+            add(1, "연령대가 아직 경쟁력 있는 편");
+          } else if (["40", "41"].includes(answers.age)) {
+            add(-1, "연령 점수는 보수적으로 봐야 함");
+          } else if (["42", "43", "44", "45+"].includes(answers.age)) {
+            add(-2, "EE 점수 구조상 연령은 불리할 수 있음");
+          }
+
+          if (["bachelor", "two-plus", "master", "professional", "doctorate"].includes(answers.education)) {
+            add(2, "학력 요소가 비교적 좋은 편");
+          }
+          if (["master", "professional", "doctorate"].includes(answers.education)) {
+            add(1, "상위 학력 기반 점수 여지가 있음");
+          }
+          if (answers.ecaStatus === "completed" || answers.ecaStatus === "canadian-degree") {
+            add(2, "학력 점수화에 필요한 ECA 또는 캐나다 학위 상태가 준비됨");
+          } else if (answers.ecaStatus === "in-progress") {
+            add(0, "ECA 진행 상태라 다음 단계로 이어갈 수 있음");
+          } else if (answers.ecaStatus === "needed") {
+            add(-2, "해외 학력 점수화 전 ECA 준비가 먼저 필요함");
+          }
+
+          if (answers.english === "clb9plus") {
+            add(3, "영어 점수가 잘 나오면 EE와 주정부 모두에서 강점이 큼");
+          } else if (answers.english === "clb8") {
+            add(2, "언어 점수가 준수한 편");
+          } else if (answers.english === "clb7") {
+            add(1, "언어 점수 개선 여지가 있음");
+          } else if (answers.english === "clb6") {
+            add(-1, "언어 점수 보완이 먼저 필요할 수 있음");
+          }
+
+          if (["2", "3", "4", "5"].includes(answers.foreignExp)) {
+            add(2, "해외 숙련 경력이 활용될 수 있음");
+          }
+          if (["1", "2", "3", "4", "5"].includes(answers.canadianExp)) {
+            add(3, "캐나다 경력은 많은 경로에서 직접 강점이 됨");
+          }
+          if (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0") {
+            add(3, "현재 캐나다 skilled 경력이 CEC 또는 주정부 경로에 직접 연결될 수 있음");
+          } else if (hasCanadianWorkBase(answers.base) && answers.canadianJobSkill === "non-skilled") {
+            add(-2, "현재 캐나다 일이 TEER 4-5 쪽이면 연방 skilled 경로 연결은 약할 수 있음");
+          }
+          if (answers.languageScoreStatus === "official") {
+            add(2, "실제 언어점수가 있어 프로필 판단 정확도가 높음");
+          } else if (answers.languageScoreStatus === "booked") {
+            add(1, "언어시험이 다음 단계로 연결될 수 있음");
+          } else if (answers.languageScoreStatus === "none" && answers.ee === "yes") {
+            add(-2, "EE 방향이면 실제 언어점수가 먼저 필요함");
+          }
+          if (answers.languageTest === "tef-tcf" && answers.advantage === "french") {
+            add(2, "프랑스어 시험이 실제 강점으로 연결될 수 있음");
+          }
+          if (answers.targetOccupationPlan === "current-canada-job") {
+            if (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0") {
+              add(3, "현재 캐나다 직무 기준으로 이민 방향을 잡기 쉬움");
+            } else if (answers.canadianJobSkill === "non-skilled") {
+              add(-2, "현재 직무 기준 이민이면 skilled 직무 전환이 먼저 중요할 수 있음");
+            }
+          }
+          if (answers.targetOccupationPlan === "previous-korea-job") {
+            if (answers.foreignExpAlignment === "same-skilled" && answers.foreignExp !== "0") {
+              add(3, "한국 경력을 primary occupation으로 정리하기 좋은 상태");
+            } else if (answers.foreignExpAlignment === "related-skilled") {
+              add(1, "한국 경력은 활용 가능하지만 NOC 정리를 더 정확히 해야 함");
+            } else if (answers.foreignExpAlignment === "unrelated") {
+              add(-2, "한국 경력과 목표 직군이 다르면 그대로 쓰기 어려울 수 있음");
+            }
+          }
+          if (answers.targetOccupationPlan === "degree-field" && answers.degreeCareerPlan === "use-degree") {
+            add(1, "전공을 살린 직군으로 가면 경력 스토리를 다시 짜기 쉬울 수 있음");
+          }
+          if (answers.degreeCareerPlan === "not-use-degree") {
+            add(0, "전공보다 실제 job duties와 목표 NOC 정리가 더 중요함");
+          }
+
+          if (answers.ee === "yes") {
+            if (["핵심", "중심", "많음", "있음", "일부"].includes(insight.statuses.ee)) {
+              add(3, "EE와 연결해 보기 쉬움");
+            } else if (insight.statuses.ee === "별도 체계") {
+              add(-1, "EE보다 별도 체계를 먼저 봐야 함");
+            }
+          }
+
+          if (answers.ee === "no" && insight.id === "federal") {
+            add(-2, "연방 EE 자체가 중심");
+          }
+
+          if (answers.jobOffer === "yes") {
+            if (insight.statuses.jobOffer === "중심") {
+              add(3, "잡오퍼 중심 경로가 많음");
+            } else if (["있음", "일부"].includes(insight.statuses.jobOffer)) {
+              add(2, "잡오퍼 활용 경로가 있음");
+            } else {
+              add(-1, "잡오퍼 강점이 직접적이지 않음");
+            }
+          }
+
+          if (answers.jobOffer === "no" && insight.statuses.jobOffer === "중심") {
+            add(-1, "잡오퍼 비중이 큰 편");
+          }
+
+          if (answers.advantage === "french" && statusSupports(insight.statuses.french)) {
+            add(2, "프랑스어 강점을 살릴 수 있음");
+          }
+          if (answers.advantage === "regional" && statusSupports(insight.statuses.regional)) {
+            add(2, "지역·커뮤니티 경로가 있음");
+          }
+          if (answers.advantage === "health" && statusSupports(insight.statuses.health)) {
+            add(2, "보건의료 관련 경로를 볼 수 있음");
+          }
+          if (answers.advantage === "trades" && statusSupports(insight.statuses.trades)) {
+            add(2, "기술직·trade 경로와 연결 가능");
+          }
+
+          if (answers.occupation === "healthcare-social" && statusSupports(insight.statuses.health)) {
+            add(3, "현재 직군과 지역 경로가 잘 맞음");
+          }
+          if (answers.occupation === "trades" && statusSupports(insight.statuses.trades)) {
+            add(3, "기술직 성격과 잘 맞는 지역");
+          }
+          if (answers.occupation === "stem" && statusSupports(insight.statuses.ee)) {
+            add(2, "STEM 배경이 EE 또는 주정부 경로와 연결될 가능성이 있음");
+          }
+          if (answers.occupation === "education" && insight.id === "federal") {
+            add(2, "연방 category-based selection의 현재 교육 직군과 같이 봐야 함");
+          }
+          if (answers.occupation === "transport" && insight.id === "federal") {
+            add(2, "연방 category-based selection의 현재 운송 직군과 같이 보는 편이 좋음");
+          }
+          if (answers.occupation === "physician-canada" && insight.id === "federal" && answers.canadianExp !== "0") {
+            add(3, "현재 연방 category-based selection의 의사 + 캐나다 경력 축과 연결됨");
+          }
+          if (answers.occupation === "senior-manager-canada" && insight.id === "federal" && answers.canadianExp !== "0") {
+            add(3, "현재 연방 category-based selection의 senior manager + 캐나다 경력 축과 연결됨");
+          }
+          if (answers.occupation === "researcher-canada" && insight.id === "federal" && answers.canadianExp !== "0") {
+            add(3, "현재 연방 category-based selection의 researcher + 캐나다 경력 축과 연결됨");
+          }
+          if (answers.occupation === "hospitality" && insight.id === "alberta") {
+            add(2, "알버타는 tourism and hospitality stream을 별도 운영");
+          }
+          if (answers.occupation === "business-admin" && statusSupports(insight.statuses.jobOffer)) {
+            add(1, "비즈니스·행정직은 고용주 중심 경로와 같이 보는 편이 좋음");
+          }
+
+          if (answers.path === "unsure" && score === 0 && insight.updateCount > 0) {
+            add(1, "현재 업데이트와 구조 정보가 비교적 풍부함");
+          }
+
+          if (answers.budget === "tight") {
+            if (insight.lifestyle.costLevel <= 1) {
+              addLifestyle(2, "비용 부담이 상대적으로 낮은 쪽");
+            } else if (insight.lifestyle.costLevel === 2) {
+              addLifestyle(1, "비용 부담이 아주 높지는 않음");
+            } else {
+              addLifestyle(-2, "비용 부담이 큰 편");
+            }
+
+            if (answers.path === "graduate") {
+              if (insight.lifestyle.tuitionLevel <= 1) {
+                addLifestyle(2, "학비 부담도 비교적 낮은 편");
+              } else if (insight.lifestyle.tuitionLevel >= 3) {
+                addLifestyle(-1, "유학생 비용 부담은 큰 편");
+              }
+            }
+          }
+
+          if (answers.setting === "metro") {
+            if (insight.lifestyle.metroLevel >= 3) {
+              addLifestyle(2, "대도시 접근성이 강한 지역");
+            } else if (insight.lifestyle.metroLevel === 1) {
+              addLifestyle(-1, "대도시 중심 선호와는 거리가 있음");
+            }
+          }
+
+          if (answers.setting === "regional") {
+            if (insight.lifestyle.regionalLevel >= 3) {
+              addLifestyle(2, "지역·시골 정착과 잘 맞는 편");
+            } else if (insight.lifestyle.regionalLevel === 1) {
+              addLifestyle(-1, "지역 정착 중심으로 보긴 어려움");
+            }
+          }
+
+          if (answers.ecaStatus === "needed") {
+            addLifestyle(0, "해외 학력이라면 ECA 비용과 준비 기간도 고려 필요");
+          }
+
+          return {
+            score,
+            policyReasons: policyReasons.slice(0, 3),
+            lifestyleReasons: lifestyleReasons.slice(0, 3)
+          };
+        }
+
+        function estimateFitPercent(answers, evaluation) {
+          let base = 52 + evaluation.score * 4;
+
+          if (answers.english === "unknown") {
+            base -= 8;
+          }
+          if (answers.languageScoreStatus !== "official") {
+            base -= 4;
+          }
+          if (answers.ee === "unsure") {
+            base -= 4;
+          }
+          if (["42", "43", "44", "45+"].includes(answers.age)) {
+            base -= 6;
+          }
+          if (answers.ecaStatus === "needed") {
+            base -= 5;
+          }
+          if (answers.targetOccupationPlan === "current-canada-job" && answers.canadianJobSkill === "non-skilled") {
+            base -= 5;
+          }
+          if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment === "unrelated") {
+            base -= 6;
+          }
+
+          return Math.max(18, Math.min(92, base));
+        }
+
+        function estimateImmigrationChancePercent(answers, evaluation, insight) {
+          let chance = estimateFitPercent(answers, evaluation) - 10;
+
+          if (answers.languageScoreStatus === "official") {
+            chance += 6;
+          } else if (answers.languageScoreStatus === "none") {
+            chance -= 6;
+          }
+
+          if (answers.ecaStatus === "completed" || answers.ecaStatus === "canadian-degree") {
+            chance += 5;
+          } else if (answers.ecaStatus === "needed") {
+            chance -= 8;
+          } else if (answers.ecaStatus === "in-progress") {
+            chance -= 2;
+          }
+
+          if (answers.canadianExp !== "0") {
+            chance += 5;
+          }
+
+          if (answers.ee === "yes" && !statusSupports(insight.statuses.ee)) {
+            chance -= 6;
+          }
+
+          if (answers.jobOffer === "yes" && ["중심", "있음", "일부"].includes(insight.statuses.jobOffer)) {
+            chance += 4;
+          }
+
+          if (insight.updateCount <= 0) {
+            chance -= 2;
+          }
+
+          if (answers.targetOccupationPlan === "current-canada-job" && answers.canadianJobSkill === "skilled" && answers.canadianExp !== "0") {
+            chance += 4;
+          } else if (answers.targetOccupationPlan === "current-canada-job" && answers.canadianJobSkill === "non-skilled") {
+            chance -= 7;
+          }
+
+          if (answers.targetOccupationPlan === "previous-korea-job") {
+            if (answers.foreignExpAlignment === "same-skilled" && answers.foreignExp !== "0") {
+              chance += 4;
+            } else if (answers.foreignExpAlignment === "unrelated") {
+              chance -= 8;
+            }
+          }
+
+          return Math.max(12, Math.min(88, chance));
+        }
+
+        function getLatestEECutoff() {
+          const eeRound = UPDATES.find((update) => update.sourceId === "ee-rounds");
+          return eeRound?.metrics?.cutoffScore ?? null;
+        }
+
+        function getEESnapshot(answers, insight) {
+          const latestCutoff = getLatestEECutoff();
+          const hasOfficialLanguageScore = answers.languageScoreStatus === "official";
+          const hasEeReadyEca = answers.ecaStatus === "completed" || answers.ecaStatus === "canadian-degree";
+          const readinessPoints =
+            (answers.age === "20-29" ? 4 : ["30", "31"].includes(answers.age) ? 3 : ["32", "33", "34"].includes(answers.age) ? 2 : ["35", "36", "37", "38", "39"].includes(answers.age) ? 1 : 0) +
+            (answers.education === "doctorate" ? 4 : ["master", "professional"].includes(answers.education) ? 4 : answers.education === "two-plus" ? 3 : answers.education === "bachelor" ? 3 : answers.education === "two-year" ? 2 : answers.education === "one-year" ? 1 : 0) +
+            (answers.english === "clb9plus" ? 4 : answers.english === "clb8" ? 3 : answers.english === "clb7" ? 2 : 0) +
+            (["4", "5"].includes(answers.foreignExp) ? 3 : answers.foreignExp === "3" ? 3 : answers.foreignExp === "2" ? 2 : answers.foreignExp === "1" ? 1 : 0) +
+            (["4", "5"].includes(answers.canadianExp) ? 4 : answers.canadianExp === "3" ? 4 : answers.canadianExp === "2" ? 3 : answers.canadianExp === "1" ? 2 : 0) +
+            (answers.advantage === "french" ? 2 : 0);
+
+          const band = readinessPoints >= 14 ? "상" : readinessPoints >= 9 ? "중" : "하";
+          let comparison = "최신 EE 컷오프 데이터가 연결되면 여기서 함께 비교합니다.";
+
+          if (latestCutoff) {
+            if (!hasOfficialLanguageScore && !hasEeReadyEca) {
+              comparison = "최근 EE 컷오프 " + latestCutoff + "와 직접 비교하려면 공식 언어점수와 ECA 상태를 더 확인해야 합니다.";
+            } else if (!hasOfficialLanguageScore) {
+              comparison = "최근 EE 컷오프 " + latestCutoff + "와 더 정확히 비교하려면 공식 언어점수표가 필요합니다.";
+            } else if (!hasEeReadyEca) {
+              comparison = "최근 EE 컷오프 " + latestCutoff + "와 더 정확히 비교하려면 ECA 완료 여부를 더 확인해야 합니다.";
+            } else if (answers.english === "unknown") {
+              comparison = "최근 EE 컷오프 " + latestCutoff + "를 참고 중입니다. 현재는 CLB 구간 입력이 없어 보수적으로 추정합니다.";
+            } else {
+              comparison = "최근 EE 컷오프 " + latestCutoff + "를 기준으로 현재 입력값으로 대략 비교 중입니다.";
+            }
+          }
+
+          const explain = insight.statuses.ee === "핵심" || statusSupports(insight.statuses.ee)
+            ? "이 지역은 EE와 함께 보기에 적합합니다."
+            : "이 지역은 EE보다 다른 경로가 먼저일 수 있습니다.";
+
+          return {
+            band,
+            comparison,
+            explain
+          };
+        }
+
+        function buildCareerRecognitionItems(answers, insight) {
+          const items = [];
+
+          if (answers.base === "working-holiday") {
+            items.push("워홀은 open work permit이라 비자 이름보다 현재 캐나다 경력이 어떤 NOC·TEER인지가 더 중요합니다.");
+          }
+
+          if (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0") {
+            items.push("현재 캐나다 skilled 경력이 있으면 CEC와 일부 주정부 경로를 현실적으로 같이 볼 수 있습니다.");
+          } else if (hasCanadianWorkBase(answers.base) && answers.canadianJobSkill === "non-skilled") {
+            items.push("현재 캐나다 일이 TEER 4-5 쪽이면 CEC 연결은 약할 수 있어 skilled 직무 전환이 핵심입니다.");
+          }
+
+          if (answers.targetOccupationPlan === "previous-korea-job") {
+            if (answers.foreignExpAlignment === "same-skilled" && answers.foreignExp !== "0") {
+              items.push("한국 경력으로 갈 경우, 목표 primary occupation과 같은 NOC의 숙련 경력을 기준으로 정리하는 편이 유리합니다.");
+            } else if (answers.foreignExpAlignment === "related-skilled") {
+              items.push("한국 경력과 목표 직군이 비슷해도 NOC가 다르면 설명을 더 정교하게 해야 할 수 있습니다.");
+            } else if (answers.foreignExpAlignment === "unrelated") {
+              items.push("한국 경력이 목표 직군과 거의 다르면 연방 FSW의 주력 경력으로 바로 쓰기 어려울 수 있습니다.");
+            }
+          }
+
+          if (answers.degreeCareerPlan === "use-degree" && answers.targetOccupationPlan === "degree-field") {
+            items.push("한국 전공을 살린 직군으로 가면 경력 스토리를 연결하기는 쉬워질 수 있지만, 결국 실제 직무와 NOC가 더 중요합니다.");
+          } else if (answers.degreeCareerPlan === "not-use-degree") {
+            items.push("전공을 안 살려도 이민은 가능하지만, 학력은 점수용으로 보고 실제 경력은 현재 또는 목표 직무 NOC 기준으로 정리하는 편이 좋습니다.");
+          }
+
+          if (items.length === 0) {
+            items.push("대부분의 경제이민은 전공 일치 자체보다 실제 job duties, NOC, 언어점수, 경력 기간을 더 직접적으로 봅니다.");
+          }
+
+          if (insight.id === "federal" && answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment === "unrelated") {
+            items.push("연방 EE 쪽은 현재 지역보다도 primary occupation을 어떤 NOC로 잡을지부터 다시 정리하는 게 좋습니다.");
+          }
+
+          return items.slice(0, 3);
+        }
+
+        function buildImprovementPlan(answers, insight, immigrationChancePercent) {
+          const actions = [];
+
+          function addAction(delta, title, detail) {
+            if (actions.some((action) => action.title === title)) {
+              return;
+            }
+
+            actions.push({ delta, title, detail });
+          }
+
+          if (answers.path === "business" && statusSupports(insight.statuses.entrepreneur)) {
+            addAction(8, "사업계획서와 자금 증빙 정리", "사업·창업 stream은 운영 계획, 투자금, 순자산 증빙 준비도가 실제 체감에 크게 작용합니다.");
+            addAction(5, "해당 지역 사업성 검토 또는 탐방 준비", "지역 시장성과 운영 가능성을 미리 정리하면 entrepreneur 심사 준비가 훨씬 쉬워집니다.");
+          }
+
+          if (answers.languageScoreStatus === "none") {
+            const delta = answers.english === "unknown"
+              ? 12
+              : answers.english === "clb6"
+                ? 11
+                : answers.english === "clb7"
+                  ? 9
+                  : answers.english === "clb8"
+                    ? 7
+                    : 6;
+
+            addAction(
+              delta,
+              answers.languageTest === "none" ? "언어시험 응시 후 공식 점수표 확보" : "공식 언어점수표까지 확보",
+              "EE와 대부분의 주정부 경로는 공식 언어점수가 있어야 실제 비교와 프로필 판단이 정확해집니다."
+            );
+          } else if (answers.languageScoreStatus === "booked") {
+            addAction(6, "예약한 언어시험 결과까지 확보", "시험 예약 상태보다 실제 점수표가 있어야 점수와 경로 판단이 훨씬 선명해집니다.");
+          } else if (answers.languageScoreStatus === "official" && ["clb6", "clb7", "clb8"].includes(answers.english)) {
+            const delta = answers.english === "clb8" ? 5 : answers.english === "clb7" ? 8 : 10;
+            addAction(delta, "언어점수 CLB 9 이상 목표", "특히 EE와 점수형 주정부 경로는 CLB 9 전후에서 체감 차이가 커질 수 있습니다.");
+          }
+
+          if (answers.ecaStatus === "needed") {
+            addAction(8, "ECA 완료", "해외 학력을 점수 구조에 올리려면 ECA가 먼저 정리돼야 합니다.");
+          } else if (answers.ecaStatus === "in-progress") {
+            addAction(4, "ECA 결과 수령까지 마무리", "진행 중 상태보다 완료 상태가 되어야 실제 비교와 프로필 제출이 쉬워집니다.");
+          } else if (answers.ecaStatus === "unsure") {
+            addAction(5, "ECA 필요 여부 먼저 확인", "해외 학위인지 캐나다 학위인지에 따라 준비 서류와 점수 계산이 크게 달라집니다.");
+          }
+
+          if (answers.ee !== "yes" && statusSupports(insight.statuses.ee)) {
+            const delta = insight.statuses.ee === "핵심" ? 6 : 4;
+            addAction(delta, "EE 자격 확인 후 프로필 열기", "이 지역은 EE와 같이 볼 때 선택지가 넓어지고 초청 연결이 쉬워질 수 있습니다.");
+          }
+
+          if (answers.targetOccupationPlan === "unsure") {
+            addAction(7, "이민에 쓸 주력 직군 1개 정하기", "현재 캐나다 일, 한국 경력, 전공 기반 직군 중 무엇으로 갈지 먼저 정해야 점수와 전략 계산이 정확해집니다.");
+          }
+
+          if (answers.targetOccupationPlan === "current-canada-job" && answers.canadianJobSkill === "non-skilled") {
+            addAction(11, "캐나다에서 TEER 0-3 직무로 옮기기", "현재 캐나다 일을 기준으로 갈 계획이라면 skilled 직무 전환이 가장 큰 차이를 만들 수 있습니다.");
+          }
+
+          if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment === "unrelated") {
+            addAction(9, "한국 경력과 맞는 primary occupation 다시 정리", "연방 FSW 쪽은 목표 직군과 같은 NOC의 숙련 경력으로 설명이 되어야 훨씬 안정적입니다.");
+          } else if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment === "related-skilled") {
+            addAction(6, "한국 경력의 NOC와 job duties 정교하게 정리", "비슷한 분야라도 직무 설명이 맞아야 primary occupation으로 설득력이 생깁니다.");
+          }
+
+          if (answers.targetOccupationPlan === "degree-field" && answers.degreeCareerPlan === "use-degree") {
+            addAction(5, "전공 기반 직무로 실제 경력 만들기", "전공을 살린 직군으로 실제 경력이 생기면 경력 연결성과 설명력이 좋아질 수 있습니다.");
+          }
+
+          if (answers.jobOffer !== "yes" && ["중심", "있음", "일부"].includes(insight.statuses.jobOffer)) {
+            const delta = insight.statuses.jobOffer === "중심" ? 9 : insight.statuses.jobOffer === "있음" ? 7 : 5;
+            addAction(delta, "해당 주 고용주 잡오퍼 확보", "이 지역은 고용주 오퍼가 있으면 지원 가능한 stream 수와 실제 속도가 함께 올라갈 수 있습니다.");
+          }
+
+          if (answers.canadianExp === "0" && (statusSupports(insight.statuses.localExperience) || statusSupports(insight.statuses.graduate) || answers.base === "student")) {
+            const delta = statusSupports(insight.statuses.localExperience) ? 10 : 7;
+            addAction(delta, "캐나다 경력 1년 만들기", "현지 경력 1년은 CEC와 여러 주정부 경로에서 직접적인 체감 차이를 만드는 경우가 많습니다.");
+          } else if (answers.canadianExp === "1" && statusSupports(insight.statuses.localExperience)) {
+            addAction(4, "캐나다 경력 2년까지 늘리기", "일부 경로는 현지 경력이 길수록 안정적으로 보이는 편입니다.");
+          }
+
+          if (answers.path === "worker" && answers.foreignExp === "0") {
+            addAction(5, "숙련 경력 1년 채우기", "해외 숙련 경력 1년은 EE와 취업형 주정부 경로의 최소 판단선이 되는 경우가 많습니다.");
+          }
+
+          if (answers.path === "graduate" && answers.base === "outside") {
+            addAction(7, "학교와 주를 같이 고른 유학 경로 설계", "유학은 학교보다 지역과 졸업 후 경로를 먼저 같이 봐야 실제 이민 연결이 좋아집니다.");
+          }
+
+          if (answers.advantage !== "french" && statusSupports(insight.statuses.french)) {
+            addAction(4, "프랑스어 점수도 선택지에 포함", "프랑스어 점수는 연방과 일부 주에서 예상보다 큰 차별점이 될 수 있습니다.");
+          }
+
+          if (answers.setting !== "regional" && ["많음", "중심"].includes(insight.statuses.regional)) {
+            addAction(4, "지역 정착 옵션도 열어두기", "이 지역은 대도시보다 지역·커뮤니티 경로에서 실제 선택지가 더 넓을 수 있습니다.");
+          }
+
+          if (actions.length === 0) {
+            addAction(3, "최신 컷오프와 공지 변동 계속 추적", "현재는 큰 약점보다 draw 시점, 직군 선발, 주별 intake 열림 여부의 영향이 더 큽니다.");
+          }
+
+          const topActions = actions
+            .sort((left, right) => right.delta - left.delta)
+            .slice(0, 3);
+          const weights = [1, 0.7, 0.5];
+          const estimatedLift = topActions.reduce(
+            (sum, action, index) => sum + Math.round(action.delta * (weights[index] ?? 0.4)),
+            0
+          );
+
+          return {
+            items: topActions,
+            estimatedLift,
+            projectedChance: Math.min(92, immigrationChancePercent + estimatedLift)
+          };
+        }
+
+        function buildScenarioTimeline(answers, insight) {
+          if (answers.path === "business") {
+            return [
+              "1. 사업 계획, 순자산, 자금 증빙 준비: 2-4개월",
+              "2. 해당 지역 사업·창업 stream 확인 및 EOI/사전 접촉: 1-6개월",
+              "3. 사업 시작 또는 인수, 운영 요건 충족: 6-18개월",
+              "4. nomination 후 PR 단계 진행: 추가 6-12개월+"
+            ];
+          }
+
+          if (answers.base === "student" || answers.path === "graduate") {
+            return [
+              "1. 학비와 지역을 기준으로 학교·주 선택: 1-3개월",
+              "2. 학업 후 졸업자 경로 또는 PGWP 준비: 1-2년+",
+              "3. 현지 경력 1년 전후 확보 후 EE/PNP 검토",
+              "4. nomination 또는 ITA 후 PR 접수: 추가 6개월+"
+            ];
+          }
+
+          if (answers.base === "working-holiday" && answers.canadianJobSkill === "non-skilled") {
+            return [
+              "1. 현재 캐나다 일의 NOC·TEER 확인: 1-2주",
+              "2. 가능하면 TEER 0-3 직무 또는 관련 잡오퍼로 이동: 1-6개월",
+              "3. 언어점수·ECA와 함께 EE/주정부 연결 가능한지 재점검",
+              "4. 경력 전환 후 초청 또는 nomination 흐름 검토: 추가 6개월+"
+            ];
+          }
+
+          if (answers.base === "working-holiday" && answers.canadianJobSkill === "skilled") {
+            return [
+              "1. 현재 캐나다 skilled 경력의 NOC, 근무시간, 합법 체류 기록 정리: 2-4주",
+              "2. 언어시험·ECA 준비와 함께 1년 경력 충족 여부 계산: 1-3개월",
+              "3. CEC 또는 주정부 현지경력 stream 검토: 1-6개월",
+              "4. 초청 후 PR 서류 접수 및 심사 진행: 추가 6개월+"
+            ];
+          }
+
+          if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment !== "same-skilled") {
+            return [
+              "1. 한국 경력 기준으로 사용할 primary occupation NOC 다시 정리: 2-4주",
+              "2. 경력증명서와 실제 job duties가 맞는지 점검: 2-6주",
+              "3. 언어시험·ECA 준비 후 EE/주정부 적합성 재계산: 1-3개월",
+              "4. 맞는 경로가 나오면 프로필 생성과 초청 대기: 추가 1-6개월+"
+            ];
+          }
+
+          if (hasCanadianWorkBase(answers.base) || answers.canadianExp !== "0") {
+            return [
+              "1. 현재 NOC, 근무시간, 합법 체류 상태 정리: 2-4주",
+              "2. 언어시험과 필요한 서류 정리: 1-3개월",
+              "3. EE 또는 주정부 stream 등록/초청 대기: 1-6개월",
+              "4. 초청 후 PR 서류 접수와 심사 진행: 추가 6개월+"
+            ];
+          }
+
+          if (answers.jobOffer === "yes") {
+            return [
+              "1. 고용주 오퍼 조건과 직무 코드 확인: 2-4주",
+              "2. 해당 지역 고용주 중심 stream 또는 EE 연계 경로 검토: 1-2개월",
+              "3. EOI/NOI/초청 대기 또는 바로 신청: 1-6개월",
+              "4. nomination 또는 ITA 후 PR 단계 진행: 추가 6개월+"
+            ];
+          }
+
+          if (insight.statuses.regional === "많음" || insight.statuses.regional === "중심") {
+            return [
+              "1. 지역 커뮤니티 참여 조건과 생활 가능성 확인: 2-6주",
+              "2. 언어시험·학력평가·경력 정리: 1-3개월",
+              "3. 지역 stream 또는 EOI 등록 후 초청 대기: 1-6개월",
+              "4. nomination 후 PR 접수: 추가 6개월+"
+            ];
+          }
+
+          return [
+            "1. 언어시험과 학력평가(ECA) 준비: 1-3개월",
+            "2. EE 또는 주정부 stream 적합성 점검 후 프로필 생성",
+            "3. 초청 또는 nomination 대기: 1-6개월+",
+            "4. PR 신청서 접수 및 심사: 추가 6개월+"
+          ];
+        }
+
+        function renderQuickStartResults() {
+          if (!quickStartForm || !quickStartResults) {
+            return;
+          }
+
+          const formData = new FormData(quickStartForm);
+          const answers = Object.fromEntries(formData.entries());
+          const ranked = DASHBOARD_INSIGHTS
+            .filter((insight) => insight.id !== "nunavut")
+            .map((insight) => ({
+              insight,
+              evaluation: scoreInsight(insight, answers)
+            }))
+            .sort((left, right) => {
+              if (right.evaluation.score !== left.evaluation.score) {
+                return right.evaluation.score - left.evaluation.score;
+              }
+
+              return right.insight.updateCount - left.insight.updateCount;
+            })
+            .slice(0, 5);
+
+          quickStartResults.innerHTML = ranked
+            .map(({ insight, evaluation }, index) => {
+              const fitPercent = estimateFitPercent(answers, evaluation);
+              const immigrationChancePercent = estimateImmigrationChancePercent(answers, evaluation, insight);
+              const improvementPlan = buildImprovementPlan(answers, insight, immigrationChancePercent);
+              const eeSnapshot = getEESnapshot(answers, insight);
+              const careerRecognitionItems = buildCareerRecognitionItems(answers, insight);
+              const timeline = buildScenarioTimeline(answers, insight);
+              const policyReasonsHtml = evaluation.policyReasons.length > 0
+                ? evaluation.policyReasons
+                    .map((reason) => "<li>" + escapeHtmlClient(reason) + "</li>")
+                    .join("")
+                : "<li>현재 조건에서 정책 구조를 먼저 확인해 볼 만한 지역입니다.</li>";
+              const lifestyleReasonsHtml = evaluation.lifestyleReasons.length > 0
+                ? evaluation.lifestyleReasons
+                    .map((reason) => "<li>" + escapeHtmlClient(reason) + "</li>")
+                    .join("")
+                : "<li>생활 선호는 중립적으로 반영됐습니다.</li>";
+              const freshnessText = "구조 " + escapeHtmlClient(insight.verifiedOn)
+                + (insight.latestPublishedAt ? " · 최신 공지 " + escapeHtmlClient(insight.latestPublishedAt) : " · 최신 공지 없음");
+              const timelineHtml = timeline
+                .map((item) => "<li>" + escapeHtmlClient(item) + "</li>")
+                .join("");
+              const careerRecognitionHtml = careerRecognitionItems
+                .map((item) => "<li>" + escapeHtmlClient(item) + "</li>")
+                .join("");
+              const improvementHtml = improvementPlan.items
+                .map((item) => [
+                  '<li class="improvement-item">',
+                  '<span class="improvement-delta">+' + escapeHtmlClient(item.delta) + '%p</span>',
+                  '<div class="improvement-copy">',
+                  '<strong>' + escapeHtmlClient(item.title) + '</strong>',
+                  '<p>' + escapeHtmlClient(item.detail) + '</p>',
+                  '</div>',
+                  '</li>'
+                ].join(""))
+                .join("");
+              const readinessLine = "언어시험: " + escapeHtmlClient(answers.languageTest)
+                + " / 점수상태: " + escapeHtmlClient(answers.languageScoreStatus)
+                + " / ECA: " + escapeHtmlClient(answers.ecaStatus);
+
+              return [
+                '<article class="wizard-result-card">',
+                '<div class="card-topline">',
+                '<span class="status-badge status-approved">추천 ' + (index + 1) + "</span>",
+                '<span class="tag">' + escapeHtmlClient(insight.labelKo) + "</span>",
+                "</div>",
+                "<h3>" + escapeHtmlClient(insight.labelKo) + "</h3>",
+                '<p class="wizard-result-system">' + escapeHtmlClient(insight.system) + "</p>",
+                '<div class="fit-band-row">',
+                '<span class="fit-score">예상 적합도 ' + escapeHtmlClient(fitPercent) + '%</span>',
+                '<span class="chance-score">이민 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
+                '<span class="compare-pill">EE 경쟁력 ' + escapeHtmlClient(eeSnapshot.band) + "</span>",
+                "</div>",
+                '<div class="scenario-chip-row">',
+                '<span class="compare-pill">EE ' + escapeHtmlClient(insight.statuses.ee) + "</span>",
+                '<span class="compare-pill">잡오퍼 ' + escapeHtmlClient(insight.statuses.jobOffer) + "</span>",
+                '<span class="compare-pill">졸업자 ' + escapeHtmlClient(insight.statuses.graduate) + "</span>",
+                '<span class="compare-pill">비용 ' + escapeHtmlClient(insight.lifestyle.costLabelKo) + "</span>",
+                '<span class="compare-pill">지역정착 ' + escapeHtmlClient(insight.lifestyle.regionalLabelKo) + "</span>",
+                "</div>",
+                '<p class="wizard-freshness">정책 반영 기준: ' + freshnessText + "</p>",
+                '<p class="wizard-freshness">서류 준비 상태: ' + readinessLine + "</p>",
+                '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.explain) + " " + escapeHtmlClient(eeSnapshot.comparison) + "</p>",
+                '<section class="career-check-panel">',
+                '<strong>경력 인정 체크</strong>',
+                '<ul class="reason-list career-check-list">' + careerRecognitionHtml + '</ul>',
+                '</section>',
+                '<section class="improvement-panel">',
+                '<div class="improvement-head">',
+                '<strong>가능성 올리는 다음 액션</strong>',
+                '<span class="improvement-total">' + escapeHtmlClient(immigrationChancePercent) + '% → ' + escapeHtmlClient(improvementPlan.projectedChance) + '%</span>',
+                '</div>',
+                '<p class="wizard-freshness">현재 입력 기준으로 먼저 체감이 큰 순서입니다. 중복 효과를 줄여 보수적으로 계산하면 추정 +' + escapeHtmlClient(improvementPlan.estimatedLift) + '%p 개선 여지가 있습니다.</p>',
+                '<ul class="improvement-list">' + improvementHtml + '</ul>',
+                '</section>',
+                '<div class="reason-columns">',
+                '<div><strong>정책 적합</strong><ul class="reason-list">' + policyReasonsHtml + "</ul></div>",
+                '<div><strong>생활 선호</strong><ul class="reason-list">' + lifestyleReasonsHtml + "</ul></div>",
+                "</div>",
+                '<div><strong>대략적인 진행 시나리오</strong><ul class="reason-list">' + timelineHtml + "</ul></div>",
+                '<a class="btn ghost" href="/region/' + encodeURIComponent(insight.id) + '">이 지역 먼저 보기</a>',
+                "</article>"
+              ].join("");
+            })
+            .join("");
+        }
+
+        if (quickStartForm) {
+          quickStartForm.addEventListener("change", renderQuickStartResults);
+          renderQuickStartResults();
+        }
+
+        const svgRegionEntries = MAP_REGION_DEFS
+          .filter((region) => region.svgId)
+          .map((region) => {
+            const regionNode = document.getElementById(region.svgId);
+            const labelNode = document.getElementById(region.svgId + " Label");
+            const regionUpdates = UPDATES.filter((update) => update.jurisdiction === region.id);
+            const programs = [...new Set(regionUpdates.map((update) => update.program))];
+            const latestDate = regionUpdates
+              .map((update) => update.publishedAt)
+              .filter(Boolean)
+              .sort()
+              .at(-1) || "업데이트 없음";
+            const tooltip = region.labelKo
+              + " · "
+              + (regionUpdates.length > 0 ? "업데이트 " + regionUpdates.length + "건" : "준비 중")
+              + " · "
+              + (programs.length > 0 ? programs.join(", ") : "source pending")
+              + " · "
+              + latestDate;
+
+            if (!regionNode) {
+              return null;
+            }
+
+            regionNode.classList.add("map-region");
+            regionNode.classList.add(regionUpdates.length > 0 ? "is-available" : "is-empty");
+            regionNode.dataset.jurisdiction = region.id;
+            regionNode.dataset.labelKo = region.labelKo;
+            regionNode.dataset.tooltip = tooltip;
+            regionNode.setAttribute("tabindex", "0");
+            regionNode.setAttribute("role", "button");
+            regionNode.setAttribute("aria-label", region.labelKo);
+
+            if (labelNode) {
+              labelNode.classList.add("map-region-label");
+            }
+
+            return {
+              id: region.id,
+              regionNode,
+              labelNode
+            };
+          })
+          .filter(Boolean);
+
+        const entryById = new Map(svgRegionEntries.map((entry) => [entry.id, entry]));
+        let activeEntry = null;
+
+        function regionHref(jurisdictionId) {
+          return "/region/" + encodeURIComponent(jurisdictionId);
+        }
+
+        function setSelectionCard(jurisdictionId) {
+          const region = MAP_REGION_DEFS.find((candidate) => candidate.id === jurisdictionId);
+          if (!region) {
+            if (mapSelectionLabel) {
+              mapSelectionLabel.textContent = defaultSelection.label;
+            }
+            if (mapSelectionMeta) {
+              mapSelectionMeta.textContent = defaultSelection.meta;
+            }
+            if (mapSelectionLink) {
+              mapSelectionLink.href = defaultSelection.href;
+              mapSelectionLink.textContent = defaultSelection.linkText;
+            }
+            return;
+          }
+
+          const regionUpdates = UPDATES.filter((update) => update.jurisdiction === jurisdictionId);
+          const programs = [...new Set(regionUpdates.map((update) => update.program))];
+          const latestDate = regionUpdates
+            .map((update) => update.publishedAt)
+            .filter(Boolean)
+            .sort()
+            .at(-1);
+
+          if (mapSelectionLabel) {
+            mapSelectionLabel.textContent = region.labelKo;
+          }
+          if (mapSelectionMeta) {
+            mapSelectionMeta.textContent = regionUpdates.length > 0
+              ? region.labelKo + " 업데이트 " + regionUpdates.length + "건 · "
+                + (programs.length > 0 ? programs.join(", ") : "program pending")
+                + (latestDate ? " · 최신 발표 " + latestDate : "")
+              : region.labelKo + " 상세 페이지로 이동합니다. 아직 카드가 없으면 준비 중 상태와 연결 소스를 먼저 보여줍니다.";
+          }
+          if (mapSelectionLink) {
+            mapSelectionLink.href = regionHref(jurisdictionId);
+            mapSelectionLink.textContent = region.labelKo + " 페이지 열기";
+          }
+        }
+
+        function clearHighlight() {
+          if (!activeEntry) {
+            return;
+          }
+
+          activeEntry.regionNode.classList.remove("is-selected");
+          if (activeEntry.labelNode) {
+            activeEntry.labelNode.classList.remove("is-selected");
+          }
+          activeEntry = null;
+        }
+
+        function highlightJurisdiction(jurisdictionId) {
+          clearHighlight();
+          const entry = entryById.get(jurisdictionId);
+          if (!entry) {
+            return;
+          }
+
+          entry.regionNode.classList.add("is-selected");
+          if (entry.labelNode) {
+            entry.labelNode.classList.add("is-selected");
+          }
+          activeEntry = entry;
+        }
+
+        function showTooltip(event, region) {
+          if (!mapTooltip) {
+            return;
+          }
+
+          mapTooltip.hidden = false;
+          mapTooltip.textContent = region.dataset.tooltip;
+          mapTooltip.style.left = event.clientX + 16 + "px";
+          mapTooltip.style.top = event.clientY + 16 + "px";
+        }
+
+        function hideTooltip() {
+          if (mapTooltip) {
+            mapTooltip.hidden = true;
+          }
+        }
+
+        function resetSelectionState() {
+          clearHighlight();
+          setSelectionCard(null);
+        }
+
+        svgRegionEntries.forEach((entry) => {
+          const region = entry.regionNode;
+          region.addEventListener("mouseenter", (event) => {
+            highlightJurisdiction(entry.id);
+            setSelectionCard(entry.id);
+            showTooltip(event, region);
+          });
+          region.addEventListener("mousemove", (event) => showTooltip(event, region));
+          region.addEventListener("mouseleave", () => {
+            hideTooltip();
+            resetSelectionState();
+          });
+          region.addEventListener("focus", () => {
+            highlightJurisdiction(entry.id);
+            setSelectionCard(entry.id);
+            if (!mapTooltip) {
+              return;
+            }
+            mapTooltip.hidden = false;
+            mapTooltip.textContent = region.dataset.tooltip;
+            const rect = region.getBoundingClientRect();
+            mapTooltip.style.left = rect.left + rect.width / 2 + "px";
+            mapTooltip.style.top = rect.top - 8 + "px";
+          });
+          region.addEventListener("blur", () => {
+            hideTooltip();
+            resetSelectionState();
+          });
+          region.addEventListener("click", () => {
+            window.location.assign(regionHref(entry.id));
+          });
+          region.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              window.location.assign(regionHref(entry.id));
+            }
+          });
+        });
+
+        hoverableJumpLinks.forEach((link) => {
+          const jurisdictionId = link.dataset.jurisdictionLink;
+
+          link.addEventListener("mouseenter", () => {
+            highlightJurisdiction(jurisdictionId);
+            setSelectionCard(jurisdictionId);
+          });
+          link.addEventListener("focus", () => {
+            highlightJurisdiction(jurisdictionId);
+            setSelectionCard(jurisdictionId);
+          });
+          link.addEventListener("mouseleave", resetSelectionState);
+          link.addEventListener("blur", resetSelectionState);
+        });
+
+        setSelectionCard(null);
+      }
+    </script>
+  `;
+}
+
+function renderLayout({ title, page, body, updates }) {
+  return `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(title)}</title>
+    <link
+      href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #edf4fc;
+        --bg-strong: #dde9f7;
+        --surface: rgba(248, 251, 255, 0.84);
+        --surface-strong: #f9fbff;
+        --text: #10233f;
+        --muted: #52647f;
+        --line: rgba(15, 61, 127, 0.12);
+        --accent: #0f3d7f;
+        --accent-deep: #0a2c5d;
+        --accent-soft: #d9e6f8;
+        --accent-strong: #2f6ec4;
+        --green: #215f4f;
+        --green-soft: #d3ebe3;
+        --blue: #2f6ec4;
+        --blue-soft: #dbe8fb;
+        --amber: #b57c2e;
+        --amber-soft: #f2e4cb;
+        --shadow: 0 20px 60px rgba(15, 61, 127, 0.14);
+        --radius-xl: 32px;
+        --radius-lg: 24px;
+        --radius-md: 18px;
+        --radius-sm: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.95), transparent 28%),
+          radial-gradient(circle at top right, rgba(73, 129, 211, 0.16), transparent 24%),
+          linear-gradient(180deg, #f5f9ff 0%, var(--bg) 52%, #e8f0fa 100%);
+        font-family:
+          "SUIT Variable",
+          "Pretendard Variable",
+          "Apple SD Gothic Neo",
+          "Noto Sans KR",
+          sans-serif;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(15, 61, 127, 0.06) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(15, 61, 127, 0.06) 1px, transparent 1px);
+        background-size: 36px 36px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 88%);
+        opacity: 0.5;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .page-shell {
+        position: relative;
+        width: min(calc(100% - 32px), 1180px);
+        margin: 0 auto;
+        padding: 22px 0 72px;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 14px;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 20px;
+        padding: 14px 18px;
+        margin-bottom: 24px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(248, 251, 255, 0.84);
+        backdrop-filter: blur(16px);
+        box-shadow: 0 8px 28px rgba(15, 61, 127, 0.09);
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-sm);
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #fff;
+        font-size: 0.95rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+      }
+
+      .brand-copy {
+        display: grid;
+      }
+
+      .brand-copy strong {
+        font-size: 0.98rem;
+      }
+
+      .brand-copy span {
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .site-nav {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .site-nav a {
+        position: relative;
+        padding-bottom: 2px;
+      }
+
+      .site-nav a::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -2px;
+        width: 100%;
+        height: 1px;
+        background: currentColor;
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 180ms ease;
+      }
+
+      .site-nav a:hover::after,
+      .site-nav a:focus-visible::after,
+      .site-nav a.is-active::after {
+        transform: scaleX(1);
+      }
+
+      .site-nav a.is-active {
+        color: var(--accent-deep);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+
+      .hero-copy,
+      .hero-panel,
+      .section,
+      .news-card,
+      .studio-card {
+        position: relative;
+        overflow: hidden;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: linear-gradient(180deg, rgba(252, 254, 255, 0.94), rgba(245, 249, 255, 0.8));
+        box-shadow: var(--shadow);
+      }
+
+      .hero-copy::before,
+      .hero-panel::before,
+      .section::before,
+      .news-card::before,
+      .studio-card::before {
+        content: "";
+        position: absolute;
+        inset: auto -10% -48% 42%;
+        height: 320px;
+        background: radial-gradient(circle, rgba(15, 61, 127, 0.16), transparent 66%);
+        pointer-events: none;
+      }
+
+      .eyebrow,
+      .panel-kicker {
+        margin: 0 0 14px;
+        color: var(--accent-deep);
+        font-size: 0.82rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+      }
+
+      h1 {
+        margin: 0 0 14px;
+        font-weight: 800;
+        font-size: clamp(2.5rem, 4vw, 4.5rem);
+        line-height: 1.05;
+        letter-spacing: -0.045em;
+      }
+
+      .hero-text {
+        max-width: 60ch;
+        margin: 20px 0 0;
+        color: var(--muted);
+        font-size: 1.08rem;
+        line-height: 1.8;
+      }
+
+      .crumbs {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 20px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .hero-actions,
+      .studio-actions,
+      .chip-row,
+      .pill-row,
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .btn,
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 52px;
+        padding: 0 22px;
+        border: 1px solid rgba(15, 61, 127, 0.14);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.62);
+        color: var(--text);
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          transform 180ms ease,
+          box-shadow 180ms ease,
+          background 180ms ease;
+      }
+
+      .btn:hover,
+      .btn:focus-visible,
+      .chip:hover,
+      .chip:focus-visible,
+      .news-card:hover,
+      .studio-card:hover {
+        transform: translateY(-2px);
+      }
+
+      .chip.active {
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #fff9f5;
+        box-shadow: 0 16px 32px rgba(15, 61, 127, 0.18);
+      }
+
+      .btn.ghost {
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      .btn.tone-red {
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #fff9f5;
+        box-shadow: 0 16px 32px rgba(15, 61, 127, 0.24);
+      }
+
+      .btn.tone-amber {
+        background: var(--amber-soft);
+        color: #78511a;
+      }
+
+      .btn.tone-green {
+        background: var(--green);
+        color: #f3fff5;
+      }
+
+      .btn.tone-blue {
+        background: var(--blue);
+        color: #f3f8ff;
+      }
+
+      .hero-panel {
+        align-self: end;
+      }
+
+      .map-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .map-landing {
+        display: grid;
+        gap: 12px;
+        min-height: calc(100vh - 156px);
+        align-content: center;
+      }
+
+      .map-landing-shell {
+        position: relative;
+        padding: 22px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: 36px;
+        background:
+          radial-gradient(circle at top right, rgba(47, 110, 196, 0.12), transparent 26%),
+          linear-gradient(180deg, rgba(252, 254, 255, 0.94), rgba(245, 249, 255, 0.82));
+        box-shadow: var(--shadow);
+      }
+
+      .map-floating-chip {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 48px;
+        padding: 0 18px;
+        border: 1px solid rgba(15, 61, 127, 0.14);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.84);
+        box-shadow: 0 16px 28px rgba(15, 61, 127, 0.12);
+        backdrop-filter: blur(10px);
+      }
+
+      .map-floating-chip strong {
+        font-size: 0.95rem;
+      }
+
+      .map-floating-chip span {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .map-shell,
+      .map-focus-card,
+      .map-index {
+        position: relative;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        backdrop-filter: blur(10px);
+      }
+
+      .map-shell {
+        padding: 20px;
+      }
+
+      .map-sidebar {
+        display: grid;
+        gap: 14px;
+      }
+
+      .map-focus-card,
+      .map-index {
+        padding: 20px;
+      }
+
+      .map-focus-card h3 {
+        margin: 0 0 10px;
+        font-size: 1.5rem;
+        line-height: 1.3;
+      }
+
+      .map-selection-meta,
+      .results-helper,
+      .panel-note {
+        color: var(--muted);
+        line-height: 1.75;
+      }
+
+      .canada-map {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      .map-frame {
+        border: 1px solid rgba(15, 61, 127, 0.08);
+        border-radius: var(--radius-lg);
+        background:
+          radial-gradient(circle at top right, rgba(47, 110, 196, 0.12), transparent 28%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(245, 249, 255, 0.74));
+        overflow: hidden;
+      }
+
+      .map-frame-landing {
+        min-height: min(72vh, 860px);
+        padding: 40px 42px 30px;
+        display: grid;
+        place-items: center;
+        overflow: visible;
+      }
+
+      .federal-jump-row {
+        margin-bottom: 14px;
+      }
+
+      .federal-jump {
+        width: 100%;
+      }
+
+      .actual-map {
+        width: 100%;
+        height: auto;
+        max-height: min(68vh, 780px);
+      }
+
+      .actual-map text {
+        fill: var(--accent-deep);
+        font-family:
+          "SUIT Variable",
+          "Pretendard Variable",
+          "Apple SD Gothic Neo",
+          "Noto Sans KR",
+          sans-serif;
+        font-weight: 700;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .actual-map .map-region,
+      .actual-map path.map-region {
+        cursor: pointer;
+        outline: none;
+      }
+
+      .actual-map .map-region path,
+      .actual-map path.map-region {
+        fill: rgba(255, 255, 255, 0.78);
+        stroke: rgba(15, 61, 127, 0.18);
+        stroke-width: 1.4;
+        transition:
+          fill 180ms ease,
+          stroke 180ms ease,
+          filter 180ms ease;
+      }
+
+      .actual-map .map-region.is-empty path,
+      .actual-map path.map-region.is-empty {
+        fill: rgba(245, 249, 255, 0.72);
+        stroke: rgba(15, 61, 127, 0.12);
+      }
+
+      .actual-map .map-region.is-available:hover path,
+      .actual-map .map-region.is-available:focus path,
+      .actual-map .map-region.is-selected path,
+      .actual-map path.map-region.is-available:hover,
+      .actual-map path.map-region.is-available:focus,
+      .actual-map path.map-region.is-selected {
+        fill: rgba(47, 110, 196, 0.24);
+        stroke: rgba(15, 61, 127, 0.52);
+        filter: drop-shadow(0 12px 24px rgba(15, 61, 127, 0.18));
+      }
+
+      .actual-map .map-region.is-empty:hover path,
+      .actual-map .map-region.is-empty:focus path,
+      .actual-map path.map-region.is-empty:hover,
+      .actual-map path.map-region.is-empty:focus {
+        fill: rgba(217, 230, 248, 0.95);
+        stroke: rgba(15, 61, 127, 0.22);
+      }
+
+      .actual-map .map-region-label {
+        fill: rgba(10, 44, 93, 0.86);
+        transition: fill 180ms ease, transform 180ms ease;
+      }
+
+      .actual-map .map-region-label.is-selected {
+        fill: var(--accent-strong);
+      }
+
+      .map-tooltip {
+        position: fixed;
+        z-index: 40;
+        max-width: 280px;
+        padding: 10px 12px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-sm);
+        background: rgba(16, 35, 63, 0.92);
+        color: #f8fbff;
+        font-size: 0.92rem;
+        line-height: 1.5;
+        pointer-events: none;
+        box-shadow: 0 20px 40px rgba(15, 61, 127, 0.2);
+      }
+
+      .map-attribution {
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+
+      .map-attribution a {
+        color: var(--accent-deep);
+        text-decoration: underline;
+      }
+
+      .map-index {
+        display: grid;
+        gap: 18px;
+      }
+
+      .map-index-group {
+        display: grid;
+        gap: 10px;
+      }
+
+      .map-index-group.subtle {
+        gap: 12px;
+      }
+
+      .map-index-item {
+        display: grid;
+        gap: 4px;
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.7);
+        text-align: left;
+        cursor: pointer;
+        transition:
+          transform 180ms ease,
+          border-color 180ms ease,
+          box-shadow 180ms ease;
+      }
+
+      .map-index-item strong {
+        font-size: 1rem;
+      }
+
+      .map-index-item span {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .map-index-item:hover,
+      .map-index-item:focus-visible {
+        transform: translateY(-2px);
+        border-color: rgba(15, 61, 127, 0.24);
+        box-shadow: 0 16px 30px rgba(15, 61, 127, 0.12);
+      }
+
+      .map-standby-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .standby-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(217, 230, 248, 0.7);
+        color: var(--accent-deep);
+        font-size: 0.86rem;
+        font-weight: 700;
+      }
+
+      .panel-label,
+      .tag,
+      .eyebrow,
+      .status-badge,
+      .mini-flag,
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        min-height: 32px;
+        padding: 0 12px;
+        border-radius: 999px;
+      }
+
+      .panel-label,
+      .tag,
+      .pill {
+        background: var(--accent-soft);
+        color: var(--accent-deep);
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .hero-panel h2,
+      .panel-head h2 {
+        margin: 0;
+        font-size: clamp(1.85rem, 2.6vw, 3rem);
+        line-height: 1.22;
+        letter-spacing: -0.05em;
+      }
+
+      .hero-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin: 20px 0 24px;
+      }
+
+      .hero-stats div,
+      .export-preview,
+      .pill,
+      .studio-card,
+      .news-card {
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        background: var(--surface);
+        backdrop-filter: blur(10px);
+      }
+
+      .hero-stats div {
+        padding: 18px;
+        border-radius: var(--radius-md);
+      }
+
+      .hero-stats dt,
+      .hero-stats dd {
+        margin: 0;
+      }
+
+      .hero-stats dt {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .hero-stats dd {
+        display: block;
+        margin-top: 10px;
+        font-size: 1rem;
+        font-weight: 800;
+      }
+
+      .hero-panel-note {
+        margin: 0 0 18px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .hero-home .hero-copy,
+      .hero-home .hero-panel {
+        min-height: 100%;
+      }
+
+      .panel-head-tight {
+        margin-bottom: 12px;
+      }
+
+      .section-intro {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        margin-bottom: 18px;
+      }
+
+      .section-intro p {
+        margin: 0;
+        max-width: 72ch;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+
+      .panel-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--accent-deep);
+        font-weight: 800;
+      }
+
+      .panel-link::after {
+        content: "→";
+      }
+
+      .export-preview ul {
+        margin: 0;
+        padding: 18px 18px 0;
+        list-style: none;
+      }
+
+      .export-preview li {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .export-preview li:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .panel {
+        margin-bottom: 20px;
+      }
+
+      .results-panel {
+        margin-top: 20px;
+      }
+
+      .empty-state {
+        margin-top: 14px;
+        padding: 18px;
+        border: 1px dashed rgba(15, 61, 127, 0.18);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.46);
+        color: var(--muted);
+        line-height: 1.75;
+      }
+
+      .muted-note {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-end;
+        margin-bottom: 16px;
+      }
+
+      .scenario-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+      }
+
+      .wizard-layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .wizard-form,
+      .wizard-results {
+        display: grid;
+        gap: 14px;
+      }
+
+      .wizard-form {
+        padding: 20px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        backdrop-filter: blur(10px);
+      }
+
+      .wizard-field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .wizard-field span {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: var(--accent-deep);
+      }
+
+      .wizard-field select {
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid rgba(15, 61, 127, 0.14);
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--text);
+      }
+
+      .wizard-empty,
+      .wizard-result-card {
+        display: grid;
+        gap: 12px;
+        padding: 22px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        backdrop-filter: blur(10px);
+      }
+
+      .wizard-empty strong {
+        font-size: 1.06rem;
+        line-height: 1.5;
+      }
+
+      .wizard-empty span,
+      .wizard-result-system {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .wizard-freshness {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.7;
+      }
+
+      .wizard-result-card h3 {
+        margin: 0;
+        font-size: 1.24rem;
+        line-height: 1.4;
+      }
+
+      .fit-band-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .fit-score {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #fff;
+        font-weight: 800;
+      }
+
+      .chance-score {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: var(--green-soft);
+        color: var(--green);
+        border: 1px solid rgba(33, 95, 79, 0.16);
+        font-weight: 800;
+      }
+
+      .career-check-panel {
+        display: grid;
+        gap: 8px;
+        padding: 16px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .career-check-panel strong {
+        color: var(--accent-deep);
+        font-size: 0.96rem;
+      }
+
+      .career-check-list {
+        margin-top: 0;
+      }
+
+      .improvement-panel {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border: 1px solid rgba(33, 95, 79, 0.14);
+        border-radius: var(--radius-md);
+        background: linear-gradient(180deg, rgba(211, 235, 227, 0.74), rgba(255, 255, 255, 0.9));
+      }
+
+      .improvement-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .improvement-head strong {
+        color: var(--green);
+        font-size: 0.96rem;
+      }
+
+      .improvement-total {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(33, 95, 79, 0.14);
+        color: var(--green);
+        font-weight: 800;
+      }
+
+      .improvement-list {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .improvement-item {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+        padding: 12px 14px;
+        border: 1px solid rgba(33, 95, 79, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .improvement-delta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 62px;
+        min-height: 34px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: var(--green);
+        color: #f3fff5;
+        font-weight: 800;
+      }
+
+      .improvement-copy {
+        display: grid;
+        gap: 4px;
+      }
+
+      .improvement-copy strong {
+        color: var(--text);
+        font-size: 0.95rem;
+      }
+
+      .improvement-copy p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .reason-columns {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .reason-columns strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--accent-deep);
+        font-size: 0.9rem;
+      }
+
+      .reason-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .scenario-card,
+      .decision-card {
+        display: grid;
+        gap: 12px;
+        padding: 22px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        backdrop-filter: blur(10px);
+      }
+
+      .scenario-card h3,
+      .decision-card h3 {
+        margin: 0;
+        font-size: 1.22rem;
+        line-height: 1.45;
+      }
+
+      .scenario-card p,
+      .decision-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.75;
+      }
+
+      .scenario-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .scenario-chip {
+        display: grid;
+        gap: 4px;
+        min-width: 150px;
+        padding: 12px 14px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.76);
+        transition:
+          transform 180ms ease,
+          border-color 180ms ease,
+          box-shadow 180ms ease;
+      }
+
+      .scenario-chip:hover,
+      .scenario-chip:focus-visible {
+        transform: translateY(-2px);
+        border-color: rgba(15, 61, 127, 0.24);
+        box-shadow: 0 16px 30px rgba(15, 61, 127, 0.12);
+      }
+
+      .scenario-chip strong {
+        font-size: 0.98rem;
+      }
+
+      .scenario-chip span {
+        color: var(--muted);
+        font-size: 0.86rem;
+        line-height: 1.5;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: rgba(255, 255, 255, 0.6);
+      }
+
+      .compare-table {
+        width: 100%;
+        min-width: 980px;
+        border-collapse: collapse;
+      }
+
+      .compare-table th,
+      .compare-table td {
+        padding: 16px 18px;
+        border-bottom: 1px solid rgba(15, 61, 127, 0.1);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .compare-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: rgba(237, 244, 252, 0.96);
+        font-size: 0.88rem;
+        letter-spacing: 0.04em;
+      }
+
+      .compare-table tbody tr:hover {
+        background: rgba(217, 230, 248, 0.2);
+      }
+
+      .table-link {
+        color: var(--accent-deep);
+        font-weight: 800;
+      }
+
+      .compare-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: rgba(15, 61, 127, 0.08);
+        color: var(--accent-deep);
+        font-size: 0.82rem;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .news-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+      }
+
+      .news-card {
+        display: grid;
+        gap: 16px;
+        border-radius: var(--radius-lg);
+        transition:
+          transform 180ms ease,
+          box-shadow 180ms ease,
+          border-color 180ms ease;
+      }
+
+      .card-topline,
+      .status-line {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .status-badge {
+        background: rgba(15, 61, 127, 0.1);
+        color: var(--accent-deep);
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .status-approved {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .status-scheduled {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .status-draft {
+        background: rgba(181, 124, 46, 0.15);
+        color: #8c5d1d;
+      }
+
+      .status-published {
+        background: rgba(15, 61, 127, 0.12);
+        color: var(--accent-deep);
+      }
+
+      .status-rejected {
+        background: rgba(181, 124, 46, 0.18);
+        color: #8c5d1d;
+      }
+
+      .mini-flag {
+        background: rgba(47, 110, 196, 0.1);
+        color: var(--blue);
+      }
+
+      .mini-flag.warning {
+        background: rgba(181, 124, 46, 0.16);
+        color: #8c5d1d;
+      }
+
+      .news-card h2,
+      .studio-card h2 {
+        margin: 0 0 12px;
+        font-size: 1.35rem;
+        line-height: 1.5;
+      }
+
+      .summary,
+      .fact-list,
+      .field span,
+      .toolbar-field span {
+        color: var(--muted);
+      }
+
+      .summary {
+        min-height: 96px;
+        margin: 0;
+        line-height: 1.8;
+      }
+
+      .source-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+      }
+
+      .overview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .decision-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .overview-card,
+      .stream-group,
+      .stream-card,
+      .profile-note-panel {
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        background: var(--surface);
+        backdrop-filter: blur(10px);
+      }
+
+      .overview-card {
+        display: grid;
+        gap: 10px;
+        padding: 18px;
+        border-radius: var(--radius-md);
+      }
+
+      .overview-card span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .overview-card strong {
+        font-size: 1.08rem;
+        line-height: 1.5;
+      }
+
+      .stream-group-list {
+        display: grid;
+        gap: 16px;
+      }
+
+      .stream-group {
+        padding: 22px;
+        border-radius: var(--radius-lg);
+      }
+
+      .stream-group-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        margin-bottom: 16px;
+      }
+
+      .stream-group h3,
+      .profile-note-panel h3 {
+        margin: 0;
+        font-size: 1.45rem;
+        line-height: 1.35;
+      }
+
+      .stream-group-copy {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.75;
+      }
+
+      .stream-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+      }
+
+      .stream-card {
+        display: grid;
+        gap: 12px;
+        padding: 20px;
+        border-radius: var(--radius-md);
+      }
+
+      .stream-card h4 {
+        margin: 0;
+        font-size: 1.08rem;
+        line-height: 1.5;
+      }
+
+      .stream-tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .stream-tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: rgba(15, 61, 127, 0.08);
+        color: var(--accent-deep);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+
+      .stream-meta {
+        display: grid;
+        gap: 4px;
+        margin: 0;
+      }
+
+      .stream-meta strong {
+        font-size: 0.82rem;
+        color: var(--accent-deep);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .stream-meta span {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .stream-link {
+        margin-top: auto;
+      }
+
+      .glossary-panel {
+        margin: 2px 0 18px;
+        padding: 20px 22px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      .glossary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .glossary-card {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-md);
+        background: rgba(248, 251, 255, 0.84);
+      }
+
+      .glossary-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .profile-note-panel {
+        margin-top: 16px;
+        padding: 20px 22px;
+        border-radius: var(--radius-lg);
+      }
+
+      .note-list {
+        display: grid;
+        gap: 10px;
+        margin: 12px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.75;
+      }
+
+      .source-card {
+        display: grid;
+        gap: 16px;
+        padding: 24px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 16px 40px rgba(15, 61, 127, 0.08);
+      }
+
+      .source-card h3 {
+        margin: 0;
+        font-size: 1.18rem;
+        line-height: 1.5;
+      }
+
+      .source-meta {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      .fact-list {
+        margin: 0 0 14px;
+        padding-left: 18px;
+        line-height: 1.7;
+      }
+
+      .card-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      .card-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .card-links a {
+        color: var(--accent-deep);
+        font-weight: 700;
+      }
+
+      .pill-row {
+        margin-bottom: 12px;
+      }
+
+      .pill {
+        min-width: 120px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+      }
+
+      .pill span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .pill strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 1.3rem;
+      }
+
+      .toolbar-field,
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .toolbar-field select,
+      .field input,
+      .field textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid rgba(15, 61, 127, 0.14);
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 255, 0.84);
+        color: var(--text);
+      }
+
+      .studio-list {
+        display: grid;
+        gap: 16px;
+      }
+
+      .studio-card {
+        border-radius: var(--radius-lg);
+        transition:
+          transform 180ms ease,
+          box-shadow 180ms ease,
+          border-color 180ms ease;
+      }
+
+      .studio-card.stale {
+        opacity: 0.82;
+      }
+
+      .studio-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .source-link {
+        align-self: flex-start;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--accent-deep);
+        background: rgba(255, 255, 255, 0.58);
+      }
+
+      .studio-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+
+      .field.wide {
+        grid-column: 1 / -1;
+      }
+
+      @media (max-width: 960px) {
+        .hero,
+        .studio-grid,
+        .map-layout,
+        .decision-grid,
+        .wizard-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .reason-columns {
+          grid-template-columns: 1fr;
+        }
+
+        .site-header {
+          border-radius: 28px;
+          padding: 18px;
+        }
+
+        .site-nav {
+          display: none;
+        }
+      }
+
+      @media (max-width: 700px) {
+        .page-shell {
+          width: min(calc(100% - 20px), 1180px);
+          padding: 16px 0 44px;
+        }
+
+        .panel-head,
+        .card-footer,
+        .studio-head,
+        .section-intro,
+        .stream-group-head {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .summary {
+          min-height: auto;
+        }
+
+        .hero-copy,
+        .hero-panel,
+        .section,
+        .news-card,
+        .studio-card {
+          padding: 22px;
+        }
+
+        .hero-stats {
+          grid-template-columns: 1fr;
+        }
+
+        .map-shell {
+          padding: 12px;
+        }
+
+        .map-landing {
+          min-height: auto;
+        }
+
+        .map-landing-shell {
+          padding: 14px;
+          border-radius: 26px;
+        }
+
+        .map-frame-landing {
+          min-height: auto;
+          padding: 20px 16px 16px;
+        }
+
+        .map-floating-chip {
+          position: static;
+          margin-bottom: 12px;
+          width: fit-content;
+        }
+
+        .actual-map text {
+          font-size: 0.86em;
+        }
+
+        .compare-table {
+          min-width: 760px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-shell">
+      ${renderNav(page)}
+      ${body}
+    </div>
+    ${renderClientScript({ page, updates })}
+  </body>
+</html>`;
+}
+
+export function renderDashboard({
+  generatedAt,
+  updates,
+  reports = [],
+  page = "dashboard",
+  jurisdictionId = null
+}) {
+  if (page === "jurisdiction") {
+    const meta = getJurisdictionMeta(jurisdictionId ?? "federal");
+
+    return renderLayout({
+      title: `Canada Immigration Monitor | ${meta.labelKo}`,
+      page,
+      body: renderJurisdictionPage({
+        jurisdictionId: meta.id,
+        generatedAt,
+        updates,
+        reports
+      }),
+      updates
+    });
+  }
+
+  return renderLayout({
+    title: "Canada Immigration Monitor | Dashboard",
+    page: "dashboard",
+    body: renderDashboardPage({
+      generatedAt,
+      updates,
+      reports
+    }),
+    updates
+  });
+}
