@@ -992,7 +992,6 @@ function renderDashboardPage({ updates, basePath = "" }) {
     <div id="compare-table">
       ${renderComparisonTable(insights, basePath)}
     </div>
-    ${renderCanadaMapSection(updates, { basePath })}
   `;
 }
 

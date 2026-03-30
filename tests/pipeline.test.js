@@ -175,12 +175,9 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /지역을 다른 곳으로 넓혀보세요/);
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
   assert.match(dashboardHtml, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
-  assert.match(dashboardHtml, /연방 \/ Express Entry/);
-  assert.match(dashboardHtml, /Map Explorer/);
-  assert.match(dashboardHtml, /지역 탐색은 필요할 때만 열기/);
-  assert.match(dashboardHtml, /MAP_REGION_DEFS/);
-  assert.match(dashboardHtml, /id="CA-ON"/);
-  assert.match(dashboardHtml, /Wikimedia Commons/);
+  assert.match(dashboardHtml, /연방이든 주정부든, 지금 조건에서 먼저 볼 곳부터 1순위부터 정리했습니다/);
+  assert.doesNotMatch(dashboardHtml, /Map Explorer/);
+  assert.doesNotMatch(dashboardHtml, /지역 탐색은 필요할 때만 열기/);
 
   const ontarioRegionPage = await readFile(
     path.join(outputDir, "region", "ontario", "index.html"),
