@@ -22,6 +22,7 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
+const QUICK_FILTER_MAP_PREFIX = "quick-filter-";
 
 export const JURISDICTION_META = [
   { id: "federal", labelKo: "연방 / EE", shortLabel: "EE", svgId: null },
@@ -40,8 +41,15 @@ export const JURISDICTION_META = [
   { id: "newfoundland-and-labrador", labelKo: "뉴펀들랜드 래브라도", shortLabel: "NL", svgId: "CA-NL" }
 ];
 
-function loadCanadaMapSvg() {
-  const rawSvg = readFileSync(CANADA_MAP_ASSET_PATH, "utf8");
+function buildCanadaMapSvg({ idPrefix = "", className = "canada-map actual-map", ariaLabel = "캐나다 주 및 준주 지도" } = {}) {
+  let rawSvg = readFileSync(CANADA_MAP_ASSET_PATH, "utf8");
+
+  if (idPrefix) {
+    rawSvg = rawSvg
+      .replace(/\bid="([^"]+)"/g, (_match, id) => `id="${idPrefix}${id}"`)
+      .replace(/url\(#([^)]+)\)/g, (_match, id) => `url(#${idPrefix}${id})`)
+      .replace(/\b(xlink:href|href)="#([^"]+)"/g, (_match, attr, id) => `${attr}="#${idPrefix}${id}"`);
+  }
 
   return rawSvg
     .replace(/<\?xml[\s\S]*?\?>\s*/i, "")
@@ -52,11 +60,16 @@ function loadCanadaMapSvg() {
     .replace(/\sheight="[^"]*"/i, "")
     .replace(
       /<svg/i,
-      '<svg class="canada-map actual-map" viewBox="0 0 1320 1145" role="img" aria-label="캐나다 주 및 준주 지도" preserveAspectRatio="xMidYMid meet"'
+      `<svg class="${className}" viewBox="0 0 1320 1145" role="img" aria-label="${ariaLabel}" preserveAspectRatio="xMidYMid meet"`
     );
 }
 
-const CANADA_MAP_SVG = loadCanadaMapSvg();
+const CANADA_MAP_SVG = buildCanadaMapSvg();
+const QUICK_FILTER_MAP_SVG = buildCanadaMapSvg({
+  idPrefix: QUICK_FILTER_MAP_PREFIX,
+  className: "canada-map actual-map quick-filter-map",
+  ariaLabel: "관심 지역 선택 지도"
+});
 
 export const KNOWN_JURISDICTION_IDS = new Set(JURISDICTION_META.map((region) => region.id));
 
@@ -242,15 +255,6 @@ function buildJurisdictionInsights(updates) {
 }
 
 function renderSituationSection(insights) {
-  const quickFilterButtons = [
-    '<button type="button" class="chip active" data-quick-region="all">전체</button>',
-    ...insights
-      .filter((insight) => insight.id !== "nunavut")
-      .map(
-        (insight) => `<button type="button" class="chip" data-quick-region="${escapeHtml(insight.id)}">${escapeHtml(insight.labelKo)}</button>`
-      )
-  ].join("");
-
   return `
     <section class="section panel">
       <div class="panel-head">
@@ -262,11 +266,18 @@ function renderSituationSection(insights) {
       </div>
       <div class="wizard-filter-bar">
         <div class="wizard-filter-copy">
-          <strong>관심 지역 필터</strong>
-          <span>질문 답변 전에 미리 지역을 걸러서 볼 수 있습니다.</span>
+          <strong>관심 지역 지도 필터</strong>
+          <span>지도를 눌러 여러 주를 같이 고를 수 있습니다. 선택하지 않으면 전체 지역을 추천합니다.</span>
         </div>
-        <div class="wizard-filter-chips" id="quick-region-filters">
-          ${quickFilterButtons}
+        <div class="wizard-filter-shell">
+          <div class="wizard-filter-toolbar">
+            <button type="button" class="chip" data-quick-region-toggle="federal">연방 / EE</button>
+            <button type="button" class="chip" data-quick-region-clear>전체 보기</button>
+          </div>
+          <div class="wizard-filter-map-frame">
+            ${QUICK_FILTER_MAP_SVG}
+          </div>
+          <div class="wizard-filter-selection" id="quick-region-selection">선택된 지역 없음 · 전체 추천</div>
         </div>
       </div>
       <div class="wizard-layout">
@@ -1316,13 +1327,15 @@ function renderClientScript({ page, updates }) {
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
         const quickStartResults = document.getElementById("quick-start-results");
-        const quickRegionButtons = Array.from(document.querySelectorAll("[data-quick-region]"));
+        const quickRegionFederalButton = document.querySelector("[data-quick-region-toggle='federal']");
+        const quickRegionClearButton = document.querySelector("[data-quick-region-clear]");
+        const quickRegionSelection = document.getElementById("quick-region-selection");
         const mapSelectionLabel = document.getElementById("map-selection-label");
         const mapSelectionMeta = document.getElementById("map-selection-meta");
         const mapSelectionLink = document.getElementById("map-selection-link");
         const mapTooltip = document.getElementById("map-tooltip");
         const hoverableJumpLinks = Array.from(document.querySelectorAll("[data-jurisdiction-link]"));
-        let activeQuickRegion = "all";
+        const activeQuickRegions = new Set();
         const defaultSelection = {
           label: "지역을 선택해 보세요",
           meta: "비교표와 상황별 카드를 먼저 보고 범위를 좁힌 뒤, 여기서 지역 상세 페이지로 이동하면 훨씬 덜 헷갈립니다.",
@@ -1387,6 +1400,30 @@ function renderClientScript({ page, updates }) {
           }
 
           return completed;
+        }
+
+        function toggleQuickRegion(regionId) {
+          if (activeQuickRegions.has(regionId)) {
+            activeQuickRegions.delete(regionId);
+          } else {
+            activeQuickRegions.add(regionId);
+          }
+        }
+
+        function updateQuickRegionSummary() {
+          if (!quickRegionSelection) {
+            return;
+          }
+
+          if (activeQuickRegions.size === 0) {
+            quickRegionSelection.textContent = "선택된 지역 없음 · 전체 추천";
+            return;
+          }
+
+          const labels = [...activeQuickRegions]
+            .map((regionId) => MAP_REGION_DEFS.find((region) => region.id === regionId)?.labelKo ?? regionId)
+            .join(" / ");
+          quickRegionSelection.textContent = "선택된 지역: " + labels;
         }
 
         function isWorkerIntent(path) {
@@ -2494,7 +2531,7 @@ function renderClientScript({ page, updates }) {
           };
           const ranked = DASHBOARD_INSIGHTS
             .filter((insight) => insight.id !== "nunavut")
-            .filter((insight) => activeQuickRegion === "all" || insight.id === activeQuickRegion)
+            .filter((insight) => activeQuickRegions.size === 0 || activeQuickRegions.has(insight.id))
             .map((insight) => ({
               insight,
               evaluation: scoreInsight(insight, answers)
@@ -2631,17 +2668,80 @@ function renderClientScript({ page, updates }) {
           renderQuickStartResults();
         }
 
-        if (quickRegionButtons.length > 0) {
-          quickRegionButtons.forEach((button) => {
-            button.addEventListener("click", () => {
-              activeQuickRegion = button.dataset.quickRegion || "all";
-              quickRegionButtons.forEach((chip) => {
-                chip.classList.toggle("active", chip === button);
-              });
+        const quickFilterMapEntries = MAP_REGION_DEFS
+          .filter((region) => region.svgId)
+          .map((region) => {
+            const regionNode = document.getElementById("${QUICK_FILTER_MAP_PREFIX}" + region.svgId);
+            const labelNode = document.getElementById("${QUICK_FILTER_MAP_PREFIX}" + region.svgId + " Label");
+
+            if (!regionNode) {
+              return null;
+            }
+
+            regionNode.classList.add("map-region", "quick-filter-region", "is-available");
+            regionNode.dataset.quickMapRegion = region.id;
+            regionNode.setAttribute("tabindex", "0");
+            regionNode.setAttribute("role", "button");
+            regionNode.setAttribute("aria-label", region.labelKo + " 선택");
+
+            if (labelNode) {
+              labelNode.classList.add("map-region-label", "quick-filter-label");
+            }
+
+            function syncSelectedState() {
+              const selected = activeQuickRegions.has(region.id);
+              regionNode.classList.toggle("is-selected", selected);
+              if (labelNode) {
+                labelNode.classList.toggle("is-selected", selected);
+              }
+            }
+
+            function onToggle() {
+              toggleQuickRegion(region.id);
+              syncSelectedState();
+              updateQuickRegionSummary();
               renderQuickStartResults();
+            }
+
+            regionNode.addEventListener("click", onToggle);
+            regionNode.addEventListener("keydown", (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onToggle();
+              }
             });
+
+            syncSelectedState();
+
+            return {
+              regionId: region.id,
+              syncSelectedState
+            };
+          })
+          .filter(Boolean);
+
+        if (quickRegionFederalButton) {
+          quickRegionFederalButton.addEventListener("click", () => {
+            toggleQuickRegion("federal");
+            quickRegionFederalButton.classList.toggle("active", activeQuickRegions.has("federal"));
+            updateQuickRegionSummary();
+            renderQuickStartResults();
           });
         }
+
+        if (quickRegionClearButton) {
+          quickRegionClearButton.addEventListener("click", () => {
+            activeQuickRegions.clear();
+            if (quickRegionFederalButton) {
+              quickRegionFederalButton.classList.remove("active");
+            }
+            quickFilterMapEntries.forEach((entry) => entry.syncSelectedState());
+            updateQuickRegionSummary();
+            renderQuickStartResults();
+          });
+        }
+
+        updateQuickRegionSummary();
 
         const svgRegionEntries = MAP_REGION_DEFS
           .filter((region) => region.svgId)
@@ -3726,10 +3826,56 @@ function renderLayout({ title, page, body, updates }) {
         line-height: 1.7;
       }
 
-      .wizard-filter-chips {
+      .wizard-filter-shell {
+        display: grid;
+        gap: 12px;
+        padding: 18px;
+        border: 1px solid rgba(15, 61, 127, 0.12);
+        border-radius: var(--radius-lg);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .wizard-filter-toolbar {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
+      }
+
+      .wizard-filter-map-frame {
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-lg);
+        background:
+          radial-gradient(circle at top right, rgba(47, 110, 196, 0.1), transparent 30%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 249, 255, 0.8));
+        padding: 18px;
+      }
+
+      .quick-filter-map {
+        width: 100%;
+        height: auto;
+        max-height: 300px;
+      }
+
+      .quick-filter-region path,
+      path.quick-filter-region {
+        fill: rgba(255, 255, 255, 0.82);
+        stroke: rgba(15, 61, 127, 0.18);
+      }
+
+      .quick-filter-region.is-selected path,
+      path.quick-filter-region.is-selected {
+        fill: rgba(47, 110, 196, 0.28);
+        stroke: rgba(15, 61, 127, 0.56);
+      }
+
+      .quick-filter-label.is-selected {
+        fill: var(--accent-strong);
+      }
+
+      .wizard-filter-selection {
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.7;
       }
 
       .wizard-form,
