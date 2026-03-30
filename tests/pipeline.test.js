@@ -127,10 +127,10 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /내 상황으로 먼저 찾기/);
   assert.match(dashboardHtml, /나이/);
   assert.match(dashboardHtml, /캐나다 밖에서 바로 EE\/취업이민을 보고 있어요/);
-  assert.match(dashboardHtml, /워홀·오픈퍼밋으로 현지 경력 쌓아 이민을 보려 해요/);
-  assert.match(dashboardHtml, /유학 시작부터 이민 경로를 같이 보고 있어요/);
-  assert.match(dashboardHtml, /캐나다 졸업 후 PGWP\/현지 취업으로 이민을 보고 있어요/);
-  assert.match(dashboardHtml, /현재 캐나다 skilled 경력으로 바로 PR을 노리고 있어요/);
+  assert.match(dashboardHtml, /캐나다에 먼저 와서 현지 경력 쌓는 방향이에요/);
+  assert.match(dashboardHtml, /유학부터 시작해 PR까지 같이 보고 있어요/);
+  assert.match(dashboardHtml, /졸업 후 현지 취업으로 PR까지 보고 있어요/);
+  assert.match(dashboardHtml, /지금 캐나다 경력으로 바로 PR을 보고 있어요/);
   assert.match(dashboardHtml, /관심 지역 필터/);
   assert.match(dashboardHtml, /동그란 지역 버튼으로 여러 주를 같이 고를 수 있습니다/);
   assert.match(dashboardHtml, /quick-coin/);
@@ -146,12 +146,13 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /현재 직군/);
   assert.match(dashboardHtml, /영어 상태/);
   assert.match(dashboardHtml, /캐나다 경력의 성격/);
+  assert.match(dashboardHtml, /현재 비자 \/ 퍼밋 남은 기간/);
   assert.match(dashboardHtml, /ECA \/ 학력평가 상태/);
   assert.match(dashboardHtml, /학비·생활비 부담/);
   assert.match(dashboardHtml, /정착 선호/);
-  assert.match(dashboardHtml, /현재 조건에서 먼저 볼 추천 순위/);
-  assert.match(dashboardHtml, /연방이든 주정부든, 지금 조건에서 먼저 볼 곳부터 1순위부터 정리했습니다/);
-  assert.match(dashboardHtml, /주정부가 먼저|연방 EE가 먼저/);
+  assert.match(dashboardHtml, /현재 조건에서 먼저 볼 주정부 추천 순위/);
+  assert.match(dashboardHtml, /주정부 추천은 아래 순위로 보고, 연방 EE는 따로 비교합니다|지금 조건에서 먼저 볼 주정부 순서를 1순위부터 정리했습니다/);
+  assert.match(dashboardHtml, /연방 \/ EE는 따로 보기/);
   assert.match(dashboardHtml, /예상 적합도/);
   assert.match(dashboardHtml, /입력한 캐나다 skilled 경력은 CRS에 반영했습니다/);
   assert.match(dashboardHtml, /update-flash-chevron/);
@@ -160,9 +161,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /mini-region-map/);
   assert.match(dashboardHtml, /선발 방식/);
   assert.match(dashboardHtml, /이 지역은 이렇게 뽑아요/);
-  assert.match(dashboardHtml, /연방 EE 참고/);
-  assert.match(dashboardHtml, /이 주 자체 점수 아님/);
-  assert.match(dashboardHtml, /scorePlanLabel = eeSnapshot\.isFederal \? "예상 CRS" : "연방 EE 참고점수"/);
+  assert.doesNotMatch(dashboardHtml, /<strong>연방 EE 참고<\/strong>/);
+  assert.doesNotMatch(dashboardHtml, /이 주 자체 점수 아님/);
   assert.match(dashboardHtml, /EOI \+ 노동시장 우선/);
   assert.match(dashboardHtml, /왜 이 순위인가/);
   assert.match(dashboardHtml, /이 경로가 실제로 보는 것/);
@@ -175,7 +175,6 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /지역을 다른 곳으로 넓혀보세요/);
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
   assert.match(dashboardHtml, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
-  assert.match(dashboardHtml, /연방이든 주정부든, 지금 조건에서 먼저 볼 곳부터 1순위부터 정리했습니다/);
   assert.doesNotMatch(dashboardHtml, /Map Explorer/);
   assert.doesNotMatch(dashboardHtml, /지역 탐색은 필요할 때만 열기/);
 

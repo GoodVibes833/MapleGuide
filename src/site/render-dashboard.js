@@ -351,20 +351,20 @@ function renderSituationSection(insights) {
       <div class="wizard-layout">
         <form class="wizard-form" id="quick-start-form">
           <label class="wizard-field" data-required-field="path">
-            <span class="wizard-field-label">가장 가까운 현재 상황 <em class="required-mark">필수*</em></span>
+            <span class="wizard-field-label">지금 생각하는 큰 방향 <em class="required-mark">필수*</em></span>
             <select name="path">
               <option value="">선택하세요</option>
               <option value="unsure">아직 잘 모르겠어요</option>
               <option value="outside-worker">캐나다 밖에서 바로 EE/취업이민을 보고 있어요</option>
-              <option value="working-holiday">워홀·오픈퍼밋으로 현지 경력 쌓아 이민을 보려 해요</option>
-              <option value="study-plan">유학 시작부터 이민 경로를 같이 보고 있어요</option>
-              <option value="pgwp-pr">캐나다 졸업 후 PGWP/현지 취업으로 이민을 보고 있어요</option>
-              <option value="canadian-worker">현재 캐나다 skilled 경력으로 바로 PR을 노리고 있어요</option>
+              <option value="working-holiday">캐나다에 먼저 와서 현지 경력 쌓는 방향이에요</option>
+              <option value="study-plan">유학부터 시작해 PR까지 같이 보고 있어요</option>
+              <option value="pgwp-pr">졸업 후 현지 취업으로 PR까지 보고 있어요</option>
+              <option value="canadian-worker">지금 캐나다 경력으로 바로 PR을 보고 있어요</option>
               <option value="business">사업·창업 경로를 보고 있어요</option>
             </select>
           </label>
           <label class="wizard-field" data-required-field="base">
-            <span class="wizard-field-label">현재 캐나다 체류 상태 <em class="required-mark">필수*</em></span>
+            <span class="wizard-field-label">현재 실제 체류 상태 <em class="required-mark">필수*</em></span>
             <select name="base">
               <option value="">선택하세요</option>
               <option value="outside">현재 캐나다 밖에 있어요</option>
@@ -373,6 +373,17 @@ function renderSituationSection(insights) {
               <option value="pgwp">PGWP 또는 졸업 후 취업 상태예요</option>
               <option value="worker">캐나다에서 일반 취업 상태예요</option>
               <option value="unsure">설명하기 애매해요</option>
+            </select>
+          </label>
+          <label class="wizard-field">
+            <span>현재 비자 / 퍼밋 남은 기간</span>
+            <select name="permitRemaining">
+              <option value="">잘 모르겠어요</option>
+              <option value="not-applicable">아직 캐나다 밖이거나 해당 없어요</option>
+              <option value="lt6">6개월 미만 남았어요</option>
+              <option value="6to12">6-12개월 남았어요</option>
+              <option value="12to24">1-2년 정도 남았어요</option>
+              <option value="24plus">2년 이상 남았어요</option>
             </select>
           </label>
           <label class="wizard-field" data-required-field="age">
@@ -478,7 +489,6 @@ function renderSituationSection(insights) {
             <span>Express Entry</span>
             <select name="ee">
               <option value="">잘 모르겠어요</option>
-              <option value="unsure">모르겠어요</option>
               <option value="yes">EE 프로필이 있거나 만들 예정이에요</option>
               <option value="no">EE 경로는 우선순위가 아니에요</option>
             </select>
@@ -487,7 +497,6 @@ function renderSituationSection(insights) {
             <span>캐나다 잡오퍼</span>
             <select name="jobOffer">
               <option value="">잘 모르겠어요</option>
-              <option value="unsure">모르겠어요</option>
               <option value="yes">있거나 받을 가능성이 있어요</option>
               <option value="no">없어요</option>
             </select>
@@ -553,7 +562,6 @@ function renderSituationSection(insights) {
             <span>어떤 직군 기준으로 이민을 볼 생각인가요</span>
             <select name="targetOccupationPlan">
               <option value="">아직 잘 모르겠어요</option>
-              <option value="unsure">아직 잘 모르겠어요</option>
               <option value="current-canada-job">지금 캐나다에서 하는 일 기준으로 볼래요</option>
               <option value="previous-korea-job">한국에서 하던 경력 기준으로 볼래요</option>
               <option value="degree-field">한국 전공을 살린 직군으로 가면 그쪽으로 볼래요</option>
@@ -573,7 +581,6 @@ function renderSituationSection(insights) {
             <span>한국 학사 / 전공 활용 계획</span>
             <select name="degreeCareerPlan">
               <option value="">아직 모르겠어요</option>
-              <option value="unsure">아직 모르겠어요</option>
               <option value="use-degree">전공을 살려 취업하는 것도 고려해요</option>
               <option value="not-use-degree">전공은 점수용으로만 보고 다른 일로 갈 가능성이 커요</option>
             </select>
@@ -1460,6 +1467,10 @@ function renderClientScript({ page, updates, basePath = "" }) {
         const quickRegionFederalButton = document.querySelector("[data-quick-region-toggle='federal']");
         const quickRegionClearButton = document.querySelector("[data-quick-region-clear]");
         const quickRegionSelection = document.getElementById("quick-region-selection");
+        const canadianExpSelect = quickStartForm?.elements?.namedItem("canadianExp");
+        const canadianJobSkillSelect = quickStartForm?.elements?.namedItem("canadianJobSkill");
+        const baseSelect = quickStartForm?.elements?.namedItem("base");
+        const permitRemainingSelect = quickStartForm?.elements?.namedItem("permitRemaining");
         const mapSelectionLabel = document.getElementById("map-selection-label");
         const mapSelectionMeta = document.getElementById("map-selection-meta");
         const mapSelectionLink = document.getElementById("map-selection-link");
@@ -1527,6 +1538,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
           const defaults = {
             ee: "unsure",
             jobOffer: "unsure",
+            permitRemaining: "unsure",
             budget: "medium",
             setting: "balanced",
             advantage: "none",
@@ -1546,11 +1558,49 @@ function renderClientScript({ page, updates, basePath = "" }) {
           return completed;
         }
 
+        function normalizeDependentAnswers(rawAnswers) {
+          const normalized = { ...rawAnswers };
+
+          if (normalized.canadianExp === "0") {
+            normalized.canadianJobSkill = "not-working";
+          } else if (normalized.canadianExp && normalized.canadianExp !== "0" && normalized.canadianJobSkill === "not-working") {
+            normalized.canadianJobSkill = "mixed";
+          }
+
+          if (normalized.base === "outside" && (!normalized.permitRemaining || normalized.permitRemaining === "unsure")) {
+            normalized.permitRemaining = "not-applicable";
+          }
+
+          if (normalized.base !== "outside" && normalized.permitRemaining === "not-applicable") {
+            normalized.permitRemaining = "";
+          }
+
+          return normalized;
+        }
+
         function toggleQuickRegion(regionId) {
           if (activeQuickRegions.has(regionId)) {
             activeQuickRegions.delete(regionId);
           } else {
             activeQuickRegions.add(regionId);
+          }
+        }
+
+        function syncDependentSelects() {
+          if (canadianExpSelect && canadianJobSkillSelect) {
+            if (canadianExpSelect.value === "0") {
+              canadianJobSkillSelect.value = "not-working";
+            } else if (canadianExpSelect.value && canadianJobSkillSelect.value === "not-working") {
+              canadianJobSkillSelect.value = "";
+            }
+          }
+
+          if (baseSelect && permitRemainingSelect) {
+            if (baseSelect.value === "outside") {
+              permitRemainingSelect.value = "not-applicable";
+            } else if (permitRemainingSelect.value === "not-applicable") {
+              permitRemainingSelect.value = "";
+            }
           }
         }
 
@@ -1621,6 +1671,20 @@ function renderClientScript({ page, updates, basePath = "" }) {
               ? updatesMoreToggle.dataset.closeLabel || "업데이트 접기"
               : updatesMoreToggle.dataset.openLabel || "업데이트 더보기";
             olderUpdatesList.hidden = !nextExpanded;
+          });
+        }
+
+        if (canadianExpSelect) {
+          canadianExpSelect.addEventListener("change", () => {
+            syncDependentSelects();
+            renderQuickStartResults();
+          });
+        }
+
+        if (baseSelect) {
+          baseSelect.addEventListener("change", () => {
+            syncDependentSelects();
+            renderQuickStartResults();
           });
         }
 
@@ -1995,6 +2059,14 @@ function renderClientScript({ page, updates, basePath = "" }) {
             }
           }
 
+          if (hasCanadianWorkBase(answers.base) && answers.permitRemaining === "lt6") {
+            chance -= hasJobOfferRoute || hasLocalExperienceRoute ? 4 : 10;
+          } else if (hasCanadianWorkBase(answers.base) && answers.permitRemaining === "6to12") {
+            chance -= hasJobOfferRoute || hasLocalExperienceRoute ? 1 : 4;
+          } else if (hasCanadianWorkBase(answers.base) && ["12to24", "24plus"].includes(answers.permitRemaining) && hasLocalExperienceRoute) {
+            chance += 2;
+          }
+
           if (crsSnapshot.gap != null) {
             if (insight.id === "federal") {
               if (crsSnapshot.gap >= 20) {
@@ -2358,10 +2430,6 @@ function renderClientScript({ page, updates, basePath = "" }) {
           if (answers.path === "business" && statusSupports(insight.statuses.entrepreneur)) {
             pushUniqueCriterion(criteria, "business-funds", "사업 자금·계획·운영 준비");
           }
-          if (scoreLedProvince) {
-            pushUniqueCriterion(criteria, "competitive-crs", "점수형이면 최근 공개 결과와 차이");
-          }
-
           return {
             modeLabel: scoreLedProvince ? "점수·랭킹형" : "요건·타깃형",
             summary: scoreLedProvince
@@ -3183,14 +3251,12 @@ function renderClientScript({ page, updates, basePath = "" }) {
         }
 
         function describeActionScoreImpact(answers, insight, actionId) {
-          if (!(insight.id === "federal" || statusSupports(insight.statuses.ee))) {
+          if (insight.id !== "federal") {
             return null;
           }
 
-          const scorePlanLabel = insight.id === "federal" ? "예상 CRS" : "연방 EE 참고점수";
-          const noDirectScoreLabel = insight.id === "federal"
-            ? "CRS 직접 변화 없음"
-            : "연방 EE 점수 직접 변화 없음";
+          const scorePlanLabel = "예상 CRS";
+          const noDirectScoreLabel = "CRS 직접 변화 없음";
 
           function exactLift(overrides) {
             const lift = estimateProjectedCrsLift(answers, overrides);
@@ -3255,7 +3321,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
             case "study-route":
               return { lift: null, badge: "나중에 반영", label: "경력 누적 후 점수 반영", tone: "deferred" };
             case "job-offer":
-              return { lift: 0, badge: "변화 없음", label: "연방 EE 추가점수 없음", tone: "neutral" };
+              return { lift: 0, badge: "변화 없음", label: noDirectScoreLabel, tone: "neutral" };
             case "pnp-nomination":
               return {
                 lift: null,
@@ -3356,6 +3422,33 @@ function renderClientScript({ page, updates, basePath = "" }) {
           if (answers.ee !== "yes" && statusSupports(insight.statuses.ee)) {
             const delta = insight.statuses.ee === "핵심" ? 6 : 4;
             addAction(delta, "EE 자격 확인 후 프로필 열기", "이 지역은 EE와 같이 볼 때 선택지가 넓어지고 초청 연결이 쉬워질 수 있습니다.", "ee-profile");
+          }
+
+          if (hasCanadianWorkBase(answers.base) && answers.permitRemaining === "lt6") {
+            addAction(
+              14,
+              "남은 퍼밋 6개월 미만 기준으로 경로 1개로 좁히기",
+              insight.id === "federal"
+                ? "남은 기간이 짧으면 연방 EE만 볼지, 주정부·고용주 경로까지 같이 볼지 4-8주 안에 먼저 확정하는 편이 좋습니다."
+                : "남은 기간이 짧으면 이 주에서 바로 쓸 stream, 고용주 연결, 제출 순서를 먼저 확정하는 편이 좋습니다.",
+              "permit-urgent",
+              3
+            );
+            addAction(
+              10,
+              "현재 체류 유지·연장 가능성도 같이 점검",
+              "남은 기간이 짧으면 경력 계획만 보지 말고 현재 신분 유지와 접수 타이밍도 같이 확인해야 움직이기 편합니다.",
+              "permit-status",
+              2
+            );
+          } else if (hasCanadianWorkBase(answers.base) && answers.permitRemaining === "6to12") {
+            addAction(
+              7,
+              "남은 퍼밋 안에 실행할 순서 정리",
+              "6-12개월 안에 언어점수, 직군 정리, 고용주 연결, stream 선택 중 무엇을 먼저 할지 달력을 기준으로 정리하는 편이 좋습니다.",
+              "permit-plan",
+              2
+            );
           }
 
           if (activeQuickRegions.size > 0 && activeQuickRegions.size <= 2) {
@@ -3467,94 +3560,146 @@ function renderClientScript({ page, updates, basePath = "" }) {
           };
         }
 
+        function getProvinceActionPresentation(action) {
+          const actionId = action.actionId ?? "";
+          const groups = {
+            urgent: new Set(["permit-urgent", "permit-status"]),
+            route: new Set(["job-offer", "pnp-nomination", "ee-profile"]),
+            document: new Set(["language-proof", "language-clb9", "eca-complete", "eca-finish", "eca-check", "french"]),
+            experience: new Set(["teer-upgrade", "canadian-exp-next", "canadian-exp-1", "canadian-exp-2", "foreign-exp-1", "degree-experience"]),
+            strategy: new Set(["focus-occupation", "korea-primary-noc", "korea-noc-detail", "regional-setting", "expand-regions", "study-route"])
+          };
+
+          if (groups.urgent.has(actionId)) {
+            return { badge: "시급", tone: "positive", label: action.detail };
+          }
+          if (groups.route.has(actionId)) {
+            return { badge: "경로", tone: "positive", label: action.detail };
+          }
+          if (groups.document.has(actionId)) {
+            return { badge: "서류", tone: "neutral", label: action.detail };
+          }
+          if (groups.experience.has(actionId)) {
+            return { badge: "경력", tone: "positive", label: action.detail };
+          }
+          if (groups.strategy.has(actionId)) {
+            return { badge: "전략", tone: "deferred", label: action.detail };
+          }
+
+          return { badge: "준비", tone: "neutral", label: action.detail };
+        }
+
+        function getProvinceScenarioFocus(insight) {
+          switch (insight.id) {
+            case "prince-edward-island":
+              return "PEI라면 International Graduate, Skilled Worker, EE 연결 중 어떤 stream으로 갈지 먼저 정리합니다.";
+            case "alberta":
+              return "알버타라면 일반 worker 경로, EE-linked 후보, Rural Renewal까지 같이 놓고 우선순위를 정합니다.";
+            case "saskatchewan":
+              return "사스카츄완이라면 job offer 기반인지, pathway 자격형인지 먼저 나눠서 봅니다.";
+            case "ontario":
+              return "온타리오라면 Human Capital 쪽인지 Employer Job Offer 쪽인지 먼저 갈라서 보는 편이 좋습니다.";
+            case "nova-scotia":
+              return "노바스코샤라면 통합 스트림 안에서 지금 직군이 타깃 초청과 맞는지부터 확인합니다.";
+            case "newfoundland-and-labrador":
+              return "뉴펀들랜드는 먼저 EOI 제출 구조와 employer 연결 여부부터 정리합니다.";
+            case "manitoba":
+              return "매니토바는 현지 연결성, 고용주, 교육 이력 중 어떤 축으로 설명할지 먼저 정리합니다.";
+            case "new-brunswick":
+              return "뉴브런즈윅은 고용주 연결과 직군 타깃 여부를 같이 놓고 보는 편이 좋습니다.";
+            default:
+              return "이 지역은 " + (insight.selectionModel?.focusKo || "stream 자격") + "을 먼저 맞추는 편이 좋습니다.";
+          }
+        }
+
         function buildScenarioTimeline(answers, insight) {
+          let steps;
+
           if (answers.path === "business") {
-            return [
-              "1. 사업 계획, 순자산, 자금 증빙 준비: 2-4개월",
-              "2. 해당 지역 사업·창업 stream 확인 및 EOI/사전 접촉: 1-6개월",
-              "3. 사업 시작 또는 인수, 운영 요건 충족: 6-18개월",
-              "4. nomination 후 PR 단계 진행: 추가 6-12개월+"
+            steps = [
+              "사업 계획, 순자산, 자금 증빙을 먼저 정리합니다: 2-4개월",
+              "해당 지역 사업·창업 stream 확인 및 EOI/사전 접촉을 합니다: 1-6개월",
+              "사업 시작 또는 인수 후 운영 요건을 채웁니다: 6-18개월",
+              "nomination 뒤 PR 단계로 넘어갑니다: 추가 6-12개월+"
+            ];
+          } else if (answers.base === "student" || isStudyStartIntent(answers.path)) {
+            steps = [
+              "학비와 지역을 기준으로 학교·주를 먼저 고릅니다: 1-3개월",
+              "학업 후 졸업자 경로 또는 PGWP 연결을 준비합니다: 1-2년+",
+              "현지 경력 1년 전후를 확보한 뒤 EE/PNP를 다시 봅니다",
+              "nomination 또는 ITA 후 PR 접수로 넘어갑니다: 추가 6개월+"
+            ];
+          } else if (answers.base === "pgwp" || isPgwpIntent(answers.path)) {
+            steps = [
+              "현재 학위와 PGWP 남은 기간을 기준으로 주와 직무 우선순위를 정리합니다: 2-4주",
+              "현지 skilled 경력, 언어점수, ECA 상태를 기준으로 맞는 stream을 추립니다: 1-2개월",
+              "졸업자 또는 현지경력 stream 등록/초청 대기를 시작합니다: 1-6개월",
+              "nomination 또는 ITA 후 PR 접수로 넘어갑니다: 추가 6개월+"
+            ];
+          } else if (answers.base === "working-holiday" && answers.canadianJobSkill === "non-skilled") {
+            steps = [
+              "현재 캐나다 일의 NOC·TEER를 먼저 확인합니다: 1-2주",
+              "가능하면 TEER 0-3 직무나 관련 잡오퍼로 옮깁니다: 1-6개월",
+              "언어점수·ECA와 함께 EE/주정부 연결이 가능한지 다시 점검합니다",
+              "경력 전환 뒤 초청 또는 nomination 흐름으로 넘어갑니다: 추가 6개월+"
+            ];
+          } else if (answers.base === "working-holiday" && answers.canadianJobSkill === "skilled") {
+            steps = [
+              "현재 캐나다 skilled 경력의 NOC, 근무시간, 합법 체류 기록을 정리합니다: 2-4주",
+              "언어시험·ECA 준비와 함께 1년 경력 충족 시점을 계산합니다: 1-3개월",
+              "CEC 또는 주정부 현지경력 stream을 비교합니다: 1-6개월",
+              "초청 후 PR 서류 접수와 심사로 넘어갑니다: 추가 6개월+"
+            ];
+          } else if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment !== "same-skilled") {
+            steps = [
+              "한국 경력 기준으로 사용할 primary occupation NOC를 다시 정리합니다: 2-4주",
+              "경력증명서와 실제 job duties가 맞는지 점검합니다: 2-6주",
+              "언어시험·ECA 준비 뒤 EE/주정부 적합성을 재계산합니다: 1-3개월",
+              "맞는 경로가 나오면 프로필 생성과 초청 대기를 시작합니다: 추가 1-6개월+"
+            ];
+          } else if (hasCanadianWorkBase(answers.base) || answers.canadianExp !== "0" || isCanadianExperienceIntent(answers.path)) {
+            steps = [
+              "현재 NOC, 근무시간, 합법 체류 상태를 정리합니다: 2-4주",
+              "언어시험과 필요한 서류를 정리합니다: 1-3개월",
+              "주정부 또는 EE-linked stream 등록/초청 대기를 시작합니다: 1-6개월",
+              "초청 후 PR 서류 접수와 심사로 넘어갑니다: 추가 6개월+"
+            ];
+          } else if (answers.jobOffer === "yes") {
+            steps = [
+              "고용주 오퍼 조건과 직무 코드를 먼저 확인합니다: 2-4주",
+              "해당 지역 고용주 중심 stream 또는 연계 경로를 검토합니다: 1-2개월",
+              "EOI/NOI/초청 대기 또는 바로 신청을 시작합니다: 1-6개월",
+              "nomination 또는 ITA 후 PR 단계로 넘어갑니다: 추가 6개월+"
+            ];
+          } else if (insight.statuses.regional === "많음" || insight.statuses.regional === "중심") {
+            steps = [
+              "지역 커뮤니티 참여 조건과 생활 가능성을 먼저 확인합니다: 2-6주",
+              "언어시험·학력평가·경력을 정리합니다: 1-3개월",
+              "지역 stream 또는 EOI 등록 후 초청 대기를 시작합니다: 1-6개월",
+              "nomination 후 PR 접수로 넘어갑니다: 추가 6개월+"
+            ];
+          } else {
+            steps = [
+              "언어시험과 학력평가(ECA)를 준비합니다: 1-3개월",
+              "맞는 EE 또는 주정부 stream을 점검하고 프로필을 엽니다",
+              "초청 또는 nomination을 기다립니다: 1-6개월+",
+              "PR 신청서 접수와 심사로 넘어갑니다: 추가 6개월+"
             ];
           }
 
-          if (answers.base === "student" || isStudyStartIntent(answers.path)) {
-            return [
-              "1. 학비와 지역을 기준으로 학교·주 선택: 1-3개월",
-              "2. 학업 후 졸업자 경로 또는 PGWP 준비: 1-2년+",
-              "3. 현지 경력 1년 전후 확보 후 EE/PNP 검토",
-              "4. nomination 또는 ITA 후 PR 접수: 추가 6개월+"
-            ];
+          if (insight.id !== "federal") {
+            steps.unshift(getProvinceScenarioFocus(insight));
           }
 
-          if (answers.base === "pgwp" || isPgwpIntent(answers.path)) {
-            return [
-              "1. 현재 학위와 PGWP 가능 기간 기준으로 주와 직무 우선순위 정리: 2-4주",
-              "2. 현지 skilled 경력과 언어점수, ECA 상태를 기준으로 EE/PNP 재계산: 1-2개월",
-              "3. 졸업자 또는 현지경력 stream 등록/초청 대기: 1-6개월",
-              "4. nomination 또는 ITA 후 PR 접수: 추가 6개월+"
-            ];
+          if (hasCanadianWorkBase(answers.base) && answers.permitRemaining === "lt6") {
+            steps.unshift("남은 비자/퍼밋이 6개월 미만이면 4-8주 안에 갈 주, 주력 직군, 잡오퍼 가능성을 먼저 확정합니다.");
+          } else if (hasCanadianWorkBase(answers.base) && answers.permitRemaining === "6to12") {
+            steps.unshift("남은 비자/퍼밋 6-12개월 안에 언어점수, 직군 정리, 고용주 연결 중 무엇을 먼저 할지 달력 기준으로 정합니다.");
+          } else if (hasCanadianWorkBase(answers.base) && ["12to24", "24plus"].includes(answers.permitRemaining)) {
+            steps.unshift("남은 비자/퍼밋 기간이 비교적 있어 경력 1년·2년 채우기 전략을 같이 설계해 볼 수 있습니다.");
           }
 
-          if (answers.base === "working-holiday" && answers.canadianJobSkill === "non-skilled") {
-            return [
-              "1. 현재 캐나다 일의 NOC·TEER 확인: 1-2주",
-              "2. 가능하면 TEER 0-3 직무 또는 관련 잡오퍼로 이동: 1-6개월",
-              "3. 언어점수·ECA와 함께 EE/주정부 연결 가능한지 재점검",
-              "4. 경력 전환 후 초청 또는 nomination 흐름 검토: 추가 6개월+"
-            ];
-          }
-
-          if (answers.base === "working-holiday" && answers.canadianJobSkill === "skilled") {
-            return [
-              "1. 현재 캐나다 skilled 경력의 NOC, 근무시간, 합법 체류 기록 정리: 2-4주",
-              "2. 언어시험·ECA 준비와 함께 1년 경력 충족 여부 계산: 1-3개월",
-              "3. CEC 또는 주정부 현지경력 stream 검토: 1-6개월",
-              "4. 초청 후 PR 서류 접수 및 심사 진행: 추가 6개월+"
-            ];
-          }
-
-          if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment !== "same-skilled") {
-            return [
-              "1. 한국 경력 기준으로 사용할 primary occupation NOC 다시 정리: 2-4주",
-              "2. 경력증명서와 실제 job duties가 맞는지 점검: 2-6주",
-              "3. 언어시험·ECA 준비 후 EE/주정부 적합성 재계산: 1-3개월",
-              "4. 맞는 경로가 나오면 프로필 생성과 초청 대기: 추가 1-6개월+"
-            ];
-          }
-
-          if (hasCanadianWorkBase(answers.base) || answers.canadianExp !== "0" || isCanadianExperienceIntent(answers.path)) {
-            return [
-              "1. 현재 NOC, 근무시간, 합법 체류 상태 정리: 2-4주",
-              "2. 언어시험과 필요한 서류 정리: 1-3개월",
-              "3. EE 또는 주정부 stream 등록/초청 대기: 1-6개월",
-              "4. 초청 후 PR 서류 접수와 심사 진행: 추가 6개월+"
-            ];
-          }
-
-          if (answers.jobOffer === "yes") {
-            return [
-              "1. 고용주 오퍼 조건과 직무 코드 확인: 2-4주",
-              "2. 해당 지역 고용주 중심 stream 또는 EE 연계 경로 검토: 1-2개월",
-              "3. EOI/NOI/초청 대기 또는 바로 신청: 1-6개월",
-              "4. nomination 또는 ITA 후 PR 단계 진행: 추가 6개월+"
-            ];
-          }
-
-          if (insight.statuses.regional === "많음" || insight.statuses.regional === "중심") {
-            return [
-              "1. 지역 커뮤니티 참여 조건과 생활 가능성 확인: 2-6주",
-              "2. 언어시험·학력평가·경력 정리: 1-3개월",
-              "3. 지역 stream 또는 EOI 등록 후 초청 대기: 1-6개월",
-              "4. nomination 후 PR 접수: 추가 6개월+"
-            ];
-          }
-
-          return [
-            "1. 언어시험과 학력평가(ECA) 준비: 1-3개월",
-            "2. EE 또는 주정부 stream 적합성 점검 후 프로필 생성",
-            "3. 초청 또는 nomination 대기: 1-6개월+",
-            "4. PR 신청서 접수 및 심사: 추가 6개월+"
-          ];
+          return steps.slice(0, 4).map((step, index) => (index + 1) + ". " + step);
         }
 
         function renderQuickStartResults() {
@@ -3563,7 +3708,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
           }
 
           const formData = new FormData(quickStartForm);
-          const rawAnswers = Object.fromEntries(formData.entries());
+          const rawAnswers = normalizeDependentAnswers(Object.fromEntries(formData.entries()));
           const missingRequiredFields = getMissingRequiredFields(rawAnswers);
           syncMissingRequiredStates(rawAnswers);
 
@@ -3581,7 +3726,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
             return;
           }
 
-          const completedRawAnswers = applyOptionalAnswerDefaults(rawAnswers);
+          const completedRawAnswers = normalizeDependentAnswers(applyOptionalAnswerDefaults(rawAnswers));
           const answers = {
             ...completedRawAnswers,
             ...normalizeLanguageAnswers(completedRawAnswers)
@@ -3593,272 +3738,303 @@ function renderClientScript({ page, updates, basePath = "" }) {
               insight,
               evaluation: scoreInsight(insight, answers)
             }));
-          const ranked = allEvaluated
+          const sortedEvaluated = allEvaluated
             .sort((left, right) => {
               if (right.evaluation.score !== left.evaluation.score) {
                 return right.evaluation.score - left.evaluation.score;
               }
 
               return right.insight.updateCount - left.insight.updateCount;
-            })
+            });
+          const federalEntry = sortedEvaluated.find(({ insight }) => insight.id === "federal") ?? null;
+          const provinceRanked = sortedEvaluated
+            .filter(({ insight }) => insight.id !== "federal")
             .slice(0, 3);
-          quickStartResults.innerHTML = [
-              '<div class="wizard-section-heading">',
-              '<div>',
-              '<p class="panel-kicker">Recommendations</p>',
-              '<h3>현재 조건에서 먼저 볼 추천 순위</h3>',
-              '</div>',
-              '<p class="panel-note">연방이든 주정부든, 지금 조건에서 먼저 볼 곳부터 1순위부터 정리했습니다.</p>',
-              '</div>'
-            ].join("")
-            + ranked
-            .map(({ insight, evaluation }, index) => {
-              const fitPercent = estimateFitPercent(answers, evaluation);
-              const immigrationChancePercent = estimateImmigrationChancePercent(answers, evaluation, insight);
-              const improvementPlan = buildImprovementPlan(answers, insight, immigrationChancePercent);
-              const eeSnapshot = getEESnapshot(answers, insight);
-              const crsSnapshot = eeSnapshot.crsSnapshot;
-              const selectionModel = insight.selectionModel;
-              const careerRecognitionItems = buildCareerRecognitionItems(answers, insight);
-              const timeline = buildScenarioTimeline(answers, insight);
-              const pathwayGuideBundle = buildEvaluatedPathwayGuide(answers, insight, eeSnapshot);
-              const pathwayCurrentItems = pathwayGuideBundle.evaluated
-                .filter((criterion) => criterion.state === "has")
-                .map((criterion) => criterion.label)
-                .slice(0, 3);
-              const pathwayNeedItems = pathwayGuideBundle.evaluated
-                .filter((criterion) => criterion.state !== "has")
-                .map((criterion) => criterion.label)
-                .slice(0, 3);
-              const topActionItems = improvementPlan.items.slice(0, 2);
-              const leadSummary = buildRecommendationLeadSummary(insight, evaluation, eeSnapshot);
-              const routeTypeLabel = insight.id === "federal" ? "연방" : "주정부";
-              const routeSummaryLabel = routeTypeLabel + " 경로 · " + selectionModel.badgeKo;
-              const whyRankItems = [
-                ...evaluation.policyReasons.slice(0, 2),
-                insight.id === "federal"
-                  ? "연방은 EE 점수와 최근 컷오프를 바로 비교하는 방식이에요."
-                  : "이 지역은 " + selectionModel.focusKo + "을 먼저 보는 편이에요."
-              ].filter(Boolean).slice(0, 3);
-              const policyReasonsHtml = evaluation.policyReasons.length > 0
-                ? evaluation.policyReasons
-                    .map((reason) => "<li>" + escapeHtmlClient(reason) + "</li>")
-                    .join("")
-                : "<li>현재 조건에서 정책 구조를 먼저 확인해 볼 만한 지역입니다.</li>";
-              const lifestyleReasonsHtml = evaluation.lifestyleReasons.length > 0
-                ? evaluation.lifestyleReasons
-                    .map((reason) => "<li>" + escapeHtmlClient(reason) + "</li>")
-                    .join("")
-                : "<li>생활 선호는 중립적으로 반영됐습니다.</li>";
-              const freshnessText = "구조 " + escapeHtmlClient(insight.verifiedOn)
-                + (insight.latestPublishedAt ? " · 최신 공지 " + escapeHtmlClient(insight.latestPublishedAt) : " · 최신 공지 없음");
-              const timelineHtml = timeline
-                .map((item) => "<li>" + escapeHtmlClient(item) + "</li>")
-                .join("");
-              const careerRecognitionHtml = careerRecognitionItems
-                .map((item) => "<li>" + escapeHtmlClient(item) + "</li>")
-                .join("");
-              const improvementHtml = improvementPlan.items
-                .map((item) => [
+
+          function renderRecommendationCard(entry, index = null, mode = "province") {
+            const { insight, evaluation } = entry;
+            const isFederalCard = mode === "federal";
+            const fitPercent = estimateFitPercent(answers, evaluation);
+            const immigrationChancePercent = estimateImmigrationChancePercent(answers, evaluation, insight);
+            const improvementPlan = buildImprovementPlan(answers, insight, immigrationChancePercent);
+            const eeSnapshot = getEESnapshot(answers, insight);
+            const crsSnapshot = eeSnapshot.crsSnapshot;
+            const selectionModel = insight.selectionModel;
+            const careerRecognitionItems = buildCareerRecognitionItems(answers, insight);
+            const timeline = buildScenarioTimeline(answers, insight);
+            const pathwayGuideBundle = buildEvaluatedPathwayGuide(answers, insight, eeSnapshot);
+            const pathwayCurrentItems = pathwayGuideBundle.evaluated
+              .filter((criterion) => criterion.state === "has")
+              .map((criterion) => criterion.label)
+              .slice(0, 3);
+            const pathwayNeedItems = pathwayGuideBundle.evaluated
+              .filter((criterion) => criterion.state !== "has")
+              .map((criterion) => criterion.label)
+              .slice(0, 3);
+            const topActionItems = improvementPlan.items.slice(0, 2);
+            const leadSummary = buildRecommendationLeadSummary(insight, evaluation, eeSnapshot);
+            const routeTypeLabel = isFederalCard ? "연방" : "주정부";
+            const routeSummaryLabel = isFederalCard
+              ? "연방 / EE · " + selectionModel.badgeKo
+              : "주정부 경로 · " + selectionModel.badgeKo;
+            const whyRankItems = [
+              ...evaluation.policyReasons.slice(0, 2),
+              isFederalCard
+                ? "연방은 EE 점수와 최근 컷오프를 직접 비교합니다."
+                : "이 지역은 " + selectionModel.focusKo + "을 먼저 보는 편이에요."
+            ].filter(Boolean).slice(0, 3);
+            const policyReasonsHtml = evaluation.policyReasons.length > 0
+              ? evaluation.policyReasons.map((reason) => "<li>" + escapeHtmlClient(reason) + "</li>").join("")
+              : "<li>현재 조건에서 정책 구조를 먼저 확인해 볼 만한 지역입니다.</li>";
+            const lifestyleReasonsHtml = evaluation.lifestyleReasons.length > 0
+              ? evaluation.lifestyleReasons.map((reason) => "<li>" + escapeHtmlClient(reason) + "</li>").join("")
+              : "<li>생활 선호는 중립적으로 반영됐습니다.</li>";
+            const freshnessText = "구조 " + escapeHtmlClient(insight.verifiedOn)
+              + (insight.latestPublishedAt ? " · 최신 공지 " + escapeHtmlClient(insight.latestPublishedAt) : " · 최신 공지 없음");
+            const timelineTitle = isFederalCard ? "연방으로 간다면 이런 순서" : "이 주라면 이런 순서로 준비";
+            const timelineHtml = timeline.map((item) => "<li>" + escapeHtmlClient(item) + "</li>").join("");
+            const careerRecognitionHtml = careerRecognitionItems.map((item) => "<li>" + escapeHtmlClient(item) + "</li>").join("");
+            const crsNoteText = crsSnapshot.notes.length > 0
+              ? crsSnapshot.notes.join(" · ")
+              : "현재 입력값 기준으로 바로 비교했습니다.";
+            const readinessLine = "영어 상태: " + escapeHtmlClient(answers.languageProfileLabelKo)
+              + " / ECA: " + escapeHtmlClient(answers.ecaStatus)
+              + (answers.permitRemaining && answers.permitRemaining !== "unsure"
+                ? " / 남은 퍼밋: " + escapeHtmlClient(
+                  answers.permitRemaining === "not-applicable" ? "해당 없음" :
+                  answers.permitRemaining === "lt6" ? "6개월 미만" :
+                  answers.permitRemaining === "6to12" ? "6-12개월" :
+                  answers.permitRemaining === "12to24" ? "1-2년" : "2년 이상"
+                )
+                : "");
+            const comparePillLabel = isFederalCard
+              ? "연방 EE 경쟁력 " + eeSnapshot.band
+              : "선발 방식 " + selectionModel.badgeKo;
+            const quickActionsHtml = topActionItems.length > 0
+              ? topActionItems
+                  .map((item) => {
+                    const actionView = isFederalCard
+                      ? {
+                          badge: item.scoreImpact?.badge ?? "준비",
+                          tone: item.scoreImpact?.tone ?? "neutral",
+                          label: item.scoreImpact?.label ?? item.detail
+                        }
+                      : getProvinceActionPresentation(item);
+
+                    return [
+                      '<li class="compact-action-item">',
+                      '<span class="improvement-delta is-' + escapeHtmlClient(actionView.tone) + '">' + escapeHtmlClient(actionView.badge) + '</span>',
+                      '<div class="compact-action-copy">',
+                      '<strong>' + escapeHtmlClient(item.title) + '</strong>',
+                      '<p>' + escapeHtmlClient(actionView.label) + '</p>',
+                      '</div>',
+                      '</li>'
+                    ].join("");
+                  })
+                  .join("")
+              : '<li class="compact-action-item"><span class="improvement-delta is-neutral">준비</span><div class="compact-action-copy"><strong>최신 공지 계속 확인</strong><p>draw, intake, 직군 우선순위 변화가 실제 체감에 더 크게 작용할 수 있어요.</p></div></li>';
+            const improvementHtml = improvementPlan.items
+              .map((item) => {
+                const actionView = isFederalCard
+                  ? {
+                      badge: item.scoreImpact?.badge ?? "준비",
+                      tone: item.scoreImpact?.tone ?? "neutral",
+                      label: item.scoreImpact?.label,
+                      showImpact: Boolean(item.scoreImpact)
+                    }
+                  : {
+                      ...getProvinceActionPresentation(item),
+                      showImpact: false
+                    };
+
+                return [
                   '<li class="improvement-item">',
-                  '<span class="improvement-delta is-' + escapeHtmlClient(item.scoreImpact?.tone ?? "neutral") + '">' + escapeHtmlClient(item.scoreImpact?.badge ?? "준비") + '</span>',
+                  '<span class="improvement-delta is-' + escapeHtmlClient(actionView.tone) + '">' + escapeHtmlClient(actionView.badge) + '</span>',
                   '<div class="improvement-copy">',
                   '<div class="improvement-title-row">',
                   '<strong>' + escapeHtmlClient(item.title) + '</strong>',
-                  item.scoreImpact
-                    ? '<span class="improvement-score-impact is-' + escapeHtmlClient(item.scoreImpact.tone) + '">' + escapeHtmlClient(item.scoreImpact.label) + '</span>'
+                  actionView.showImpact
+                    ? '<span class="improvement-score-impact is-' + escapeHtmlClient(actionView.tone) + '">' + escapeHtmlClient(actionView.label) + '</span>'
                     : "",
                   '</div>',
                   '<p>' + escapeHtmlClient(item.detail) + '</p>',
                   '</div>',
                   '</li>'
-                ].join(""))
-                .join("");
-              const crsNoteText = crsSnapshot.notes.length > 0
-                ? crsSnapshot.notes.join(" · ")
-                : "현재 입력값 기준으로 바로 비교했습니다.";
-              const scorePlanLabel = eeSnapshot.isFederal ? "예상 CRS" : "연방 EE 참고점수";
-              const readinessLine = "영어 상태: " + escapeHtmlClient(answers.languageProfileLabelKo)
-                + " / ECA: " + escapeHtmlClient(answers.ecaStatus);
-              const eeConnectionPillLabel = eeSnapshot.isFederal
-                ? "연방 EE 경쟁력 " + eeSnapshot.band
-                : eeSnapshot.supportsEePath
-                  ? "연방 EE 연결 " + insight.statuses.ee
-                  : "주정부 중심";
-              const eeReferenceHtml = eeSnapshot.supportsEePath && !eeSnapshot.isFederal
-                ? [
-                    '<section class="ee-reference-panel">',
-                    '<div class="ee-reference-head">',
-                    '<strong>연방 EE 참고</strong>',
-                    '<span class="ee-reference-badge">이 주 자체 점수 아님</span>',
-                    '</div>',
-                    '<p class="ee-reference-copy">' + escapeHtmlClient(eeSnapshot.explain) + '</p>',
-                    '<div class="ee-score-row">',
-                    '<span class="ee-score-pill">' + escapeHtmlClient(eeSnapshot.scoreLabel) + ' ' + escapeHtmlClient(crsSnapshot.score) + '점</span>',
-                    '<span class="ee-cutoff-pill">최근 EE 컷오프 ' + escapeHtmlClient(crsSnapshot.cutoff ?? "대기") + '점</span>',
-                    '<span class="ee-gap-pill ' + (crsSnapshot.gap == null ? "is-neutral" : crsSnapshot.gap >= 0 ? "is-positive" : "is-negative") + '">현재 ' + escapeHtmlClient(crsSnapshot.gapLabel) + '점</span>',
-                    '</div>',
-                    '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.comparison) + '</p>',
-                    '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + '</p>',
-                    '</section>'
-                  ].join("")
-                : "";
-              const pathwayGuideHtml = renderPathwayGuidePanel(insight, pathwayGuideBundle);
-              const quickActionsHtml = topActionItems.length > 0
-                ? topActionItems
-                    .map((item) => [
-                      '<li class="compact-action-item">',
-                      '<span class="improvement-delta is-' + escapeHtmlClient(item.scoreImpact?.tone ?? "neutral") + '">' + escapeHtmlClient(item.scoreImpact?.badge ?? "준비") + '</span>',
-                      '<div class="compact-action-copy">',
-                      '<strong>' + escapeHtmlClient(item.title) + '</strong>',
-                      '<p>' + escapeHtmlClient(item.scoreImpact?.label ?? item.detail) + '</p>',
-                      '</div>',
-                      '</li>'
-                    ].join(""))
-                    .join("")
-                : '<li class="compact-action-item"><span class="improvement-delta is-neutral">준비</span><div class="compact-action-copy"><strong>최신 공지 계속 확인</strong><p>draw, intake, 직군 우선순위 변화가 실제 체감에 더 크게 작용할 수 있어요.</p></div></li>';
+                ].join("");
+              })
+              .join("");
+            const improvementSummaryLabel = isFederalCard
+              ? (
+                  improvementPlan.projectedScoreLift > 0
+                    ? "예상 CRS " + improvementPlan.baseScore + "점 → " + improvementPlan.projectedScore + "점"
+                    : improvementPlan.bestFutureScoreLift > 0
+                      ? "지금 " + improvementPlan.baseScore + "점 · 나중에 최대 " + (improvementPlan.baseScore + improvementPlan.bestFutureScoreLift) + "점"
+                      : "예상 CRS " + improvementPlan.baseScore + "점 유지"
+                )
+              : "주 기준 우선 액션 " + Math.max(1, topActionItems.length) + "개";
+            const pathwayGuideHtml = renderPathwayGuidePanel(insight, pathwayGuideBundle);
 
-              return [
-                '<article class="wizard-result-card">',
-                '<div class="wizard-card-header">',
-                '<div class="wizard-card-title-stack">',
-                '<div class="card-topline">',
-                '<span class="status-badge status-approved">추천 ' + (index + 1) + "</span>",
-                '<span class="tag">' + escapeHtmlClient(routeTypeLabel) + "</span>",
-                "</div>",
-                "<h3>" + escapeHtmlClient(insight.labelKo) + "</h3>",
-                '<p class="wizard-result-system">' + escapeHtmlClient(routeSummaryLabel) + "</p>",
-                "</div>",
-                '<div class="wizard-card-mini-map" aria-hidden="true">' + getRecommendationMiniMapMarkup(insight.id) + "</div>",
-                "</div>",
-                '<p class="wizard-result-lead">' + escapeHtmlClient(leadSummary) + "</p>",
-                '<div class="fit-band-row">',
-                '<span class="fit-score">예상 적합도 ' + escapeHtmlClient(fitPercent) + '%</span>',
-                '<span class="chance-score">현재 진입 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
-                '<span class="compare-pill">' + escapeHtmlClient(eeConnectionPillLabel) + "</span>",
-                "</div>",
-                (eeSnapshot.isFederal
-                  ? '<div class="ee-score-row">'
-                    + '<span class="ee-score-pill">' + escapeHtmlClient(eeSnapshot.scoreLabel) + ' ' + escapeHtmlClient(crsSnapshot.score) + '점</span>'
-                    + '<span class="ee-cutoff-pill">최근 EE 컷오프 ' + escapeHtmlClient(crsSnapshot.cutoff ?? "대기") + '점</span>'
-                    + '<span class="ee-gap-pill ' + (crsSnapshot.gap == null ? "is-neutral" : crsSnapshot.gap >= 0 ? "is-positive" : "is-negative") + '">현재 ' + escapeHtmlClient(crsSnapshot.gapLabel) + '점</span>'
-                    + "</div>"
-                  : ""),
-                '<div class="scenario-chip-row">',
-                '<span class="compare-pill">EE ' + escapeHtmlClient(insight.statuses.ee) + "</span>",
-                '<span class="compare-pill">잡오퍼 ' + escapeHtmlClient(insight.statuses.jobOffer) + "</span>",
-                '<span class="compare-pill">졸업자 ' + escapeHtmlClient(insight.statuses.graduate) + "</span>",
-                '<span class="compare-pill">비용 ' + escapeHtmlClient(insight.lifestyle.costLabelKo) + "</span>",
-                '<span class="compare-pill">지역정착 ' + escapeHtmlClient(insight.lifestyle.regionalLabelKo) + "</span>",
-                "</div>",
-                '<div class="result-summary-stack">',
-                '<div class="result-summary-card">',
-                '<strong>왜 이 순위인가</strong>',
-                '<ul class="result-summary-list">'
-                  + whyRankItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                  + '</ul>',
-                '</div>',
-                '<div class="result-summary-card">',
-                '<strong>내가 이미 가진 것</strong>',
-                '<ul class="result-summary-list">'
-                  + (pathwayCurrentItems.length
-                    ? pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                    : '<li>강점 정리를 더 해보는 게 좋아요.</li>')
-                  + '</ul>',
-                '</div>',
-                '<div class="result-summary-card">',
-                '<div class="improvement-head">',
-                '<strong>지금 할 것</strong>',
-                '<span class="improvement-total">' + escapeHtmlClient(
-                  improvementPlan.projectedScoreLift > 0
-                    ? scorePlanLabel + " " + improvementPlan.baseScore + "점 → " + improvementPlan.projectedScore + "점"
-                    : improvementPlan.bestFutureScoreLift > 0
-                      ? "지금 " + improvementPlan.baseScore + "점 · 나중에 최대 " + (improvementPlan.baseScore + improvementPlan.bestFutureScoreLift) + "점"
-                      : scorePlanLabel + " " + improvementPlan.baseScore + "점 유지"
-                ) + '</span>',
-                '</div>',
-                '<ul class="compact-action-list">' + quickActionsHtml + '</ul>',
-                '</div>',
-                '</div>',
-                '<details class="result-details">',
-                '<summary>자세히 보기</summary>',
-                '<p class="wizard-freshness">정책 반영 기준: ' + freshnessText + "</p>",
-                '<p class="wizard-freshness">서류 준비 상태: ' + readinessLine + "</p>",
-                '<section class="result-summary-block detail-summary-block">',
-                '<strong>이 경로가 실제로 보는 것</strong>',
-                '<ul class="result-summary-list">'
-                  + (pathwayNeedItems.length
-                    ? pathwayNeedItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                    : pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join(""))
-                  + '</ul>',
-                '</section>',
-                '<section class="selection-model-panel">',
-                '<div class="selection-model-head">',
-                '<strong>이 지역은 이렇게 뽑아요</strong>',
-                '<span class="selection-model-badge">' + escapeHtmlClient(selectionModel.badgeKo) + '</span>',
-                '</div>',
-                '<p class="selection-model-detail">' + escapeHtmlClient(selectionModel.detailKo) + '</p>',
-                '<div class="selection-model-grid">',
-                '<div class="selection-model-stat"><span>점수 읽는 법</span><strong>' + escapeHtmlClient(selectionModel.scoreViewKo) + '</strong></div>',
-                '<div class="selection-model-stat"><span>지금 먼저 볼 것</span><strong>' + escapeHtmlClient(selectionModel.focusKo) + '</strong></div>',
-                '<div class="selection-model-stat"><span>신청 흐름</span><strong>' + escapeHtmlClient(selectionModel.intakeKo) + '</strong></div>',
-                '</div>',
-                '</section>',
-                (eeSnapshot.isFederal
-                  ? '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.explain) + "</p>"
-                    + '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.comparison) + "</p>"
-                    + '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + "</p>"
-                  : ""),
-                eeReferenceHtml,
-                pathwayGuideHtml,
-                '<section class="career-check-panel">',
-                '<strong>경력 인정 체크</strong>',
-                '<ul class="reason-list career-check-list">' + careerRecognitionHtml + '</ul>',
-                '</section>',
-                '<section class="improvement-panel">',
-                '<div class="improvement-head">',
-                '<strong>가능성 올리는 다음 액션</strong>',
-                '<span class="improvement-total">' + escapeHtmlClient(
-                  improvementPlan.projectedScoreLift > 0
-                    ? scorePlanLabel + " " + improvementPlan.baseScore + "점 → " + improvementPlan.projectedScore + "점"
-                    : improvementPlan.bestFutureScoreLift > 0
-                      ? "지금 " + improvementPlan.baseScore + "점 · 나중에 최대 " + (improvementPlan.baseScore + improvementPlan.bestFutureScoreLift) + "점"
-                      : scorePlanLabel + " " + improvementPlan.baseScore + "점 유지"
-                ) + '</span>',
-                '</div>',
-                '<p class="wizard-freshness">' + escapeHtmlClient(
-                  improvementPlan.projectedScoreLift > 0
-                    ? (eeSnapshot.isFederal
+            return [
+              '<article class="wizard-result-card">',
+              '<div class="wizard-card-header">',
+              '<div class="wizard-card-title-stack">',
+              '<div class="card-topline">',
+              '<span class="status-badge status-approved">' + escapeHtmlClient(
+                isFederalCard ? "연방 / EE" : "추천 " + (index + 1)
+              ) + "</span>",
+              '<span class="tag">' + escapeHtmlClient(routeTypeLabel) + "</span>",
+              "</div>",
+              "<h3>" + escapeHtmlClient(insight.labelKo) + "</h3>",
+              '<p class="wizard-result-system">' + escapeHtmlClient(routeSummaryLabel) + "</p>",
+              "</div>",
+              '<div class="wizard-card-mini-map" aria-hidden="true">' + getRecommendationMiniMapMarkup(insight.id) + "</div>",
+              "</div>",
+              '<p class="wizard-result-lead">' + escapeHtmlClient(leadSummary) + "</p>",
+              '<div class="fit-band-row">',
+              '<span class="fit-score">예상 적합도 ' + escapeHtmlClient(fitPercent) + '%</span>',
+              '<span class="chance-score">현재 진입 가능성 ' + escapeHtmlClient(immigrationChancePercent) + '%</span>',
+              '<span class="compare-pill">' + escapeHtmlClient(comparePillLabel) + "</span>",
+              "</div>",
+              (isFederalCard
+                ? '<div class="ee-score-row">'
+                  + '<span class="ee-score-pill">예상 CRS ' + escapeHtmlClient(crsSnapshot.score) + '점</span>'
+                  + '<span class="ee-cutoff-pill">최근 EE 컷오프 ' + escapeHtmlClient(crsSnapshot.cutoff ?? "대기") + '점</span>'
+                  + '<span class="ee-gap-pill ' + (crsSnapshot.gap == null ? "is-neutral" : crsSnapshot.gap >= 0 ? "is-positive" : "is-negative") + '">현재 ' + escapeHtmlClient(crsSnapshot.gapLabel) + '점</span>'
+                  + "</div>"
+                : ""),
+              '<div class="scenario-chip-row">',
+              '<span class="compare-pill">EE ' + escapeHtmlClient(insight.statuses.ee) + "</span>",
+              '<span class="compare-pill">잡오퍼 ' + escapeHtmlClient(insight.statuses.jobOffer) + "</span>",
+              '<span class="compare-pill">졸업자 ' + escapeHtmlClient(insight.statuses.graduate) + "</span>",
+              '<span class="compare-pill">비용 ' + escapeHtmlClient(insight.lifestyle.costLabelKo) + "</span>",
+              '<span class="compare-pill">지역정착 ' + escapeHtmlClient(insight.lifestyle.regionalLabelKo) + "</span>",
+              "</div>",
+              '<div class="result-summary-stack">',
+              '<div class="result-summary-card">',
+              '<strong>왜 이 순위인가</strong>',
+              '<ul class="result-summary-list">' + whyRankItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("") + '</ul>',
+              '</div>',
+              '<div class="result-summary-card">',
+              '<strong>내가 이미 가진 것</strong>',
+              '<ul class="result-summary-list">'
+                + (pathwayCurrentItems.length
+                  ? pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+                  : '<li>강점 정리를 더 해보는 게 좋아요.</li>')
+                + '</ul>',
+              '</div>',
+              '<div class="result-summary-card">',
+              '<div class="improvement-head">',
+              '<strong>지금 할 것</strong>',
+              '<span class="improvement-total">' + escapeHtmlClient(improvementSummaryLabel) + '</span>',
+              '</div>',
+              '<ul class="compact-action-list">' + quickActionsHtml + '</ul>',
+              '</div>',
+              '</div>',
+              '<details class="result-details">',
+              '<summary>자세히 보기</summary>',
+              '<p class="wizard-freshness">정책 반영 기준: ' + freshnessText + "</p>",
+              '<p class="wizard-freshness">서류 준비 상태: ' + readinessLine + "</p>",
+              '<section class="result-summary-block detail-summary-block">',
+              '<strong>이 경로가 실제로 보는 것</strong>',
+              '<ul class="result-summary-list">'
+                + (pathwayNeedItems.length
+                  ? pathwayNeedItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+                  : pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join(""))
+                + '</ul>',
+              '</section>',
+              '<section class="selection-model-panel">',
+              '<div class="selection-model-head">',
+              '<strong>' + escapeHtmlClient(isFederalCard ? "연방은 이렇게 봐요" : "이 지역은 이렇게 뽑아요") + '</strong>',
+              '<span class="selection-model-badge">' + escapeHtmlClient(selectionModel.badgeKo) + '</span>',
+              '</div>',
+              '<p class="selection-model-detail">' + escapeHtmlClient(selectionModel.detailKo) + '</p>',
+              '<div class="selection-model-grid">',
+              '<div class="selection-model-stat"><span>점수 읽는 법</span><strong>' + escapeHtmlClient(selectionModel.scoreViewKo) + '</strong></div>',
+              '<div class="selection-model-stat"><span>지금 먼저 볼 것</span><strong>' + escapeHtmlClient(selectionModel.focusKo) + '</strong></div>',
+              '<div class="selection-model-stat"><span>신청 흐름</span><strong>' + escapeHtmlClient(selectionModel.intakeKo) + '</strong></div>',
+              '</div>',
+              '</section>',
+              (isFederalCard
+                ? '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.explain) + "</p>"
+                  + '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.comparison) + "</p>"
+                  + '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + "</p>"
+                : ""),
+              pathwayGuideHtml,
+              '<section class="career-check-panel">',
+              '<strong>경력 인정 체크</strong>',
+              '<ul class="reason-list career-check-list">' + careerRecognitionHtml + '</ul>',
+              '</section>',
+              '<section class="improvement-panel">',
+              '<div class="improvement-head">',
+              '<strong>' + escapeHtmlClient(isFederalCard ? "가능성 올리는 다음 액션" : "이 주 기준으로 먼저 할 것") + '</strong>',
+              '<span class="improvement-total">' + escapeHtmlClient(improvementSummaryLabel) + '</span>',
+              '</div>',
+              '<p class="wizard-freshness">' + escapeHtmlClient(
+                isFederalCard
+                  ? (
+                    improvementPlan.projectedScoreLift > 0
                       ? "직접 점수에 반영되는 액션은 CRS 기준으로 먼저 정렬했습니다. 점수는 안 오르지만 경로를 넓히는 액션도 같이 남겼습니다."
-                      : "직접 점수에 반영되는 액션은 연방 EE 기준으로 먼저 정렬했습니다. 주 자체 선발은 위 선발 방식 박스를 같이 보세요.")
-                    : improvementPlan.bestFutureScoreLift > 0
-                      ? "바로 오르는 점수는 없지만, 아래처럼 시간이 필요한 액션은 나중에 실제 CRS 상승으로 이어질 수 있습니다."
-                      : "점수는 안 오르지만 경로를 넓히거나 서류를 정리하는 액션을 먼저 보여줍니다."
-                ) + '</p>',
-                (insight.id === "federal" || statusSupports(insight.statuses.ee))
-                  ? '<p class="wizard-freshness">' + escapeHtmlClient(
-                    eeSnapshot.isFederal
-                      ? "EE가 연결된 지역은 각 액션 아래에 CRS 직접 변화도 같이 표시합니다."
-                      : "EE가 연결된 지역은 각 액션 아래에 연방 EE 점수 변화도 같이 표시합니다."
-                  ) + '</p>'
-                  : "",
-                '<ul class="improvement-list">' + improvementHtml + '</ul>',
-                '</section>',
-                '<div class="reason-columns">',
-                '<div><strong>정책 적합</strong><ul class="reason-list">' + policyReasonsHtml + "</ul></div>",
-                '<div><strong>생활 선호</strong><ul class="reason-list">' + lifestyleReasonsHtml + "</ul></div>",
-                "</div>",
-                '<div><strong>대략적인 진행 시나리오</strong><ul class="reason-list">' + timelineHtml + "</ul></div>",
-                '</details>',
-                '<a class="btn ghost" href="' + ((BASE_PATH || "") + '/region/' + encodeURIComponent(insight.id)) + '">이 지역 먼저 보기</a>',
-                "</article>"
-              ].join("");
-            })
-            .join("");
+                      : improvementPlan.bestFutureScoreLift > 0
+                        ? "바로 오르는 점수는 없지만, 아래처럼 시간이 필요한 액션은 나중에 실제 CRS 상승으로 이어질 수 있습니다."
+                        : "점수는 안 오르지만 경로를 넓히거나 서류를 정리하는 액션을 먼저 보여줍니다."
+                  )
+                  : "이 주는 점수 하나보다 stream 자격, 고용주 연결, 서류 순서를 먼저 정리하는 편이 이해가 쉽습니다."
+              ) + '</p>',
+              (isFederalCard ? '<p class="wizard-freshness">EE 각 액션 아래에는 CRS 직접 변화도 같이 표시합니다.</p>' : ""),
+              '<ul class="improvement-list">' + improvementHtml + '</ul>',
+              '</section>',
+              '<div class="reason-columns">',
+              '<div><strong>정책 적합</strong><ul class="reason-list">' + policyReasonsHtml + "</ul></div>",
+              '<div><strong>생활 선호</strong><ul class="reason-list">' + lifestyleReasonsHtml + "</ul></div>",
+              "</div>",
+              '<div><strong>' + escapeHtmlClient(timelineTitle) + '</strong><ul class="reason-list">' + timelineHtml + "</ul></div>",
+              '</details>',
+              '<a class="btn ghost" href="' + ((BASE_PATH || "") + '/region/' + encodeURIComponent(insight.id)) + '">이 지역 먼저 보기</a>',
+              "</article>"
+            ].join("");
+          }
+
+          const provinceHeaderNote = federalEntry
+            ? "주정부 추천은 아래 순위로 보고, 연방 EE는 따로 비교합니다."
+            : "지금 조건에서 먼저 볼 주정부 순서를 1순위부터 정리했습니다.";
+          const resultsSections = [];
+
+          if (provinceRanked.length > 0) {
+            resultsSections.push(
+              [
+                '<div class="wizard-section-heading">',
+                '<div>',
+                '<p class="panel-kicker">Recommendations</p>',
+                '<h3>현재 조건에서 먼저 볼 주정부 추천 순위</h3>',
+                '</div>',
+                '<p class="panel-note">' + escapeHtmlClient(provinceHeaderNote) + '</p>',
+                '</div>'
+              ].join("")
+            );
+            resultsSections.push(provinceRanked.map((entry, index) => renderRecommendationCard(entry, index, "province")).join(""));
+          }
+
+          if (federalEntry) {
+            resultsSections.push(
+              [
+                '<div class="wizard-section-heading federal-side-heading">',
+                '<div>',
+                '<p class="panel-kicker">Federal</p>',
+                '<h3>연방 / EE는 따로 보기</h3>',
+                '</div>',
+                '<p class="panel-note">연방은 주정부와 다르게 CRS와 최근 컷오프를 따로 비교하는 편이 이해하기 쉽습니다.</p>',
+                '</div>'
+              ].join("")
+            );
+            resultsSections.push(renderRecommendationCard(federalEntry, null, "federal"));
+          }
+
+          quickStartResults.innerHTML = resultsSections.join("");
         }
 
         if (quickStartForm) {
           quickStartForm.addEventListener("change", renderQuickStartResults);
+          syncDependentSelects();
           renderQuickStartResults();
         }
 
