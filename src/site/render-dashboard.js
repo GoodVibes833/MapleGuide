@@ -16,6 +16,7 @@ import {
 } from "./crs-helpers.js";
 import {
   getLanguageImprovementActions,
+  getNextCanadianExperienceYear,
   shouldSuggestSkilledSwitch
 } from "./recommendation-helpers.js";
 
@@ -1331,6 +1332,7 @@ function renderClientScript({ page, updates }) {
         ${describeCanadianExperienceCrsTreatment.toString()}
         ${estimateCanadianExperienceCrsPoints.toString()}
         ${getLanguageImprovementActions.toString()}
+        ${getNextCanadianExperienceYear.toString()}
         ${shouldSuggestSkilledSwitch.toString()}
 
         function hasSkilledCanadianTrack(answers) {
@@ -2100,6 +2102,25 @@ function renderClientScript({ page, updates }) {
               return { lift: null, badge: "나중에 반영", label: "경력 누적 후 점수 반영", tone: "deferred" };
             case "job-offer":
               return { lift: 0, badge: "변화 없음", label: "EE 잡오퍼 점수 없음", tone: "neutral" };
+            case "pnp-nomination":
+              return {
+                lift: null,
+                futureLift: 600,
+                badge: "+600점",
+                label: "EE-linked nomination 되면 CRS +600점",
+                tone: "deferred"
+              };
+            case "canadian-exp-next":
+              {
+                const nextCanadianYear = getNextCanadianExperienceYear(answers);
+
+                return nextCanadianYear
+                  ? exactLift({
+                      canadianJobSkill: "skilled",
+                      canadianExp: nextCanadianYear
+                    })
+                  : { lift: 0, badge: "변화 없음", label: "CRS 직접 변화 없음", tone: "neutral" };
+              }
             case "canadian-exp-1":
               return exactLift({
                 canadianJobSkill: "skilled",
@@ -2113,7 +2134,7 @@ function renderClientScript({ page, updates }) {
             case "foreign-exp-1":
               return exactLift({ foreignExp: "1" });
             case "french":
-              return { lift: null, badge: "계산 대기", label: "프랑스어 세부점수 입력 필요", tone: "neutral" };
+              return { lift: null, futureLift: 50, badge: "최대 +50점", label: "NCLC 7+면 최대 +50점", tone: "deferred" };
             default:
               return null;
           }
@@ -2179,6 +2200,10 @@ function renderClientScript({ page, updates }) {
             addAction(delta, "EE 자격 확인 후 프로필 열기", "이 지역은 EE와 같이 볼 때 선택지가 넓어지고 초청 연결이 쉬워질 수 있습니다.", "ee-profile");
           }
 
+          if (insight.id !== "federal" && statusSupports(insight.statuses.ee)) {
+            addAction(18, "이 지역의 EE-linked nomination 노리기", "해당 주의 enhanced 또는 EE-linked nomination을 받으면 EE 점수가 크게 뛰어 초청 가능성이 완전히 달라질 수 있습니다.", "pnp-nomination");
+          }
+
           if (answers.targetOccupationPlan === "unsure") {
             addAction(7, "이민에 쓸 주력 직군 1개 정하기", "현재 캐나다 일, 한국 경력, 전공 기반 직군 중 무엇으로 갈지 먼저 정해야 점수와 전략 계산이 정확해집니다.", "focus-occupation");
           }
@@ -2205,8 +2230,17 @@ function renderClientScript({ page, updates }) {
           if (answers.canadianExp === "0" && (statusSupports(insight.statuses.localExperience) || statusSupports(insight.statuses.graduate) || answers.base === "student")) {
             const delta = statusSupports(insight.statuses.localExperience) ? 10 : 7;
             addAction(delta, "캐나다 경력 1년 만들기", "현지 경력 1년은 CEC와 여러 주정부 경로에서 직접적인 체감 차이를 만드는 경우가 많습니다.", "canadian-exp-1");
-          } else if (answers.canadianExp === "1" && statusSupports(insight.statuses.localExperience)) {
-            addAction(4, "캐나다 경력 2년까지 늘리기", "일부 경로는 현지 경력이 길수록 안정적으로 보이는 편입니다.", "canadian-exp-2");
+          } else {
+            const nextCanadianYear = getNextCanadianExperienceYear(answers);
+
+            if (nextCanadianYear && statusSupports(insight.statuses.localExperience)) {
+              addAction(
+                8,
+                "캐나다 skilled 경력 " + nextCanadianYear + "년까지 늘리기",
+                "캐나다 skilled 경력은 해가 하나 늘 때마다 CRS와 일부 경로 안정성이 같이 올라가는 편입니다.",
+                "canadian-exp-next"
+              );
+            }
           }
 
           if (["worker", "outside-worker"].includes(answers.path) && answers.foreignExp === "0") {

@@ -20,3 +20,17 @@ export function shouldSuggestSkilledSwitch(answers) {
       || ["working-holiday", "pgwp-pr", "canadian-worker"].includes(answers.path)
     );
 }
+
+export function getNextCanadianExperienceYear(answers) {
+  if (answers.canadianJobSkill !== "skilled") {
+    return null;
+  }
+
+  const currentYears = Number.parseInt(answers.canadianExp, 10) || 0;
+
+  if (currentYears < 1 || currentYears >= 5) {
+    return null;
+  }
+
+  return String(currentYears + 1);
+}

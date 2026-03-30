@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   getLanguageImprovementActions,
+  getNextCanadianExperienceYear,
   shouldSuggestSkilledSwitch
 } from "../src/site/recommendation-helpers.js";
 
@@ -53,5 +54,23 @@ test("already skilled Canadian work does not suggest skilled switch", () => {
       canadianJobSkill: "skilled"
     }),
     false
+  );
+});
+
+test("skilled Canadian work suggests the next year milestone until 5 years", () => {
+  assert.equal(
+    getNextCanadianExperienceYear({
+      canadianExp: "2",
+      canadianJobSkill: "skilled"
+    }),
+    "3"
+  );
+
+  assert.equal(
+    getNextCanadianExperienceYear({
+      canadianExp: "5",
+      canadianJobSkill: "skilled"
+    }),
+    null
   );
 });
