@@ -126,11 +126,11 @@ function renderNav(page) {
 
   return `
     <header class="site-header">
-      <a class="brand" href="/" aria-label="Canada Immigration Monitor 홈">
-        <span class="brand-mark">CI</span>
+      <a class="brand" href="/" aria-label="MaplePath Compass 홈">
+        <span class="brand-mark">MP</span>
         <span class="brand-copy">
-          <strong>Canada Immigration Monitor</strong>
-          <span>캐나다 이민 업데이트 허브</span>
+          <strong>MaplePath Compass</strong>
+          <span>캐나다 이민 길찾기 허브</span>
         </span>
       </a>
       <nav class="site-nav" aria-label="주요 메뉴">
@@ -517,7 +517,7 @@ function renderHomeHero(insights) {
     <section class="hero hero-home">
       <div class="hero-copy">
         <p class="eyebrow">Beginner First</p>
-        <h1>캐나다 이민을 한눈에 이해하는 시작 화면</h1>
+        <h1>캐나다 이민을 더 쉽게 찾는 시작 화면</h1>
         <p class="hero-text">
           긴 설명보다 질문 몇 개로 먼저 범위를 좁히고, 그다음 비교표와 지도에서 지역을 고르도록 바꿨습니다.
         </p>
@@ -3763,7 +3763,7 @@ export function renderDashboard({
     const meta = getJurisdictionMeta(jurisdictionId ?? "federal");
 
     return renderLayout({
-      title: `Canada Immigration Monitor | ${meta.labelKo}`,
+      title: `MaplePath Compass | ${meta.labelKo}`,
       page,
       body: renderJurisdictionPage({
         jurisdictionId: meta.id,
@@ -3776,7 +3776,7 @@ export function renderDashboard({
   }
 
   return renderLayout({
-    title: "Canada Immigration Monitor | Dashboard",
+    title: "MaplePath Compass | Dashboard",
     page: "dashboard",
     body: renderDashboardPage({
       generatedAt,
