@@ -1995,15 +1995,25 @@ function renderClientScript({ page, updates }) {
           function exactLift(overrides) {
             const lift = estimateProjectedCrsLift(answers, overrides);
             return lift > 0
-              ? { label: "완료 시 예상 CRS +" + lift + "점", tone: "positive" }
-              : { label: "CRS 직접 변화 없음", tone: "neutral" };
+              ? {
+                  lift,
+                  badge: "+" + lift + "점",
+                  label: "완료 시 예상 CRS +" + lift + "점",
+                  tone: "positive"
+                }
+              : {
+                  lift: 0,
+                  badge: "변화 없음",
+                  label: "CRS 직접 변화 없음",
+                  tone: "neutral"
+                };
           }
 
           switch (actionId) {
             case "language-proof":
               return answers.english === "unknown"
-                ? { label: "실제 점수표가 나와야 계산 가능", tone: "neutral" }
-                : { label: "현재 추정 CRS와 동일", tone: "neutral" };
+                ? { lift: null, badge: "계산 대기", label: "실제 점수표가 나와야 계산 가능", tone: "neutral" }
+                : { lift: 0, badge: "변화 없음", label: "현재 추정 CRS와 동일", tone: "neutral" };
             case "language-clb9":
               return exactLift({
                 english: "clb9plus",
@@ -2014,19 +2024,19 @@ function renderClientScript({ page, updates }) {
             case "eca-finish":
               return exactLift({ ecaStatus: "completed" });
             case "eca-check":
-              return { label: "학력 종류 확인 후 계산 가능", tone: "neutral" };
+              return { lift: null, badge: "계산 대기", label: "학력 종류 확인 후 계산 가능", tone: "neutral" };
             case "ee-profile":
             case "focus-occupation":
             case "korea-primary-noc":
             case "korea-noc-detail":
             case "regional-setting":
-              return { label: "CRS 직접 변화 없음", tone: "neutral" };
+              return { lift: 0, badge: "변화 없음", label: "CRS 직접 변화 없음", tone: "neutral" };
             case "teer-upgrade":
             case "degree-experience":
             case "study-route":
-              return { label: "경력 누적 후 점수 반영", tone: "deferred" };
+              return { lift: null, badge: "나중에 반영", label: "경력 누적 후 점수 반영", tone: "deferred" };
             case "job-offer":
-              return { label: "EE 잡오퍼 점수 없음", tone: "neutral" };
+              return { lift: 0, badge: "변화 없음", label: "EE 잡오퍼 점수 없음", tone: "neutral" };
             case "canadian-exp-1":
               return exactLift({
                 canadianJobSkill: "skilled",
@@ -2040,7 +2050,7 @@ function renderClientScript({ page, updates }) {
             case "foreign-exp-1":
               return exactLift({ foreignExp: "1" });
             case "french":
-              return { label: "프랑스어 세부점수 입력 필요", tone: "neutral" };
+              return { lift: null, badge: "계산 대기", label: "프랑스어 세부점수 입력 필요", tone: "neutral" };
             default:
               return null;
           }
@@ -2154,19 +2164,26 @@ function renderClientScript({ page, updates }) {
             addAction(3, "최신 컷오프와 공지 변동 계속 추적", "현재는 큰 약점보다 draw 시점, 직군 선발, 주별 intake 열림 여부의 영향이 더 큽니다.");
           }
 
+          const crsSnapshot = estimateCrsSnapshot(answers);
           const topActions = actions
-            .sort((left, right) => right.delta - left.delta)
+            .sort((left, right) => {
+              const rightLift = right.scoreImpact?.lift ?? -1;
+              const leftLift = left.scoreImpact?.lift ?? -1;
+
+              if (rightLift !== leftLift) {
+                return rightLift - leftLift;
+              }
+
+              return right.delta - left.delta;
+            })
             .slice(0, 3);
-          const weights = [1, 0.7, 0.5];
-          const estimatedLift = topActions.reduce(
-            (sum, action, index) => sum + Math.round(action.delta * (weights[index] ?? 0.4)),
-            0
-          );
+          const projectedScoreLift = topActions.reduce((sum, action) => sum + Math.max(0, action.scoreImpact?.lift ?? 0), 0);
 
           return {
             items: topActions,
-            estimatedLift,
-            projectedChance: Math.min(92, immigrationChancePercent + estimatedLift)
+            baseScore: crsSnapshot.score,
+            projectedScoreLift,
+            projectedScore: crsSnapshot.score + projectedScoreLift
           };
         }
 
@@ -2307,7 +2324,7 @@ function renderClientScript({ page, updates }) {
               const improvementHtml = improvementPlan.items
                 .map((item) => [
                   '<li class="improvement-item">',
-                  '<span class="improvement-delta">+' + escapeHtmlClient(item.delta) + '%p</span>',
+                  '<span class="improvement-delta is-' + escapeHtmlClient(item.scoreImpact?.tone ?? "neutral") + '">' + escapeHtmlClient(item.scoreImpact?.badge ?? "준비") + '</span>',
                   '<div class="improvement-copy">',
                   '<div class="improvement-title-row">',
                   '<strong>' + escapeHtmlClient(item.title) + '</strong>',
@@ -2363,9 +2380,9 @@ function renderClientScript({ page, updates }) {
                 '<section class="improvement-panel">',
                 '<div class="improvement-head">',
                 '<strong>가능성 올리는 다음 액션</strong>',
-                '<span class="improvement-total">' + escapeHtmlClient(immigrationChancePercent) + '% → ' + escapeHtmlClient(improvementPlan.projectedChance) + '%</span>',
+                '<span class="improvement-total">예상 CRS ' + escapeHtmlClient(improvementPlan.baseScore) + '점 → ' + escapeHtmlClient(improvementPlan.projectedScore) + '점</span>',
                 '</div>',
-                '<p class="wizard-freshness">현재 입력 기준으로 먼저 체감이 큰 순서입니다. 중복 효과를 줄여 보수적으로 계산하면 추정 +' + escapeHtmlClient(improvementPlan.estimatedLift) + '%p 개선 여지가 있습니다.</p>',
+                '<p class="wizard-freshness">직접 점수에 반영되는 액션은 CRS 기준으로 먼저 정렬했습니다. 점수는 안 오르지만 경로를 넓히는 액션도 같이 남겼습니다.</p>',
                 (insight.id === "federal" || statusSupports(insight.statuses.ee))
                   ? '<p class="wizard-freshness">EE가 연결된 지역은 각 액션 아래에 CRS 직접 변화도 같이 표시합니다.</p>'
                   : "",
@@ -3675,13 +3692,26 @@ function renderLayout({ title, page, body, updates }) {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 62px;
+        min-width: 84px;
         min-height: 34px;
         padding: 0 10px;
         border-radius: 999px;
+        font-weight: 800;
+      }
+
+      .improvement-delta.is-positive {
         background: var(--green);
         color: #f3fff5;
-        font-weight: 800;
+      }
+
+      .improvement-delta.is-neutral {
+        background: rgba(28, 61, 108, 0.08);
+        color: var(--accent-deep);
+      }
+
+      .improvement-delta.is-deferred {
+        background: rgba(191, 143, 68, 0.12);
+        color: #8b611e;
       }
 
       .improvement-copy {
