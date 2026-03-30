@@ -3876,10 +3876,9 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .wizard-filter-map-frame {
-        display: grid;
-        place-items: center;
+        position: relative;
         width: min(100%, 620px);
-        min-height: 68px;
+        height: 68px;
         border: 1px solid rgba(15, 61, 127, 0.1);
         border-radius: var(--radius-lg);
         background:
@@ -3890,11 +3889,21 @@ function renderLayout({ title, page, body, updates }) {
       }
 
       .quick-filter-map {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: -132px;
         width: 100%;
         height: auto;
         max-height: none;
-        transform: scale(1.16) translateY(-132px);
+        transform: scale(1.16);
         transform-origin: center top;
+        pointer-events: none;
+      }
+
+      .quick-filter-map .quick-filter-region,
+      .quick-filter-map path.quick-filter-region {
+        pointer-events: auto;
       }
 
       .quick-filter-region path,
