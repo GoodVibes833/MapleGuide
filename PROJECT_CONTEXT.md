@@ -50,6 +50,7 @@ These are intentional decisions. Do not casually undo them in a new session.
 - recommendation cards should be the main product surface
 - federal / EE must stay visually separate from province ranking
 - province cards can mention EE linkage, but must label it clearly as federal reference logic
+- province cards should not lead with raw federal point deltas in the main action area; point math belongs mainly to the federal card or a clearly labeled EE-bridge section
 - questionnaire should separate:
   - Korean previous job
   - current Canadian job
@@ -174,6 +175,8 @@ The recommendation engine currently considers:
 - active anchor occupation
 - Korea experience alignment
 - degree usage plan
+- typed Korea / Canada job titles with inferred occupation candidates
+- expanded service / hospitality / retail / manufacturing role families
 
 ## Current Recommendation Output
 
@@ -199,6 +202,12 @@ Province recommendations currently show:
   - school -> PGWP -> local skilled route when needed
 - detailed eligibility snapshot
 - job reality check
+- a top-level reality badge that should answer one of these quickly:
+  - can compare directly now
+  - exception stream first
+  - same-industry upgrade needed
+  - school / PGWP route more realistic
+  - Korea-experience route stronger
 - federal / EE bridge section when the province has EE linkage
 - multiple concrete plan variants:
   - score route
@@ -222,6 +231,7 @@ Correct behavior:
 
 - province card = province selection logic first
 - province card may include a separate `연방/EE 연계` block
+- province quick actions should talk in route terms like `직무`, `학교`, `고용주`, `EE 연계`, not look like raw CRS ranking by default
 - that block can show:
   - current federal reference score
   - latest EE cutoff

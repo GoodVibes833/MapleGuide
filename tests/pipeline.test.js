@@ -149,8 +149,13 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /지금 캐나다에서 실제로 하는 job title/);
   assert.match(dashboardHtml, /이민에 쓸 주력 경력 축/);
   assert.match(dashboardHtml, /요리사 \/ cook \/ chef/);
+  assert.match(dashboardHtml, /레스토랑 매니저 \/ restaurant manager/);
   assert.match(dashboardHtml, /서버 \/ 캐셔 \/ 바리스타 \/ food counter/);
+  assert.match(dashboardHtml, /호텔 프론트 \/ guest service \/ front desk/);
+  assert.match(dashboardHtml, /하우스키핑 \/ 클리닝 \/ room attendant/);
   assert.match(dashboardHtml, /사무행정 \/ 오피스 \/ 코디네이터/);
+  assert.match(dashboardHtml, /네일 \/ 헤어 \/ 뷰티 서비스/);
+  assert.match(dashboardHtml, /제조 \/ production \/ factory worker/);
   assert.match(dashboardHtml, /제빵 \/ 파티시에 \/ bakery/);
   assert.match(dashboardHtml, /자동차 정비 \/ mechanic \/ technician/);
   assert.match(dashboardHtml, /영어 상태/);
@@ -178,6 +183,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.doesNotMatch(dashboardHtml, /이 주 자체 점수 아님/);
   assert.match(dashboardHtml, /EOI \+ 노동시장 우선/);
   assert.match(dashboardHtml, /왜 이 순위인가/);
+  assert.match(dashboardHtml, /바로 비교 가능|직무 전환 필요|학교 경유 권장|고용주\/지역 먼저|한국 경력 재구성|지금 직무 가능/);
   assert.match(dashboardHtml, /현재 자격상태/);
   assert.match(dashboardHtml, /직무 현실 체크/);
   assert.match(dashboardHtml, /이 직무를 이 주에서 보면/);

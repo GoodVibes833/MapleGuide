@@ -56,12 +56,17 @@ const OCCUPATION_OPTIONS = [
   { value: "teacher-education-support", labelKo: "교사 / 교육지원 / school support" },
   { value: "cook-chef", labelKo: "요리사 / cook / chef" },
   { value: "baker-pastry", labelKo: "제빵 / 파티시에 / bakery" },
+  { value: "restaurant-manager", labelKo: "레스토랑 매니저 / restaurant manager" },
   { value: "food-service-supervisor", labelKo: "푸드서비스 슈퍼바이저 / shift lead" },
   { value: "server-counter", labelKo: "서버 / 캐셔 / 바리스타 / food counter" },
+  { value: "hotel-front-desk", labelKo: "호텔 프론트 / guest service / front desk" },
+  { value: "housekeeping-cleaning", labelKo: "하우스키핑 / 클리닝 / room attendant" },
   { value: "retail-supervisor", labelKo: "리테일 슈퍼바이저 / 매장리더" },
   { value: "retail-sales", labelKo: "리테일 판매 / 매장서비스" },
+  { value: "beauty-salon", labelKo: "네일 / 헤어 / 뷰티 서비스" },
   { value: "warehouse-logistics", labelKo: "창고 / 물류 / warehouse associate" },
   { value: "shipping-dispatch", labelKo: "shipping / receiving / dispatch" },
+  { value: "manufacturing-production", labelKo: "제조 / production / factory worker" },
   { value: "truck-driver", labelKo: "트럭 / 배송 / 운송기사" },
   { value: "construction-trade", labelKo: "건설 / 전기 / 배관 / carpentry" },
   { value: "industrial-trade", labelKo: "용접 / machinist / industrial trade" },
@@ -3747,10 +3752,14 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         const OCCUPATION_TITLE_HINTS = [
           { occupation: "cook-chef", keywords: ["cook", "chef", "line cook", "kitchen", "요리", "주방"] },
+          { occupation: "restaurant-manager", keywords: ["restaurant manager", "restaurant gm", "restaurant general manager", "f&b manager", "매니저", "지배인"] },
           { occupation: "food-service-supervisor", keywords: ["food service supervisor", "restaurant supervisor", "shift lead", "shift supervisor", "kitchen supervisor", "슈퍼바이저", "매니저"] },
           { occupation: "server-counter", keywords: ["server", "waiter", "waitress", "barista", "cashier", "food counter", "counter", "서빙", "바리스타", "캐셔"] },
+          { occupation: "hotel-front-desk", keywords: ["front desk", "guest service", "guest services", "front office", "hotel receptionist", "receptionist", "프론트", "리셉션", "게스트 서비스"] },
+          { occupation: "housekeeping-cleaning", keywords: ["housekeeping", "housekeeper", "room attendant", "cleaner", "janitor", "클리너", "청소", "하우스키핑"] },
           { occupation: "retail-supervisor", keywords: ["retail supervisor", "assistant manager", "store manager", "store supervisor", "점장", "매장관리"] },
           { occupation: "retail-sales", keywords: ["retail", "sales associate", "store clerk", "salesperson", "판매", "매장", "샵"] },
+          { occupation: "beauty-salon", keywords: ["nail", "esthetician", "hair stylist", "beauty", "salon", "네일", "미용", "헤어", "살롱"] },
           { occupation: "office-admin", keywords: ["office", "administrator", "administrative assistant", "coordinator", "admin", "사무", "행정", "오피스", "코디네이터", "총무"] },
           { occupation: "accounting-bookkeeping", keywords: ["bookkeeper", "bookkeeping", "payroll", "accounts payable", "accounts receivable", "북키핑", "회계보조", "급여", "경리"] },
           { occupation: "accountant-finance", keywords: ["accountant", "financial analyst", "finance", "controller", "회계사", "재무", "finance manager"] },
@@ -3765,6 +3774,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           { occupation: "baker-pastry", keywords: ["baker", "bakery", "pastry", "제빵", "파티시에"] },
           { occupation: "warehouse-logistics", keywords: ["warehouse", "material handler", "forklift", "picker", "packer", "창고", "물류", "포크리프트", "피커", "패커"] },
           { occupation: "shipping-dispatch", keywords: ["shipping", "receiving", "dispatcher", "dispatch", "logistics coordinator", "입출고", "배차", "디스패치", "출하"] },
+          { occupation: "manufacturing-production", keywords: ["production", "factory", "assembler", "machine operator", "fabrication", "생산", "제조", "공장", "조립", "오퍼레이터"] },
           { occupation: "truck-driver", keywords: ["truck", "driver", "delivery", "기사", "운전", "트럭", "배송"] },
           { occupation: "construction-trade", keywords: ["electrician", "plumber", "carpenter", "construction", "전기", "배관", "목수", "건설"] },
           { occupation: "industrial-trade", keywords: ["welder", "machinist", "millwright", "welding", "용접", "machinist", "산업"] },
@@ -3952,6 +3962,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 pivotKo: "baker·pastry·production bakery 직무",
                 upgradeKo: "production baker·lead baker로 정리"
               };
+            case "restaurant-manager":
+              return {
+                labelKo: "레스토랑 매니저 / restaurant manager",
+                tags: ["hospitality", "management", "skilled-likely"],
+                pivotKo: "restaurant manager·F&B manager 직무",
+                upgradeKo: "restaurant manager duty와 team management를 더 명확히 정리"
+              };
             case "food-service-supervisor":
               return {
                 labelKo: "푸드서비스 슈퍼바이저 / shift lead",
@@ -3965,6 +3982,20 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 tags: ["hospitality", "service-entry", "non-skilled-likely"],
                 pivotKo: "front-line service에서 supervisor·cook 쪽으로 전환",
                 upgradeKo: "food service supervisor·cook·shift lead 쪽으로 이동"
+              };
+            case "hotel-front-desk":
+              return {
+                labelKo: "호텔 프론트 / guest service / front desk",
+                tags: ["hospitality", "office", "mixed-skill"],
+                pivotKo: "front desk·guest service·hotel supervisor 직무",
+                upgradeKo: "guest service supervisor·front office supervisor 쪽으로 정리"
+              };
+            case "housekeeping-cleaning":
+              return {
+                labelKo: "하우스키핑 / 클리닝 / room attendant",
+                tags: ["hospitality", "service-entry", "non-skilled-likely"],
+                pivotKo: "housekeeping에서 supervisor·inspection 쪽으로 전환",
+                upgradeKo: "housekeeping supervisor·lead room attendant 쪽으로 이동"
               };
             case "retail-supervisor":
               return {
@@ -3980,6 +4011,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 pivotKo: "매장서비스에서 supervisor·coordinator로 전환",
                 upgradeKo: "retail supervisor·office coordinator로 전환"
               };
+            case "beauty-salon":
+              return {
+                labelKo: "네일 / 헤어 / 뷰티 서비스",
+                tags: ["service-entry", "mixed-skill", "regulated"],
+                pivotKo: "personal service에서 manager·trainer·licensed role 쪽으로 전환",
+                upgradeKo: "salon manager·licensed esthetician·stylist 쪽으로 정리"
+              };
             case "warehouse-logistics":
               return {
                 labelKo: "창고 / 물류 / warehouse associate",
@@ -3993,6 +4031,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 tags: ["transport", "warehouse", "mixed-skill"],
                 pivotKo: "shipping·receiving·dispatcher 직무",
                 upgradeKo: "dispatcher·logistics coordinator·lead 축으로 정리"
+              };
+            case "manufacturing-production":
+              return {
+                labelKo: "제조 / production / factory worker",
+                tags: ["trades", "warehouse", "mixed-skill"],
+                pivotKo: "machine operator·production lead·manufacturing technician 직무",
+                upgradeKo: "machine operator·lead hand·technician 쪽으로 정리"
               };
             case "truck-driver":
               return {
@@ -4095,18 +4140,28 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               return ["cook", "chef", "line cook / kitchen lead"];
             case "baker-pastry":
               return ["baker", "pastry baker", "production baker"];
+            case "restaurant-manager":
+              return ["restaurant manager", "food service manager", "front of house manager"];
             case "food-service-supervisor":
               return ["food service supervisor", "shift supervisor", "restaurant supervisor"];
             case "server-counter":
               return ["server / bartender", "food counter attendant", "barista / cashier"];
+            case "hotel-front-desk":
+              return ["hotel front desk clerk", "guest service agent", "front office supervisor"];
+            case "housekeeping-cleaning":
+              return ["room attendant", "housekeeper", "housekeeping supervisor"];
             case "retail-supervisor":
               return ["retail supervisor", "store supervisor", "assistant store manager"];
             case "retail-sales":
               return ["retail salesperson", "sales associate", "store clerk"];
+            case "beauty-salon":
+              return ["hair stylist", "esthetician", "salon manager / beauty supervisor"];
             case "warehouse-logistics":
               return ["warehouse associate", "material handler", "inventory / shipping support"];
             case "shipping-dispatch":
               return ["dispatcher", "shipping / receiving clerk", "logistics coordinator"];
+            case "manufacturing-production":
+              return ["production worker", "machine operator", "manufacturing technician / lead hand"];
             case "truck-driver":
               return ["transport truck driver", "delivery driver", "commercial driver"];
             case "construction-trade":
@@ -4206,6 +4261,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 { label: "Pastry baker", teer: "TEER 3", note: "현재 직무 그대로" },
                 { label: "Production baker", teer: "TEER 2-3", note: "업그레이드 후보" }
               ];
+            case "restaurant-manager":
+              return [
+                { label: "Restaurant manager", teer: "TEER 0-1", note: "현재 직무 그대로" },
+                { label: "Food service manager", teer: "TEER 0-1", note: "현재 직무 그대로" },
+                { label: "Front of house manager", teer: "TEER 1-2", note: "현재 직무 그대로" }
+              ];
             case "food-service-supervisor":
               return [
                 { label: "Food service supervisor", teer: "TEER 2", note: "현재 직무 그대로" },
@@ -4217,6 +4278,18 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 { label: "Server / bartender", teer: "TEER 4-5", note: "현재 role" },
                 { label: "Food counter attendant", teer: "TEER 5", note: "현재 role" },
                 { label: "Food service supervisor", teer: "TEER 2", note: "전환 목표" }
+              ];
+            case "hotel-front-desk":
+              return [
+                { label: "Front desk clerk", teer: "TEER 3-4", note: "현재 직무 확인" },
+                { label: "Guest service agent", teer: "TEER 3", note: "현재 직무 그대로" },
+                { label: "Front office supervisor", teer: "TEER 2", note: "전환 목표" }
+              ];
+            case "housekeeping-cleaning":
+              return [
+                { label: "Room attendant", teer: "TEER 5", note: "현재 role" },
+                { label: "Cleaner / housekeeper", teer: "TEER 5", note: "현재 role" },
+                { label: "Housekeeping supervisor", teer: "TEER 2", note: "전환 목표" }
               ];
             case "retail-supervisor":
               return [
@@ -4230,6 +4303,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 { label: "Sales associate", teer: "TEER 4", note: "현재 role" },
                 { label: "Retail supervisor", teer: "TEER 2", note: "전환 목표" }
               ];
+            case "beauty-salon":
+              return [
+                { label: "Hair stylist", teer: "TEER 3", note: "license 확인" },
+                { label: "Esthetician", teer: "TEER 3", note: "license 확인" },
+                { label: "Salon manager", teer: "TEER 0-2", note: "전환 목표" }
+              ];
             case "warehouse-logistics":
               return [
                 { label: "Warehouse associate", teer: "TEER 4", note: "현재 role" },
@@ -4241,6 +4320,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 { label: "Dispatcher", teer: "TEER 2", note: "현재 직무 그대로" },
                 { label: "Shipping / receiving clerk", teer: "TEER 3-4", note: "직무 확인 필요" },
                 { label: "Logistics coordinator", teer: "TEER 2", note: "업그레이드 후보" }
+              ];
+            case "manufacturing-production":
+              return [
+                { label: "Production worker", teer: "TEER 4-5", note: "현재 role" },
+                { label: "Machine operator", teer: "TEER 3-4", note: "업그레이드 후보" },
+                { label: "Manufacturing technician / lead hand", teer: "TEER 2-3", note: "전환 목표" }
               ];
             case "truck-driver":
               return [
@@ -5033,6 +5118,93 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return plans.sort((left, right) => right.priority - left.priority).slice(0, 3);
         }
 
+        function buildRouteRealitySnapshot(answers, insight, occupationLens, concreteProvincePlans, isFederalCard) {
+          const leadPlan = concreteProvincePlans[0] || null;
+          const hasKoreaRoute = answers.targetOccupationPlan === "previous-korea-job" && hasResolvedKoreaOccupation(answers);
+          const hasCanadaSkilled = hasResolvedCanadaOccupation(answers) && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
+          const isCanadaNonSkilled = answers.canadianJobSkill === "non-skilled";
+          const provinceFallback = leadPlan?.summary || occupationLens.summary;
+
+          if (isFederalCard) {
+            if (occupationLens.badge === "연방 skilled 축") {
+              return {
+                badge: "바로 비교 가능",
+                tone: "positive",
+                title: "현재 직무나 경력을 기준으로 연방 EE와 바로 비교할 수 있어요.",
+                summary: occupationLens.summary
+              };
+            }
+
+            if (hasKoreaRoute) {
+              return {
+                badge: "한국 경력 활용",
+                tone: "neutral",
+                title: "캐나다 현재 일보다 한국 경력 축으로 다시 짜는 편이 더 현실적일 수 있어요.",
+                summary: occupationLens.fallbackRoute
+              };
+            }
+
+            return {
+              badge: "전환/학교 먼저",
+              tone: "negative",
+              title: "지금 직무 그대로는 연방 skilled 비교가 약해서 직무 전환이나 학교 경유를 먼저 보는 편이 좋아요.",
+              summary: occupationLens.fallbackRoute
+            };
+          }
+
+          if (leadPlan?.badge === "지금 가능" || (hasCanadaSkilled && occupationLens.tone === "positive")) {
+            return {
+              badge: "지금 직무 가능",
+              tone: "positive",
+              title: "현재 직무나 경력 그대로 이 주의 stream과 비교해 볼 수 있어요.",
+              summary: provinceFallback
+            };
+          }
+
+          if (leadPlan?.badge === "한국 경력" || hasKoreaRoute) {
+            return {
+              badge: "한국 경력 재구성",
+              tone: "neutral",
+              title: "현재 캐나다 일보다 한국 경력 축으로 다시 짜면 이 주에서 열리는 길이 더 분명해질 수 있어요.",
+              summary: provinceFallback
+            };
+          }
+
+          if (leadPlan?.badge === "학교 경유") {
+            return {
+              badge: "학교 경유 권장",
+              tone: "neutral",
+              title: "지금 직무 그대로보다 학교 -> PGWP -> local skilled 경력 경유가 더 현실적일 수 있어요.",
+              summary: leadPlan.summary
+            };
+          }
+
+          if (leadPlan?.badge === "고용주 연결") {
+            return {
+              badge: "고용주/지역 먼저",
+              tone: "neutral",
+              title: "점수보다 employer-driven 또는 지역 경로를 먼저 보는 편이 더 맞아요.",
+              summary: leadPlan.summary
+            };
+          }
+
+          if (leadPlan?.badge === "전환 필요" || isCanadaNonSkilled) {
+            return {
+              badge: "직무 전환 필요",
+              tone: "negative",
+              title: "현재 직무 그대로보다 같은 업종 안에서 supervisor·skilled 쪽으로 올려야 이 주에서 훨씬 잘 읽혀요.",
+              summary: leadPlan?.summary || occupationLens.fallbackRoute
+            };
+          }
+
+          return {
+            badge: "stream 확인",
+            tone: occupationLens.tone || "neutral",
+            title: "이 주는 점수 하나보다 stream 자격과 직무 연결을 먼저 보는 편이에요.",
+            summary: provinceFallback
+          };
+        }
+
         function buildProvinceEeBridge(answers, insight, eeSnapshot) {
           if (insight.id === "federal" || !statusSupports(insight.statuses.ee)) {
             return null;
@@ -5506,6 +5678,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const jobRealityItems = buildJobRealityCheck(answers, insight);
             const occupationLens = buildProvinceOccupationLens(answers, insight);
             const concreteProvincePlans = isFederalCard ? [] : buildConcreteProvincePlans(answers, insight);
+            const routeReality = buildRouteRealitySnapshot(answers, insight, occupationLens, concreteProvincePlans, isFederalCard);
             const provinceEeBridge = buildProvinceEeBridge(answers, insight, eeSnapshot);
             const profileStrengthItems = buildProfileStrengths(answers);
             const occupationContextLine = buildOccupationContextSummary(answers);
@@ -5627,7 +5800,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                     }
                   : {
                       ...getProvinceActionPresentation(item),
-                      showImpact: Boolean(item.scoreImpact),
+                      showImpact: Boolean(item.actionId === "pnp-nomination"),
                       impactLabel: item.scoreImpact?.label ?? ""
                     };
 
@@ -5718,6 +5891,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               (!isFederalCard
                 ? '<p class="wizard-freshness">직무 기준: ' + escapeHtmlClient(occupationContextLine) + "</p>"
                 : ""),
+              '<div class="route-reality-banner is-' + escapeHtmlClient(routeReality.tone) + '">',
+              '<span class="route-reality-badge">' + escapeHtmlClient(routeReality.badge) + '</span>',
+              '<div class="route-reality-copy">',
+              '<strong>' + escapeHtmlClient(routeReality.title) + '</strong>',
+              '<p>' + escapeHtmlClient(routeReality.summary) + '</p>',
+              '</div>',
+              '</div>',
               '<div class="result-summary-stack">',
               '<div class="result-summary-card">',
               '<strong>왜 이 순위인가</strong>',
@@ -7684,6 +7864,57 @@ function renderLayout({ title, page, body, updates, basePath = "", analyticsMeas
 
       .result-summary-stack > * {
         width: 100% !important;
+      }
+
+      .route-reality-banner {
+        display: grid;
+        gap: 10px;
+        align-items: start;
+        padding: 14px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.82);
+      }
+
+      .route-reality-banner.is-positive {
+        border-color: rgba(33, 95, 79, 0.18);
+        background: linear-gradient(180deg, rgba(223, 240, 233, 0.82), rgba(255, 255, 255, 0.92));
+      }
+
+      .route-reality-banner.is-negative {
+        border-color: rgba(138, 99, 42, 0.16);
+        background: linear-gradient(180deg, rgba(248, 239, 224, 0.82), rgba(255, 255, 255, 0.92));
+      }
+
+      .route-reality-badge {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        min-height: 30px;
+        padding: 0 12px;
+        border-radius: 999px;
+        background: rgba(15, 61, 127, 0.08);
+        color: var(--accent-deep);
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+      }
+
+      .route-reality-copy {
+        display: grid;
+        gap: 4px;
+      }
+
+      .route-reality-copy strong {
+        color: var(--accent-deep);
+        font-size: 0.95rem;
+        line-height: 1.55;
+      }
+
+      .route-reality-copy p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.68;
       }
 
       .result-summary-card,

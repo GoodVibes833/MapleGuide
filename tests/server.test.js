@@ -80,6 +80,11 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /지금 캐나다에서 하는 일/);
   assert.match(dashboardResponse.body, /지금 캐나다에서 실제로 하는 job title/);
   assert.match(dashboardResponse.body, /이민에 쓸 주력 경력 축/);
+  assert.match(dashboardResponse.body, /레스토랑 매니저 \/ restaurant manager/);
+  assert.match(dashboardResponse.body, /호텔 프론트 \/ guest service \/ front desk/);
+  assert.match(dashboardResponse.body, /하우스키핑 \/ 클리닝 \/ room attendant/);
+  assert.match(dashboardResponse.body, /네일 \/ 헤어 \/ 뷰티 서비스/);
+  assert.match(dashboardResponse.body, /제조 \/ production \/ factory worker/);
   assert.match(dashboardResponse.body, /현재 비자 \/ 퍼밋 남은 기간/);
   assert.match(dashboardResponse.body, /ECA \/ 학력평가 상태/);
   assert.match(dashboardResponse.body, /먼저 꼭 필요한 정보/);
@@ -99,6 +104,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.doesNotMatch(dashboardResponse.body, /<strong>연방 EE 참고<\/strong>/);
   assert.doesNotMatch(dashboardResponse.body, /이 주 자체 점수 아님/);
   assert.match(dashboardResponse.body, /왜 이 순위인가/);
+  assert.match(dashboardResponse.body, /바로 비교 가능|직무 전환 필요|학교 경유 권장|고용주\/지역 먼저|한국 경력 재구성|지금 직무 가능/);
   assert.match(dashboardResponse.body, /이 직무를 이 주에서 보면/);
   assert.match(dashboardResponse.body, /NOC 예시:/);
   assert.match(dashboardResponse.body, /해석 후보:/);
