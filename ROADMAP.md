@@ -182,6 +182,8 @@ MapleGuide를 `완성에 가깝다`고 볼 기준은 아래입니다.
 
 - 폼 단계에서 title만 넣어도 candidate role이 보임
 - 추천 카드에서 `현재 role`, `upgrade target`, `school path target`이 분리됨
+- exact title profile이 broad occupation bucket보다 우선해서 `Food Service Supervisor`, `Dispatcher`, `Bookkeeper`, `Office Administrator` 같은 입력을 더 직접적으로 읽음
+- `정밀 title 후보`와 `직군 축 후보`가 분리되어 보이고, 주별 rules DB token hit에도 반영됨
 
 ## Phase 2. 주별 rules DB 1차
 

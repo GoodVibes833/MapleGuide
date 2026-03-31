@@ -193,7 +193,9 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /지금 주력으로 보기:/);
   assert.match(dashboardHtml, /캐나다 현재 직무 축|한국 경력 축|전환\/학교 축|비교 진행 중/);
   assert.match(dashboardHtml, /현재 해석:/);
+  assert.match(dashboardHtml, /정밀 title 후보:/);
   assert.match(dashboardHtml, /title 후보:/);
+  assert.match(dashboardHtml, /직군 축 후보:/);
   assert.match(dashboardHtml, /title 단계:/);
   assert.match(dashboardHtml, /title 해석 메모:/);
   assert.match(dashboardHtml, /직무 상태:/);

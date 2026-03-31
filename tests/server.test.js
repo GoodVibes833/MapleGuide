@@ -116,7 +116,9 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /지금 주력으로 보기:/);
   assert.match(dashboardResponse.body, /캐나다 현재 직무 축|한국 경력 축|전환\/학교 축|비교 진행 중/);
   assert.match(dashboardResponse.body, /현재 해석:/);
+  assert.match(dashboardResponse.body, /정밀 title 후보:/);
   assert.match(dashboardResponse.body, /title 후보:/);
+  assert.match(dashboardResponse.body, /직군 축 후보:/);
   assert.match(dashboardResponse.body, /title 단계:/);
   assert.match(dashboardResponse.body, /title 해석 메모:/);
   assert.match(dashboardResponse.body, /직무 상태:/);

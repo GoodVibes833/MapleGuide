@@ -4113,15 +4113,497 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           { occupation: "researcher-canada", keywords: ["researcher", "scientist", "research associate", "postdoctoral", "연구원", "연구자"] }
         ];
 
-        function inferOccupationCandidatesFromTitle(title) {
-          const normalizedTitle = (title || "").trim().toLowerCase();
+        const TITLE_ROLE_PROFILES = [
+          {
+            occupation: "office-admin",
+            label: "Office administrator",
+            teer: "TEER 3",
+            note: "direct candidate",
+            keywords: ["office administrator", "office admin", "office manager"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "office administrator처럼 duties가 비교적 선명한 title이라 바로 비교하기 좋아요.",
+            tokens: ["professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "office-admin",
+            label: "Administrative assistant",
+            teer: "TEER 3",
+            note: "direct candidate",
+            keywords: ["administrative assistant", "admin assistant"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "administrative assistant처럼 직무 축이 비교적 명확한 title이라 skilled 쪽으로 바로 읽히기 좋아요.",
+            tokens: ["professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "office-admin",
+            label: "Office coordinator",
+            teer: "TEER 2-3",
+            note: "upgrade target",
+            keywords: ["office coordinator", "administrative coordinator", "operations coordinator"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 3,
+            reason: "coordinator title이면 office broad role보다 더 강하게 skilled 쪽으로 읽혀요.",
+            tokens: ["professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "office-admin",
+            label: "Receptionist",
+            teer: "TEER 4",
+            note: "broad office role",
+            keywords: ["receptionist", "front desk receptionist", "office clerk"],
+            stageLabel: "broad office 쪽",
+            scoreAdjustment: 0,
+            reason: "receptionist·clerk 계열은 office 축이긴 하지만 duties를 더 명확히 써야 해요.",
+            tokens: ["professional"]
+          },
+          {
+            occupation: "accounting-bookkeeping",
+            label: "Bookkeeper",
+            teer: "TEER 2",
+            note: "direct candidate",
+            keywords: ["bookkeeper", "full charge bookkeeper"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "bookkeeper는 accounting/bookkeeping 축으로 비교적 바로 읽히는 title이에요.",
+            tokens: ["professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "accounting-bookkeeping",
+            label: "Payroll administrator",
+            teer: "TEER 2",
+            note: "direct candidate",
+            keywords: ["payroll administrator", "payroll specialist"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "payroll 쪽은 bookkeeping보다도 duties가 더 선명하게 보일 수 있어요.",
+            tokens: ["professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "accounting-bookkeeping",
+            label: "Accounting technician",
+            teer: "TEER 2",
+            note: "upgrade target",
+            keywords: ["accounting technician", "ap clerk", "accounts payable", "accounts receivable", "ar clerk"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "AP/AR·accounting technician 축이면 bookkeeping broad role보다 더 선명합니다.",
+            tokens: ["professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "customer-service",
+            label: "Customer service representative",
+            teer: "TEER 3-4",
+            note: "broad customer service",
+            keywords: ["customer service representative", "customer service agent", "csr", "call centre agent", "call center agent"],
+            stageLabel: "entry/broad 쪽",
+            scoreAdjustment: -1,
+            reason: "customer service rep·agent는 그대로보다 coordinator·lead 쪽으로 좁혀야 더 선명해져요.",
+            tokens: ["professional"]
+          },
+          {
+            occupation: "customer-service",
+            label: "Client service coordinator",
+            teer: "TEER 2-3",
+            note: "upgrade target",
+            keywords: ["client service coordinator", "service coordinator", "customer experience coordinator"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 2,
+            reason: "coordinator title이면 단순 customer service보다 한 단계 위로 읽혀요.",
+            tokens: ["professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "server-counter",
+            label: "Food service supervisor",
+            teer: "TEER 2",
+            note: "upgrade target",
+            keywords: ["food service supervisor", "restaurant supervisor", "fss"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 3,
+            reason: "food service supervisor는 front-line service보다 훨씬 직접 비교 가능한 title이에요.",
+            tokens: ["hospitality", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "server-counter",
+            label: "Shift supervisor / shift lead",
+            teer: "TEER 2-3",
+            note: "upgrade target",
+            keywords: ["shift supervisor", "shift lead", "team lead"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 2,
+            reason: "shift lead 성격이 보이면 server broad role보다 훨씬 유리합니다.",
+            tokens: ["hospitality", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "server-counter",
+            label: "Cook / kitchen staff",
+            teer: "TEER 3",
+            note: "side-step upgrade",
+            keywords: ["cook", "line cook", "prep cook", "kitchen staff"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 2,
+            reason: "같은 업종 안에서도 cook 쪽으로 읽히면 direct skilled 비교가 쉬워집니다.",
+            tokens: ["hospitality", "trades", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "server-counter",
+            label: "Server / bartender",
+            teer: "TEER 4-5",
+            note: "current role",
+            keywords: ["server", "bartender", "waiter", "waitress"],
+            stageLabel: "entry-level 쪽",
+            scoreAdjustment: -2,
+            reason: "front-line service title이라 대부분 주에서 그대로는 약하게 읽혀요.",
+            tokens: ["low-skill", "service-entry", "hospitality"]
+          },
+          {
+            occupation: "server-counter",
+            label: "Barista / cashier / counter attendant",
+            teer: "TEER 5",
+            note: "current role",
+            keywords: ["barista", "cashier", "food counter attendant", "counter attendant", "food counter"],
+            stageLabel: "entry-level 쪽",
+            scoreAdjustment: -2,
+            reason: "barista·cashier·counter 계열은 그대로보다 supervisor·cook 전환이 더 중요해요.",
+            tokens: ["low-skill", "service-entry", "hospitality"]
+          },
+          {
+            occupation: "hotel-front-desk",
+            label: "Front office supervisor",
+            teer: "TEER 2",
+            note: "upgrade target",
+            keywords: ["front office supervisor", "guest service supervisor"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 2,
+            reason: "front office supervisor 쪽이면 guest service broad role보다 훨씬 선명해져요.",
+            tokens: ["hospitality", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "hotel-front-desk",
+            label: "Guest service agent",
+            teer: "TEER 3",
+            note: "direct candidate",
+            keywords: ["guest service agent", "guest services agent", "front desk clerk", "front desk agent"],
+            stageLabel: "mixed direct",
+            scoreAdjustment: 0,
+            reason: "guest service agent는 가능한 편이지만 supervisor duty가 붙으면 더 유리해져요.",
+            tokens: ["hospitality", "job-offer"]
+          },
+          {
+            occupation: "housekeeping-cleaning",
+            label: "Housekeeping supervisor",
+            teer: "TEER 2",
+            note: "upgrade target",
+            keywords: ["housekeeping supervisor", "housekeeping lead", "room inspector"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 2,
+            reason: "housekeeping supervisor·inspection 쪽이면 훨씬 선명해져요.",
+            tokens: ["hospitality", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "housekeeping-cleaning",
+            label: "Room attendant / cleaner",
+            teer: "TEER 5",
+            note: "current role",
+            keywords: ["room attendant", "housekeeper", "cleaner", "janitor"],
+            stageLabel: "entry-level 쪽",
+            scoreAdjustment: -2,
+            reason: "cleaner·room attendant는 그대로보다 supervisor 쪽으로 올라가야 해요.",
+            tokens: ["low-skill", "service-entry", "job-offer"]
+          },
+          {
+            occupation: "retail-sales",
+            label: "Retail supervisor",
+            teer: "TEER 2",
+            note: "upgrade target",
+            keywords: ["retail supervisor", "store supervisor", "assistant manager", "keyholder"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 3,
+            reason: "retail supervisor·assistant manager에 가까운 title이면 훨씬 유리해져요.",
+            tokens: ["job-offer", "local-skilled", "professional"]
+          },
+          {
+            occupation: "retail-sales",
+            label: "Sales associate / retail sales",
+            teer: "TEER 4",
+            note: "current role",
+            keywords: ["sales associate", "retail salesperson", "salesperson", "store clerk", "cashier"],
+            stageLabel: "entry-level 쪽",
+            scoreAdjustment: -2,
+            reason: "retail sales 자체는 그대로보다 supervisor 쪽으로 올라가야 읽히기 쉬워요.",
+            tokens: ["low-skill", "service-entry"]
+          },
+          {
+            occupation: "warehouse-logistics",
+            label: "Dispatcher",
+            teer: "TEER 2",
+            note: "direct candidate",
+            keywords: ["dispatcher", "dispatch coordinator"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 3,
+            reason: "dispatcher는 warehouse broad role보다 훨씬 직접 비교 가능한 title이에요.",
+            tokens: ["transport", "professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "warehouse-logistics",
+            label: "Inventory / logistics coordinator",
+            teer: "TEER 2-3",
+            note: "upgrade target",
+            keywords: ["inventory coordinator", "logistics coordinator", "inventory clerk", "shipping coordinator"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 2,
+            reason: "inventory·logistics coordinator 쪽이면 창고 기본 role보다 훨씬 선명해져요.",
+            tokens: ["warehouse", "professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "warehouse-logistics",
+            label: "Shipping / receiving clerk",
+            teer: "TEER 3-4",
+            note: "mixed direct",
+            keywords: ["shipping clerk", "receiving clerk", "shipping and receiving"],
+            stageLabel: "mixed direct",
+            scoreAdjustment: 0,
+            reason: "shipping/receiving clerk는 duties에 따라 TEER 해석이 갈릴 수 있어요.",
+            tokens: ["warehouse", "job-offer"]
+          },
+          {
+            occupation: "warehouse-logistics",
+            label: "Warehouse associate / material handler",
+            teer: "TEER 4",
+            note: "current role",
+            keywords: ["warehouse associate", "material handler", "forklift", "order picker", "picker", "packer"],
+            stageLabel: "entry-level 쪽",
+            scoreAdjustment: -1,
+            reason: "warehouse associate·picker·packer는 그대로보다 dispatch·coordinator 쪽이 더 유리해요.",
+            tokens: ["warehouse", "low-skill", "job-offer"]
+          },
+          {
+            occupation: "shipping-dispatch",
+            label: "Dispatcher",
+            teer: "TEER 2",
+            note: "direct candidate",
+            keywords: ["dispatcher", "dispatch coordinator"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "dispatcher·logistics coordinator는 바로 비교 가능한 쪽으로 읽혀요.",
+            tokens: ["transport", "professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "shipping-dispatch",
+            label: "Logistics coordinator",
+            teer: "TEER 2",
+            note: "upgrade target",
+            keywords: ["logistics coordinator", "transport coordinator"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "logistics coordinator는 shipping broad role보다 더 직접적입니다.",
+            tokens: ["transport", "professional", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "shipping-dispatch",
+            label: "Shipping / receiving clerk",
+            teer: "TEER 3-4",
+            note: "mixed direct",
+            keywords: ["shipping clerk", "receiving clerk", "shipping and receiving"],
+            stageLabel: "mixed direct",
+            scoreAdjustment: 0,
+            reason: "shipping/receiving clerk는 duties에 따라 TEER 해석이 갈릴 수 있어요.",
+            tokens: ["warehouse", "job-offer"]
+          },
+          {
+            occupation: "caregiver-psw",
+            label: "Personal support worker",
+            teer: "TEER 4",
+            note: "exception route direct",
+            keywords: ["personal support worker", "psw"],
+            stageLabel: "예외 stream direct",
+            scoreAdjustment: 1,
+            reason: "PSW 쪽이면 예외 stream이나 employer-driven 경로와 바로 비교해 볼 수 있어요.",
+            tokens: ["health", "care-support", "low-skill", "job-offer"]
+          },
+          {
+            occupation: "caregiver-psw",
+            label: "Home support worker",
+            teer: "TEER 4",
+            note: "exception route direct",
+            keywords: ["home support worker", "support worker", "home support"],
+            stageLabel: "예외 stream direct",
+            scoreAdjustment: 1,
+            reason: "home support worker 쪽이면 AIP·Ontario 예외 stream과 바로 비교해 볼 수 있어요.",
+            tokens: ["health", "care-support", "low-skill", "job-offer", "atlantic"]
+          },
+          {
+            occupation: "caregiver-psw",
+            label: "Caregiver / care aide",
+            teer: "TEER 4",
+            note: "broad care role",
+            keywords: ["caregiver", "care aide", "care worker"],
+            stageLabel: "broad care 쪽",
+            scoreAdjustment: 0,
+            reason: "caregiver만으로는 넓어서 PSW / support worker duties를 더 붙이는 게 좋아요.",
+            tokens: ["health", "care-support", "low-skill"]
+          },
+          {
+            occupation: "cook-chef",
+            label: "Chef / sous-chef",
+            teer: "TEER 2",
+            note: "direct candidate",
+            keywords: ["chef", "sous chef", "head chef"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "chef·sous-chef는 skilled 축으로 바로 읽히기 좋은 title이에요.",
+            tokens: ["hospitality", "trades", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "cook-chef",
+            label: "Cook / line cook",
+            teer: "TEER 3",
+            note: "direct candidate",
+            keywords: ["cook", "line cook", "prep cook"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 1,
+            reason: "cook·line cook도 충분히 비교 가능한 쪽이지만 duty를 더 선명하게 쓰면 더 좋아져요.",
+            tokens: ["hospitality", "trades", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "food-service-supervisor",
+            label: "Food service supervisor",
+            teer: "TEER 2",
+            note: "direct candidate",
+            keywords: ["food service supervisor", "restaurant supervisor", "shift supervisor", "shift lead"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "food service supervisor duty가 바로 보이는 title이라 비교하기 좋아요.",
+            tokens: ["hospitality", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "manufacturing-production",
+            label: "Machine operator",
+            teer: "TEER 3-4",
+            note: "upgrade target",
+            keywords: ["machine operator", "cnc operator", "operator"],
+            stageLabel: "mixed direct",
+            scoreAdjustment: 1,
+            reason: "machine operator는 production worker broad role보다 더 선명하게 읽혀요.",
+            tokens: ["trades", "job-offer"]
+          },
+          {
+            occupation: "manufacturing-production",
+            label: "Lead hand / production lead",
+            teer: "TEER 2-3",
+            note: "upgrade target",
+            keywords: ["lead hand", "production lead", "team lead"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 2,
+            reason: "lead hand·production lead 쪽이면 훨씬 더 유리해져요.",
+            tokens: ["trades", "job-offer", "local-skilled"]
+          },
+          {
+            occupation: "manufacturing-production",
+            label: "Production worker",
+            teer: "TEER 4-5",
+            note: "current role",
+            keywords: ["production worker", "assembler", "factory worker"],
+            stageLabel: "entry-level 쪽",
+            scoreAdjustment: -1,
+            reason: "production worker 그대로보다 operator·lead hand·technician 쪽이 더 현실적이에요.",
+            tokens: ["low-skill", "job-offer"]
+          },
+          {
+            occupation: "truck-driver",
+            label: "Transport truck driver",
+            teer: "TEER 3",
+            note: "direct candidate",
+            keywords: ["transport truck driver", "truck driver", "class 1 driver", "class a driver"],
+            stageLabel: "direct skilled 쪽",
+            scoreAdjustment: 2,
+            reason: "transport truck driver는 그대로 skilled 축으로 바로 읽히는 편이에요.",
+            tokens: ["transport", "trades", "job-offer", "local-skilled", "regional"]
+          },
+          {
+            occupation: "truck-driver",
+            label: "Delivery driver",
+            teer: "TEER 3-4",
+            note: "mixed direct",
+            keywords: ["delivery driver", "courier driver"],
+            stageLabel: "mixed direct",
+            scoreAdjustment: 0,
+            reason: "delivery driver는 업무 범위에 따라 skilled 해석이 갈릴 수 있어요.",
+            tokens: ["transport", "job-offer"]
+          },
+          {
+            occupation: "beauty-salon",
+            label: "Hair stylist / esthetician",
+            teer: "TEER 3",
+            note: "license check",
+            keywords: ["hair stylist", "hairstylist", "esthetician", "esthetician"],
+            stageLabel: "mixed direct",
+            scoreAdjustment: 1,
+            reason: "license가 맞으면 direct 비교가 가능하지만, 규제 여부를 먼저 확인해야 해요.",
+            tokens: ["regulated", "job-offer"]
+          },
+          {
+            occupation: "beauty-salon",
+            label: "Salon manager",
+            teer: "TEER 0-2",
+            note: "upgrade target",
+            keywords: ["salon manager", "spa manager"],
+            stageLabel: "upgrade-ready",
+            scoreAdjustment: 2,
+            reason: "salon manager 쪽이면 단순 service보다 훨씬 더 강하게 읽혀요.",
+            tokens: ["regulated", "job-offer", "local-skilled"]
+          }
+        ];
+
+        function normalizeTitleText(title) {
+          return (title || "").trim().toLowerCase();
+        }
+
+        function inferTitleRoleProfiles(occupation, title) {
+          const normalizedTitle = normalizeTitleText(title);
+
           if (!normalizedTitle) {
             return [];
           }
 
-          return OCCUPATION_TITLE_HINTS
+          const scopedProfiles = TITLE_ROLE_PROFILES
+            .filter((profile) => !hasOccupationSelection(occupation) || profile.occupation === occupation)
+            .filter((profile) => profile.keywords.some((keyword) => normalizedTitle.includes(keyword.toLowerCase())))
+            .sort((left, right) => {
+              const leftKeywordLength = Math.max(...left.keywords.map((keyword) => keyword.length));
+              const rightKeywordLength = Math.max(...right.keywords.map((keyword) => keyword.length));
+              return rightKeywordLength - leftKeywordLength;
+            });
+
+          return scopedProfiles.filter(
+            (profile, index, list) =>
+              list.findIndex((candidate) => candidate.label === profile.label && candidate.occupation === profile.occupation) === index
+          );
+        }
+
+        function getPreferredTitleRoleProfile(occupation, title) {
+          return inferTitleRoleProfiles(occupation, title)[0] || null;
+        }
+
+        function getResolvedCandidateProfiles(occupation, title) {
+          const inferredProfiles = inferTitleRoleProfiles(occupation, title);
+          return inferredProfiles.length > 0 ? inferredProfiles.slice(0, 3) : getOccupationCandidateProfiles(occupation);
+        }
+
+        function inferOccupationCandidatesFromTitle(title) {
+          const normalizedTitle = normalizeTitleText(title);
+          if (!normalizedTitle) {
+            return [];
+          }
+
+          const preciseMatches = inferTitleRoleProfiles("", title).map((profile) => profile.occupation);
+          const broadMatches = OCCUPATION_TITLE_HINTS
             .filter((rule) => rule.keywords.some((keyword) => normalizedTitle.includes(keyword.toLowerCase())))
             .map((rule) => rule.occupation)
+            .filter((occupation, index, list) => list.indexOf(occupation) === index);
+
+          return [...preciseMatches, ...broadMatches]
             .filter((occupation, index, list) => list.indexOf(occupation) === index)
             .slice(0, 3);
         }
@@ -4144,8 +4626,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         function getOccupationInferenceSummary(selectedOccupation, title) {
           const candidates = inferOccupationCandidatesFromTitle(title);
+          const preciseProfiles = inferTitleRoleProfiles(resolveOccupationId(selectedOccupation, title), title);
 
-          if (!title || candidates.length === 0) {
+          if (!title || (candidates.length === 0 && preciseProfiles.length === 0)) {
             return null;
           }
 
@@ -4155,6 +4638,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return {
             title,
             labels,
+            preciseProfiles: preciseProfiles.map((profile) => profile.label + " (" + profile.teer + ")"),
             selectedLabel
           };
         }
@@ -4162,10 +4646,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         function buildOccupationTitleHint(selectedOccupation, title, side = "canada") {
           const resolvedOccupation = resolveOccupationId(selectedOccupation, title);
           const inference = getOccupationInferenceSummary(selectedOccupation, title);
-          const profiles = getOccupationCandidateProfiles(resolvedOccupation).slice(0, 2);
+          const profiles = getResolvedCandidateProfiles(resolvedOccupation, title).slice(0, 2);
 
           if (inference) {
-            return "해석 후보: " + inference.labels.join(" / ")
+            return "해석 후보: "
+              + (inference.preciseProfiles.length > 0 ? inference.preciseProfiles.join(" / ") : inference.labels.join(" / "))
+              + (inference.labels.length > 0 ? " · 직군축: " + inference.labels.join(" / ") : "")
               + " · "
               + profiles.map((profile) => profile.label + " (" + profile.teer + ", " + profile.note + ")").join(" / ");
           }
@@ -4790,13 +5276,22 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         function getOccupationTitleStage(occupation, title) {
-          const normalizedTitle = (title || "").trim().toLowerCase();
+          const normalizedTitle = normalizeTitleText(title);
+          const preciseProfile = getPreferredTitleRoleProfile(occupation, title);
 
           if (!normalizedTitle) {
             return {
               label: "title 미입력",
               scoreAdjustment: 0,
               reason: "실제 title을 적으면 현재 role이 바로 비교 가능한지 더 정확히 읽을 수 있어요."
+            };
+          }
+
+          if (preciseProfile) {
+            return {
+              label: preciseProfile.stageLabel || "title 후보 확인",
+              scoreAdjustment: preciseProfile.scoreAdjustment ?? 0,
+              reason: preciseProfile.reason || (preciseProfile.label + " 쪽으로 읽혀요.")
             };
           }
 
@@ -4990,14 +5485,22 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const koreaInference = getOccupationInferenceSummary(answers.koreaOccupation, answers.koreaJobTitle);
           const canadaInference = getOccupationInferenceSummary(answers.canadaOccupation, answers.canadaJobTitle);
           const usingKoreaRoute = answers.targetOccupationPlan === "previous-korea-job" && hasResolvedKoreaOccupation(answers);
-          const routeLabel = usingKoreaRoute
-            ? "한국 " + routeMeta.labelKo
-            : hasResolvedCanadaOccupation(answers)
-              ? "현재 캐나다 " + routeMeta.labelKo
-              : routeMeta.labelKo;
           const routeTags = routeMeta.tags;
-          const nocExamples = getOccupationNocExamples(routeOccupationId);
-          const candidateProfiles = getOccupationCandidateProfiles(routeOccupationId);
+          const routeTitle = usingKoreaRoute ? answers.koreaJobTitle : answers.canadaJobTitle;
+          const titleRoleProfiles = getResolvedCandidateProfiles(routeOccupationId, routeTitle);
+          const preferredTitleProfile = getPreferredTitleRoleProfile(routeOccupationId, routeTitle);
+          const routeDisplayLabel = preferredTitleProfile ? preferredTitleProfile.label : routeMeta.labelKo;
+          const routeLabel = usingKoreaRoute
+            ? "한국 " + routeDisplayLabel
+            : hasResolvedCanadaOccupation(answers)
+              ? "현재 캐나다 " + routeDisplayLabel
+              : routeDisplayLabel;
+          const nocExamples = titleRoleProfiles.length > 0
+            ? titleRoleProfiles.map((profile) => profile.label.toLowerCase())
+            : getOccupationNocExamples(routeOccupationId);
+          const candidateProfiles = titleRoleProfiles.length > 0
+            ? titleRoleProfiles
+            : getOccupationCandidateProfiles(routeOccupationId);
           const koreaTitleStage = getKoreaOccupationTitleStage(answers);
           const canadaTitleStage = getCanadaOccupationTitleStage(answers);
           const canUseKoreaSkilled = hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
@@ -5027,6 +5530,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           if (routeTitleStage) {
             titleLensLines.push("현재 주력 title 단계: " + routeTitleStage.label);
             titleLensLines.push("현재 주력 title 메모: " + routeTitleStage.reason);
+          }
+
+          if (preferredTitleProfile) {
+            titleLensLines.push("정밀 title 후보: " + preferredTitleProfile.label + " (" + preferredTitleProfile.teer + ")");
           }
 
           if (canadaInference) {
@@ -5066,14 +5573,14 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               scoreAdjustment = 0;
             }
 
-            return {
+          return {
               badge,
               tone,
               summary,
               primaryRoute,
               fallbackRoute,
               rankReasonKo,
-              scoreAdjustment,
+              scoreAdjustment: scoreAdjustment + (preferredTitleProfile?.scoreAdjustment || 0),
               nocExamples,
               candidateProfiles,
               federalReadiness: getOccupationFederalReadiness(routeOccupationId),
@@ -5375,6 +5882,30 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
         }
 
+        function getOccupationSkillBandExplanationForTitle(occupation, title) {
+          const titleProfile = getPreferredTitleRoleProfile(occupation, title);
+
+          if (!titleProfile) {
+            return getOccupationSkillBandExplanation(occupation);
+          }
+
+          switch (titleProfile.note) {
+            case "direct candidate":
+              return "현재 title 기준으로는 direct skilled 축으로 바로 비교 가능";
+            case "upgrade target":
+              return "현재 title 기준으로는 lead / supervisor / coordinator 축으로 읽혀 비교가 쉬움";
+            case "side-step upgrade":
+              return "현재 title 기준으로는 같은 업종 안 side-step skilled 전환 후보";
+            case "mixed direct":
+            case "license check":
+              return "현재 title 기준으로는 duties·자격에 따라 skilled 해석이 갈릴 수 있음";
+            case "exception route direct":
+              return "현재 title 기준으로는 예외 stream 또는 employer-driven과 직접 비교 가능";
+            default:
+              return getOccupationSkillBandExplanation(occupation);
+          }
+        }
+
         function buildTitleInterpretationEntries(answers) {
           const entries = [];
 
@@ -5394,7 +5925,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             }
 
             const meta = getOccupationMeta(resolvedOccupation);
-            const profiles = getOccupationCandidateProfiles(resolvedOccupation).slice(0, 3);
+            const preciseProfiles = inferTitleRoleProfiles(resolvedOccupation, title);
+            const profiles = getResolvedCandidateProfiles(resolvedOccupation, title).slice(0, 3);
+            const primaryPreciseProfile = preciseProfiles[0] || null;
             const upgradeTarget = profiles.find((profile) => /전환 목표|업그레이드 후보|한 단계 업그레이드/.test(profile.note)) || profiles[0];
             const inferredByTitle = getOccupationInferenceSummary(selectedOccupation, title);
             const titleStage = getOccupationTitleStage(resolvedOccupation, title);
@@ -5406,15 +5939,25 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               sideLabel: isKoreaSide ? "한국 경력" : "캐나다 현재 직무",
               heading: title || meta.labelKo,
               summary: title
-                ? ('"' + title + '"는 지금 ' + meta.labelKo + " 축으로 읽고 있어요.")
+                ? ('"' + title + '"는 지금 ' + (primaryPreciseProfile ? primaryPreciseProfile.label + " 중심으로 " : "") + meta.labelKo + " 축으로 읽고 있어요.")
                 : (meta.labelKo + " 축으로 읽고 있어요."),
               metaLabel: meta.labelKo,
-              bandLabel: getOccupationSkillBandExplanation(resolvedOccupation),
+              bandLabel: getOccupationSkillBandExplanationForTitle(resolvedOccupation, title),
               candidateLine: profiles.map((profile) => profile.label + " (" + profile.teer + ")").join(" / "),
+              exactLine: preciseProfiles.length > 0
+                ? preciseProfiles.slice(0, 2).map((profile) => profile.label + " (" + profile.teer + ")").join(" / ")
+                : "",
               targetLine: upgradeTarget
                 ? (upgradeTarget.label + " 쪽이 이민용으로 더 유리할 수 있어요.")
                 : "현재 title 그대로 밀 수 있는지 먼저 확인합니다.",
-              inferredLine: inferredByTitle ? inferredByTitle.labels.join(" / ") : meta.labelKo,
+              inferredLine: inferredByTitle
+                ? (inferredByTitle.preciseProfiles.length > 0
+                    ? inferredByTitle.preciseProfiles.join(" / ")
+                    : inferredByTitle.labels.join(" / "))
+                : meta.labelKo,
+              occupationLine: inferredByTitle && inferredByTitle.labels.length > 0
+                ? inferredByTitle.labels.join(" / ")
+                : meta.labelKo,
               titleStageLabel: titleStage.label,
               titleStageReason: titleStage.reason,
               isAnchor
@@ -5434,6 +5977,14 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const canadaMeta = getCanadaOccupationMeta(answers);
           const koreaTitleStage = getKoreaOccupationTitleStage(answers);
           const canadaTitleStage = getCanadaOccupationTitleStage(answers);
+          const canadaTitleProfile = getPreferredTitleRoleProfile(
+            resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle),
+            answers.canadaJobTitle
+          );
+          const koreaTitleProfile = getPreferredTitleRoleProfile(
+            resolveOccupationId(answers.koreaOccupation, answers.koreaJobTitle),
+            answers.koreaJobTitle
+          );
           const hasCanadaSkilled = hasCanadaOccupation && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
           const canUseKoreaSkilled = hasKoreaOccupation && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
           const canadaNonSkilled = answers.canadianJobSkill === "non-skilled";
@@ -5446,7 +5997,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 ? canadaMeta.labelKo + "은 그대로보다 " + getOccupationPlannerFocus(resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle)).transitionTarget + "로 올라가는 플랜을 같이 봐야 해요."
                 : (canadaTitleStage && canadaTitleStage.scoreAdjustment < 0
                     ? canadaTitleStage.reason + " 그래서 현재 직무 축을 쓰더라도 전환 플랜을 같이 보여주는 게 좋아요."
-                    : canadaMeta.labelKo + " 경력을 이민용 주력 축으로 설명할 수 있어요.")
+                    : (canadaTitleProfile ? canadaTitleProfile.label + " title을 중심으로 " : "") + canadaMeta.labelKo + " 경력을 이민용 주력 축으로 설명할 수 있어요.")
             };
           }
 
@@ -5455,7 +6006,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               anchorLabel: "한국 경력 축",
               summary: "지금은 한국 경력 축을 주력으로 보는 쪽이 맞아요.",
               detail: canUseKoreaSkilled
-                ? koreaMeta.labelKo + " 경력을 primary occupation으로 다시 정리하면 설명이 더 선명해질 수 있어요."
+                ? ((koreaTitleProfile ? koreaTitleProfile.label + " title을 중심으로 " : "") + koreaMeta.labelKo + " 경력을 primary occupation으로 다시 정리하면 설명이 더 선명해질 수 있어요.")
                 : koreaMeta.labelKo + " 경력은 있지만 NOC와 job duties 정리를 더 해야 해요."
             };
           }
@@ -5464,7 +6015,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             return {
               anchorLabel: "캐나다 현재 직무 축",
               summary: "현재는 캐나다 현재 직무 축이 가장 자연스러워요.",
-              detail: canadaMeta.labelKo + " 경력이 이미 skilled 축이라 EE와 주정부 둘 다 여기서 출발하기 좋아요."
+              detail: (canadaTitleProfile ? canadaTitleProfile.label + " title 기준으로 " : "") + canadaMeta.labelKo + " 경력이 이미 skilled 축이라 EE와 주정부 둘 다 여기서 출발하기 좋아요."
             };
           }
 
@@ -5532,7 +6083,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               '<p>' + escapeHtmlClient(entry.summary) + '</p>',
               '<ul class="reason-list">',
               '<li>현재 해석: ' + escapeHtmlClient(entry.metaLabel) + '</li>',
+              (entry.exactLine ? '<li>정밀 title 후보: ' + escapeHtmlClient(entry.exactLine) + '</li>' : ''),
               '<li>title 후보: ' + escapeHtmlClient(entry.inferredLine) + '</li>',
+              '<li>직군 축 후보: ' + escapeHtmlClient(entry.occupationLine) + '</li>',
               '<li>title 단계: ' + escapeHtmlClient(entry.titleStageLabel) + '</li>',
               '<li>title 해석 메모: ' + escapeHtmlClient(entry.titleStageReason) + '</li>',
               '<li>직무 상태: ' + escapeHtmlClient(entry.bandLabel) + '</li>',
@@ -6206,6 +6759,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         function getProvinceRuleContextTokens(answers, insight) {
           const routeOccupationId = getPrimaryOccupationId(answers);
           const routeTags = getOccupationMeta(routeOccupationId).tags;
+          const routeTitle = answers.targetOccupationPlan === "previous-korea-job"
+            ? answers.koreaJobTitle
+            : answers.canadaJobTitle;
+          const titleRoleProfiles = inferTitleRoleProfiles(routeOccupationId, routeTitle);
           const tokens = new Set(routeTags);
 
           if (statusSupports(insight.statuses.ee) || answers.ee === "yes") {
@@ -6258,11 +6815,20 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             tokens.add("atlantic");
           }
 
+          titleRoleProfiles.forEach((profile) => {
+            (profile.tokens || []).forEach((token) => tokens.add(token));
+          });
+
           return tokens;
         }
 
         function buildProvinceStreamGuide(answers, insight) {
           const provinceRule = PROVINCE_STREAM_RULES[insight.id];
+          const routeOccupationId = getPrimaryOccupationId(answers);
+          const routeTitle = answers.targetOccupationPlan === "previous-korea-job"
+            ? answers.koreaJobTitle
+            : answers.canadaJobTitle;
+          const preferredTitleProfile = getPreferredTitleRoleProfile(routeOccupationId, routeTitle);
 
           if (!provinceRule || !Array.isArray(provinceRule.rules) || provinceRule.rules.length === 0) {
             return null;
@@ -6313,6 +6879,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               badge = "예외 경로 참고";
               tone = "neutral";
               fitLine = "지금 직무가 stronger면 이 규칙은 보조 우회로로만 보면 돼요.";
+            }
+
+            if (preferredTitleProfile && rule.matchedTokens.length > 0) {
+              fitLine += " 현재 title은 " + preferredTitleProfile.label + " 쪽으로 읽고 있어 이 규칙과 더 직접 연결해 볼 수 있어요.";
             }
 
             return {

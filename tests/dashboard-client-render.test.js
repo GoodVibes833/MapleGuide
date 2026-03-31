@@ -307,8 +307,8 @@ function renderClientResults(rawControlValues) {
   return buildDashboardClientHarness(rawControlValues).html;
 }
 
-test("client render shows recommendations when ECA completed is the last required field", () => {
-  const html = renderClientResults({
+function buildCompleteControls(overrides = {}) {
+  return {
     path: "working-holiday",
     base: "student",
     age: "20-29",
@@ -331,8 +331,13 @@ test("client render shows recommendations when ECA completed is the last require
     canadaJobTitle: "",
     targetOccupationPlan: "",
     foreignExpAlignment: "",
-    degreeCareerPlan: ""
-  });
+    degreeCareerPlan: "",
+    ...overrides
+  };
+}
+
+test("client render shows recommendations when ECA completed is the last required field", () => {
+  const html = renderClientResults(buildCompleteControls());
 
   assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
   assert.match(html, /현재 조건에서 먼저 볼 주정부 추천 순위/);
@@ -340,31 +345,9 @@ test("client render shows recommendations when ECA completed is the last require
 });
 
 test("pageshow resync clears stale missing state and rerenders recommendations after browser restores values", () => {
-  const harness = buildDashboardClientHarness({
-    path: "working-holiday",
-    base: "student",
-    age: "20-29",
-    household: "with-spouse",
-    education: "two-year",
-    languageProfile: "guess:clb7",
-    foreignExp: "1",
-    canadianExp: "2",
-    canadianJobSkill: "skilled",
-    ee: "",
-    jobOffer: "",
-    ecaStatus: "",
-    permitRemaining: "",
-    budget: "",
-    setting: "",
-    advantage: "",
-    koreaOccupation: "",
-    koreaJobTitle: "",
-    canadaOccupation: "",
-    canadaJobTitle: "",
-    targetOccupationPlan: "",
-    foreignExpAlignment: "",
-    degreeCareerPlan: ""
-  });
+  const harness = buildDashboardClientHarness(buildCompleteControls({
+    ecaStatus: ""
+  }));
 
   assert.match(harness.quickStartResults.innerHTML, /작성 필요/);
   const ecaFieldNode = harness.requiredFieldNodes.find((fieldNode) => fieldNode.dataset.requiredField === "ecaStatus");
@@ -381,16 +364,7 @@ test("pageshow resync clears stale missing state and rerenders recommendations a
 test("saved questionnaire state restores recommendations and required markers on fresh load", () => {
   const savedState = {
     controlValues: {
-      path: "working-holiday",
-      base: "student",
-      age: "20-29",
-      household: "with-spouse",
-      education: "two-year",
-      languageProfile: "guess:clb7",
-      foreignExp: "1",
-      canadianExp: "2",
-      canadianJobSkill: "skilled",
-      ecaStatus: "completed"
+      ...buildCompleteControls()
     },
     activeQuickRegions: [
       "federal",
@@ -399,7 +373,7 @@ test("saved questionnaire state restores recommendations and required markers on
     ]
   };
 
-  const harness = buildDashboardClientHarness({
+  const harness = buildDashboardClientHarness(buildCompleteControls({
     path: "",
     base: "",
     age: "",
@@ -409,21 +383,8 @@ test("saved questionnaire state restores recommendations and required markers on
     foreignExp: "",
     canadianExp: "",
     canadianJobSkill: "",
-    ee: "",
-    jobOffer: "",
-    ecaStatus: "",
-    permitRemaining: "",
-    budget: "",
-    setting: "",
-    advantage: "",
-    koreaOccupation: "",
-    koreaJobTitle: "",
-    canadaOccupation: "",
-    canadaJobTitle: "",
-    targetOccupationPlan: "",
-    foreignExpAlignment: "",
-    degreeCareerPlan: ""
-  }, {
+    ecaStatus: ""
+  }), {
     sessionStorage: {
       "mapleguide.dashboard.state.v2": JSON.stringify(savedState)
     }
@@ -435,31 +396,7 @@ test("saved questionnaire state restores recommendations and required markers on
 });
 
 test("save, load, and reset controls preserve and clear questionnaire state", () => {
-  const harness = buildDashboardClientHarness({
-    path: "working-holiday",
-    base: "student",
-    age: "20-29",
-    household: "with-spouse",
-    education: "two-year",
-    languageProfile: "guess:clb7",
-    foreignExp: "1",
-    canadianExp: "2",
-    canadianJobSkill: "skilled",
-    ee: "",
-    jobOffer: "",
-    ecaStatus: "completed",
-    permitRemaining: "",
-    budget: "",
-    setting: "",
-    advantage: "",
-    koreaOccupation: "",
-    koreaJobTitle: "",
-    canadaOccupation: "",
-    canadaJobTitle: "",
-    targetOccupationPlan: "",
-    foreignExpAlignment: "",
-    degreeCareerPlan: ""
-  });
+  const harness = buildDashboardClientHarness(buildCompleteControls());
 
   harness.saveButton.click();
   assert.match(harness.quickFormStatus.textContent, /저장했어요/);
@@ -481,4 +418,35 @@ test("save, load, and reset controls preserve and clear questionnaire state", ()
   assert.equal(harness.sessionStorage.getItem("mapleguide.dashboard.state.v2"), null);
   assert.match(harness.quickFormStatus.textContent, /초기화/);
   assert.match(harness.quickStartResults.innerHTML, /작성 필요/);
+});
+
+test("typed supervisor title overrides broad service bucket with direct candidate guidance", () => {
+  const html = renderClientResults(
+    buildCompleteControls({
+      canadaOccupation: "server-counter",
+      canadaJobTitle: "Food Service Supervisor",
+      targetOccupationPlan: "current-canada-job"
+    })
+  );
+
+  assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
+  assert.match(html, /정밀 title 후보: Food service supervisor \(TEER 2\)/);
+  assert.match(html, /직군 축 후보: 서버 \/ 캐셔 \/ 바리스타 \/ food counter/);
+  assert.match(html, /현재 title 기준으로는 lead \/ supervisor \/ coordinator 축으로 읽혀 비교가 쉬움/);
+  assert.match(html, /food service supervisor는 front-line service보다 훨씬 직접 비교 가능한 title이에요/);
+});
+
+test("dispatcher title narrows warehouse planning toward direct logistics route", () => {
+  const html = renderClientResults(
+    buildCompleteControls({
+      canadaOccupation: "warehouse-logistics",
+      canadaJobTitle: "Dispatcher",
+      targetOccupationPlan: "current-canada-job"
+    })
+  );
+
+  assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
+  assert.match(html, /정밀 title 후보: Dispatcher \(TEER 2\)/);
+  assert.match(html, /해석 후보: Dispatcher \(TEER 2, direct candidate\)/);
+  assert.match(html, /dispatcher는 warehouse broad role보다 훨씬 직접 비교 가능한 title이에요/);
 });

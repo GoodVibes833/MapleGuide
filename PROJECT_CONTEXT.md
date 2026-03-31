@@ -22,6 +22,7 @@ Current repo status:
 - province stream rule overlays now live in `src/config/province-stream-rules.js`
 - province recommendations are primary, federal/EE is separate
 - typed Korea/Canada job titles now feed occupation inference
+- typed titles now also use a structured title-profile layer, so exact inputs like `Food Service Supervisor`, `Dispatcher`, `Bookkeeper`, `Office Administrator` can override the broader occupation bucket
 - questionnaire answers can now be saved, loaded, and reset inside the same browser session
 - GA4 is prepared but only active if `MAPLEGUIDE_GA_MEASUREMENT_ID` is configured
 
@@ -49,6 +50,11 @@ Recent high-signal progress already completed:
   - transition / school route
   - or still needs more detail
 - added `title 단계` interpretation and wired actual typed job titles into recommendation scoring, so `Server`, `Administrative Assistant`, `Bookkeeper`, `Dispatcher`-type differences affect both ranking and route wording instead of only the broad occupation bucket
+- added structured title-role profiles so exact typed titles now change:
+  - the `정밀 title 후보` shown in the title interpretation block
+  - the skill-band explanation shown for the title
+  - the province occupation lens NOC examples / candidate profiles
+  - the province rules DB token hits used by `주별 stream 현실 가이드`
 - added mismatch handling for cases where the user marks the role as skilled but the typed title still looks broad or entry-level; these now shift province plans toward title upgrade / school / exception routes instead of over-trusting the broad category
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
 - added occupation-specific planner focus for common ambiguous personas:
