@@ -158,6 +158,10 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /front-line service title이라 대부분 주에서 그대로는 약하게 읽혀요/);
   assert.match(dashboardResponse.body, /선택한 직군은 skilled 쪽이지만, 입력한 title은 아직 broad해서 전환 플랜을 같이 보는 게 좋아요/);
   assert.match(dashboardResponse.body, /현재 title 해석상 direct가 약해서/);
+  assert.match(
+    dashboardResponse.body,
+    /improvementPlan\.baseScore \+ "점 \+" \+ improvementPlan\.projectedScoreLift \+ "점 → " \+ improvementPlan\.projectedScore \+ "점"/
+  );
   assert.match(dashboardResponse.body, /캐나다 한눈에 비교/);
   assert.match(dashboardResponse.body, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
 
@@ -167,6 +171,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   });
   assert.equal(ontarioRegionResponse.statusCode, 200);
   assert.match(ontarioRegionResponse.body, /온타리오/);
+  assert.match(ontarioRegionResponse.body, /id="jurisdiction-personalized-plan"/);
+  assert.match(ontarioRegionResponse.body, /메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것/);
   assert.match(ontarioRegionResponse.body, /이 지역을 볼지 말지 먼저 판단/);
   assert.match(ontarioRegionResponse.body, /연결된 공식 소스/);
 

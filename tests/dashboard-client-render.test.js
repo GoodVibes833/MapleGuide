@@ -303,6 +303,98 @@ function buildDashboardClientHarness(rawControlValues, options = {}) {
   };
 }
 
+function buildJurisdictionClientHarness(jurisdictionId, options = {}) {
+  const html = renderDashboard({
+    generatedAt: "2026-03-31",
+    updates: [],
+    reports: [],
+    page: "jurisdiction",
+    jurisdictionId,
+    basePath: ""
+  });
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(script, "expected embedded jurisdiction script");
+
+  const personalizedRegionPlan = makeNode({
+    dataset: {
+      jurisdictionId,
+      jurisdictionLabel: jurisdictionId
+    }
+  });
+
+  const sessionStore = new Map(Object.entries(options.sessionStorage ?? {}));
+  const sessionStorage = {
+    getItem(key) {
+      return sessionStore.has(key) ? sessionStore.get(key) : null;
+    },
+    setItem(key, value) {
+      sessionStore.set(key, String(value));
+    },
+    removeItem(key) {
+      sessionStore.delete(key);
+    }
+  };
+
+  const document = {
+    getElementById(id) {
+      if (id === "jurisdiction-personalized-plan") {
+        return personalizedRegionPlan;
+      }
+      return null;
+    },
+    querySelectorAll() {
+      return [];
+    },
+    querySelector() {
+      return null;
+    },
+    createElement() {
+      return makeNode();
+    },
+    body: makeNode(),
+    documentElement: makeNode()
+  };
+
+  const context = {
+    console,
+    document,
+    window: {
+      location: { hash: "" },
+      addEventListener() {},
+      removeEventListener() {},
+      innerWidth: 1440,
+      sessionStorage,
+      scrollTo() {},
+      requestAnimationFrame(fn) {
+        fn();
+      }
+    },
+    location: { hash: "" },
+    history: { replaceState() {} },
+    navigator: { userAgent: "node" },
+    requestAnimationFrame(fn) {
+      fn();
+    },
+    sessionStorage,
+    setTimeout,
+    clearTimeout,
+    Set,
+    Map,
+    URL,
+    URLSearchParams,
+    Intl,
+    Date,
+    Math
+  };
+  context.globalThis = context;
+
+  vm.runInNewContext(script, context, { timeout: 5000 });
+  return {
+    personalizedRegionPlan,
+    sessionStorage
+  };
+}
+
 function renderClientResults(rawControlValues) {
   return buildDashboardClientHarness(rawControlValues).html;
 }
@@ -455,4 +547,47 @@ test("dispatcher title narrows warehouse planning toward direct logistics route"
   assert.match(html, /dispatcher는 warehouse broad role보다 훨씬 직접 비교 가능한 title이에요/);
   assert.match(html, /Dispatcher title 기준으로는 .* 쪽이 먼저 맞아요/);
   assert.match(html, /맞는 이유: 현재 title Dispatcher/);
+});
+
+test("complete render persists recommendation snapshots with summed CRS lift", () => {
+  const harness = buildDashboardClientHarness(buildCompleteControls({
+    languageProfile: "official:clb7",
+    foreignExp: "5",
+    canadianExp: "4",
+    canadianJobSkill: "skilled",
+    ee: "yes"
+  }));
+
+  const savedState = JSON.parse(harness.sessionStorage.getItem("mapleguide.dashboard.state.v2"));
+  assert.ok(savedState.recommendationSnapshots);
+  assert.match(
+    savedState.recommendationSnapshots.federal.improvementSummaryLabel,
+    /예상 CRS \d+점 \+\d+점 → \d+점/
+  );
+});
+
+test("jurisdiction page restores personalized plan from saved dashboard recommendations", () => {
+  const dashboardHarness = buildDashboardClientHarness(buildCompleteControls({
+    canadaOccupation: "office-admin",
+    canadaJobTitle: "Administrative Assistant",
+    targetOccupationPlan: "current-canada-job",
+    ecaStatus: "completed"
+  }));
+  const savedState = dashboardHarness.sessionStorage.getItem("mapleguide.dashboard.state.v2");
+  assert.ok(savedState, "expected saved dashboard state");
+  const parsedState = JSON.parse(savedState);
+  const recommendationId = Object.keys(parsedState.recommendationSnapshots || {}).find((id) => id !== "federal")
+    || Object.keys(parsedState.recommendationSnapshots || {})[0];
+  assert.ok(recommendationId, "expected at least one saved recommendation snapshot");
+
+  const regionHarness = buildJurisdictionClientHarness(recommendationId, {
+    sessionStorage: {
+      "mapleguide.dashboard.state.v2": savedState
+    }
+  });
+
+  assert.equal(regionHarness.personalizedRegionPlan.hidden, false);
+  assert.match(regionHarness.personalizedRegionPlan.innerHTML, /메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것/);
+  assert.match(regionHarness.personalizedRegionPlan.innerHTML, /지금 먼저 할 것/);
+  assert.match(regionHarness.personalizedRegionPlan.innerHTML, /메인 추천으로 돌아가기/);
 });

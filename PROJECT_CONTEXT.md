@@ -24,6 +24,7 @@ Current repo status:
 - typed Korea/Canada job titles now feed occupation inference
 - typed titles now also use a structured title-profile layer, so exact inputs like `Food Service Supervisor`, `Dispatcher`, `Bookkeeper`, `Office Administrator` can override the broader occupation bucket
 - questionnaire answers can now be saved, loaded, and reset inside the same browser session
+- dashboard recommendation snapshots now persist in session storage, so jurisdiction pages can restore a user-specific top plan block from the latest main-page answers
 - GA4 is prepared but only active if `MAPLEGUIDE_GA_MEASUREMENT_ID` is configured
 
 If a future session needs the full long-range build plan, read:
@@ -67,6 +68,20 @@ Recent high-signal progress already completed:
 - added `exact title -> 먼저 붙는 stream` guidance inside `주별 stream 현실 가이드`, so users can see which province rules their exact typed title is hitting first
 - added mismatch handling for cases where the user marks the role as skilled but the typed title still looks broad or entry-level; these now shift province plans toward title upgrade / school / exception routes instead of over-trusting the broad category
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
+- changed the federal improvement summary so the header shows the summed lift from the currently proposed actions, e.g. `예상 CRS 423점 +89점 → 512점`, instead of hiding the delta inside only the sub-actions
+- added recommendation snapshot persistence from the main dashboard so recommendation cards can hand a user-specific action bundle to the matching jurisdiction page
+- added a new jurisdiction top panel, `메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것`, that restores:
+  - why this jurisdiction was recommended
+  - what the user already has
+  - immediate quick actions
+  - EE bridge info when relevant
+  - stream guide cards
+  - concrete plan variants
+  - short timeline
+- current intended UX direction for jurisdiction pages:
+  - keep the generic province page structure
+  - but always lead with the personalized top block when the user arrived from the main recommendation flow
+  - this preserves official program context without breaking the feeling of continuity between dashboard and region page
 - added occupation-specific planner focus for common ambiguous personas:
   - `server / barista / cashier -> food service supervisor or cook`
   - `retail sales -> retail supervisor or office coordinator`
@@ -145,6 +160,13 @@ Recent commit trail worth checking:
 
 ### Region Pages
 
+- personalized top block when arriving from the main dashboard flow:
+  - `메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것`
+  - route-reality summary
+  - fit/chance pills
+  - why this jurisdiction / what the user already has / immediate actions
+  - EE bridge and stream guide excerpts
+  - concrete plan variants and short timeline
 - objective province overview first
 - stream structure
 - official links
@@ -160,6 +182,9 @@ These are intentional decisions. Do not casually undo them in a new session.
 - federal / EE must stay visually separate from province ranking
 - province cards can mention EE linkage, but must label it clearly as federal reference logic
 - province cards should not lead with raw federal point deltas in the main action area; point math belongs mainly to the federal card or a clearly labeled EE-bridge section
+- when showing federal score improvement in the main recommendation flow, the summary should show the current score, the summed lift from the currently suggested actions, and the projected result in one line
+- jurisdiction pages should feel like a continuation of the recommendation flow, not a disconnected encyclopedia entry
+- the personalized jurisdiction block should stay above the generic province explainer content unless product direction explicitly changes
 - when the current role is non-skilled or ambiguous, province quick actions should prioritize route steps like job-title upgrade, school/PGWP, employer-driven, or local connection before generic score boosting
 - the most common ambiguous Korean personas should currently read like this unless a future session replaces them with tighter official rules:
   - `server / barista / cashier`: direct EE weak, prefer food service supervisor or cook pivot

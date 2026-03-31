@@ -255,6 +255,10 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /front-line service title이라 대부분 주에서 그대로는 약하게 읽혀요/);
   assert.match(dashboardHtml, /선택한 직군은 skilled 쪽이지만, 입력한 title은 아직 broad해서 전환 플랜을 같이 보는 게 좋아요/);
   assert.match(dashboardHtml, /현재 title 해석상 direct가 약해서/);
+  assert.match(
+    dashboardHtml,
+    /improvementPlan\.baseScore \+ "점 \+" \+ improvementPlan\.projectedScoreLift \+ "점 → " \+ improvementPlan\.projectedScore \+ "점"/
+  );
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
   assert.match(dashboardHtml, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
   assert.doesNotMatch(dashboardHtml, /Map Explorer/);
@@ -271,6 +275,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
     "utf8"
   );
   assert.match(ontarioRegionPage, /온타리오/);
+  assert.match(ontarioRegionPage, /id="jurisdiction-personalized-plan"/);
+  assert.match(ontarioRegionPage, /메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것/);
   assert.match(ontarioRegionPage, /이 지역을 볼지 말지 먼저 판단/);
   assert.match(ontarioRegionPage, /먼저 읽어야 할 대표 경로/);
   assert.match(ontarioRegionPage, /이 지역 프로그램 구조/);

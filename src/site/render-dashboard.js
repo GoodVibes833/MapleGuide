@@ -1622,6 +1622,14 @@ function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports 
       </aside>
     </section>
 
+    <section
+      id="jurisdiction-personalized-plan"
+      class="section panel"
+      data-jurisdiction-id="${escapeHtml(meta.id)}"
+      data-jurisdiction-label="${escapeHtml(meta.labelKo)}"
+      hidden
+    ></section>
+
     ${renderRegionDecisionSection(insight)}
     ${renderKeyStreams(insight)}
     ${renderJurisdictionOverview(meta, profile)}
@@ -1701,6 +1709,40 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
       };
 
       const DASHBOARD_STORAGE_KEY = "mapleguide.dashboard.state.v2";
+      const DASHBOARD_RECOMMENDATION_SNAPSHOT_LIMIT = 2;
+
+      function getSessionStorage() {
+        try {
+          if (typeof window.sessionStorage !== "undefined") {
+            return window.sessionStorage;
+          }
+        } catch {}
+
+        return null;
+      }
+
+      function readStoredDashboardState() {
+        const storage = getSessionStorage();
+        if (!storage) {
+          return null;
+        }
+
+        try {
+          const parsed = JSON.parse(storage.getItem(DASHBOARD_STORAGE_KEY) || "null");
+          return parsed && typeof parsed === "object" ? parsed : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function escapeHtmlClient(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
 
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
@@ -1740,27 +1782,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           linkText: "연방 / EE 먼저 보기"
         };
 
-        function getSessionStorage() {
-          try {
-            if (typeof window.sessionStorage !== "undefined") {
-              return window.sessionStorage;
-            }
-          } catch {}
-
-          return null;
-        }
-
         function hasAnswerValue(value) {
           return !(typeof value === "undefined" || value === null || String(value).trim() === "");
-        }
-
-        function escapeHtmlClient(value) {
-          return String(value)
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#39;");
         }
 
         function statusSupports(status) {
@@ -1774,6 +1797,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         const REQUIRED_FIELD_LABELS = ${JSON.stringify(DASHBOARD_REQUIRED_FIELD_LABELS)};
         const OPTIONAL_ANSWER_DEFAULTS = ${JSON.stringify(DASHBOARD_OPTIONAL_DEFAULTS)};
         const PROVINCE_STREAM_RULES = ${serializeForScript(provinceStreamRules)};
+        let lastRecommendationSnapshots = {};
 
         function getMissingRequiredFields(rawAnswers) {
           return Object.entries(REQUIRED_FIELD_LABELS)
@@ -1835,6 +1859,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             .querySelectorAll("[data-recommendation-link]")
             .forEach((linkNode) => {
               linkNode.addEventListener("click", () => {
+                persistQuickStartState({
+                  recommendationSnapshots: lastRecommendationSnapshots,
+                  lastVisitedRecommendationId: linkNode.dataset.recommendationId ?? ""
+                });
                 trackAnalytics("recommendation_region_clicked", {
                   recommendation_id: linkNode.dataset.recommendationId ?? "",
                   route_type: linkNode.dataset.routeType ?? ""
@@ -1907,7 +1935,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return readDashboardRawAnswersFromControls(quickStartForm.elements, normalizeDependentAnswers);
         }
 
-        function persistQuickStartState() {
+        function persistQuickStartState(extraState = {}) {
           const storage = getSessionStorage();
           if (!storage || !quickStartForm || suspendQuickStartPersistence) {
             return;
@@ -1936,10 +1964,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           });
 
           try {
+            const previousState = readStoredDashboardState() || {};
             storage.setItem(DASHBOARD_STORAGE_KEY, JSON.stringify({
+              ...previousState,
               rawAnswers,
               controlValues,
-              activeQuickRegions: Array.from(activeQuickRegions)
+              activeQuickRegions: Array.from(activeQuickRegions),
+              ...extraState
             }));
           } catch {}
         }
@@ -1967,12 +1998,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             return false;
           }
 
-          let parsedState = null;
-          try {
-            parsedState = JSON.parse(storage.getItem(DASHBOARD_STORAGE_KEY) || "null");
-          } catch {
-            parsedState = null;
-          }
+          const parsedState = readStoredDashboardState();
 
           if (!parsedState || typeof parsedState !== "object") {
             return false;
@@ -3253,6 +3279,50 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           return items.slice(0, 4);
+        }
+
+        function buildRecommendationContextSummary(answers) {
+          const items = [];
+
+          if (answers.base === "student") {
+            items.push("캐나다 학생 상태");
+          } else if (answers.base === "working-holiday") {
+            items.push("워홀 / open work permit");
+          } else if (answers.base === "pgwp") {
+            items.push("PGWP / 졸업 후 취업");
+          } else if (answers.base === "worker") {
+            items.push("캐나다 근무 중");
+          } else if (answers.base === "outside") {
+            items.push("캐나다 밖에서 준비 중");
+          }
+
+          if (answers.household === "with-spouse") {
+            items.push("배우자 함께");
+          } else if (answers.household === "single") {
+            items.push("단독 지원");
+          }
+
+          if (answers.languageProfileLabelKo) {
+            items.push(answers.languageProfileLabelKo);
+          }
+
+          if (answers.canadianExp && answers.canadianExp !== "0") {
+            items.push("캐나다 경력 " + answers.canadianExp + "년");
+          } else {
+            items.push("캐나다 경력 없음");
+          }
+
+          if (answers.foreignExp && answers.foreignExp !== "0") {
+            items.push("해외 경력 " + answers.foreignExp + "년");
+          }
+
+          if (answers.ecaStatus === "completed") {
+            items.push("ECA 완료");
+          } else if (answers.ecaStatus === "canadian-degree") {
+            items.push("캐나다 학위");
+          }
+
+          return items.slice(0, 5).join(" · ");
         }
 
         function buildRecommendationLeadSummary(answers, insight, evaluation, eeSnapshot) {
@@ -7612,6 +7682,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               answers.base,
               answers.setting
             ].join("|");
+            const recommendationSnapshots = {};
 
           function renderRecommendationCard(entry, index = null, mode = "province") {
             const { insight, evaluation } = entry;
@@ -7648,6 +7719,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               .slice(0, 3);
             const topActionItems = improvementPlan.items.slice(0, 2);
             const leadSummary = buildRecommendationLeadSummary(answers, insight, evaluation, eeSnapshot);
+            const recommendationContextSummary = buildRecommendationContextSummary(answers);
             const routeTypeLabel = isFederalCard ? "연방" : "주정부";
             const routeSummaryLabel = isFederalCard
               ? "연방 / EE · " + selectionModel.badgeKo
@@ -7745,6 +7817,42 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   })
                   .join("")
               : '<li class="compact-action-item"><span class="improvement-delta is-neutral">준비</span><div class="compact-action-copy"><strong>최신 공지 계속 확인</strong><p>draw, intake, 직군 우선순위 변화가 실제 체감에 더 크게 작용할 수 있어요.</p></div></li>';
+            const snapshotQuickActions = quickActionCards.length > 0
+              ? quickActionCards.map((entry) => {
+                  if (entry.mode === "plan") {
+                    return {
+                      badge: entry.plan.badge,
+                      tone: "positive",
+                      title: entry.plan.title,
+                      detail: entry.plan.summary
+                    };
+                  }
+
+                  const item = entry.item;
+                  const actionView = isFederalCard
+                    ? {
+                        badge: item.scoreImpact?.badge ?? "준비",
+                        tone: item.scoreImpact?.tone ?? "neutral",
+                        label: item.scoreImpact?.label ?? item.detail
+                      }
+                    : getProvinceActionPresentation(item);
+
+                  return {
+                    badge: actionView.badge,
+                    tone: actionView.tone,
+                    title: item.title,
+                    detail: actionView.label,
+                    note: !isFederalCard && actionView.note && actionView.note !== actionView.label
+                      ? actionView.note
+                      : ""
+                  };
+                })
+              : [{
+                  badge: "준비",
+                  tone: "neutral",
+                  title: "최신 공지 계속 확인",
+                  detail: "draw, intake, 직군 우선순위 변화가 실제 체감에 더 크게 작용할 수 있어요."
+                }];
             const improvementHtml = improvementPlan.items
               .map((item) => {
                 const actionView = isFederalCard
@@ -7779,9 +7887,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const improvementSummaryLabel = isFederalCard
               ? (
                   improvementPlan.projectedScoreLift > 0
-                    ? "예상 CRS " + improvementPlan.baseScore + "점 → " + improvementPlan.projectedScore + "점"
+                    ? "예상 CRS " + improvementPlan.baseScore + "점 +" + improvementPlan.projectedScoreLift + "점 → " + improvementPlan.projectedScore + "점"
                     : improvementPlan.bestFutureScoreLift > 0
-                      ? "지금 " + improvementPlan.baseScore + "점 · 나중에 최대 " + (improvementPlan.baseScore + improvementPlan.bestFutureScoreLift) + "점"
+                      ? "지금 " + improvementPlan.baseScore + "점 +최대 " + improvementPlan.bestFutureScoreLift + "점 → 최대 " + (improvementPlan.baseScore + improvementPlan.bestFutureScoreLift) + "점"
                       : "예상 CRS " + improvementPlan.baseScore + "점 유지"
                 )
               : (
@@ -7808,6 +7916,45 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   '</section>'
                 ].join("")
               : "";
+            const summaryStrengthItems = profileStrengthItems.length
+              ? profileStrengthItems
+              : pathwayCurrentItems.length
+                ? pathwayCurrentItems
+                : ["강점 정리를 더 해보는 게 좋아요."];
+            recommendationSnapshots[insight.id] = {
+              id: insight.id,
+              labelKo: insight.labelKo,
+              routeTypeLabel,
+              routeSummaryLabel,
+              fitPercent,
+              immigrationChancePercent,
+              leadSummary,
+              recommendationContextSummary,
+              whyRankItems,
+              strengthItems: summaryStrengthItems,
+              improvementSummaryLabel,
+              quickActions: snapshotQuickActions,
+              routeReality,
+              provinceEeBridge,
+              provinceStreamGuide: provinceStreamGuide
+                ? {
+                    overview: provinceStreamGuide.overview,
+                    titleHitLine: provinceStreamGuide.titleHitLine,
+                    cards: provinceStreamGuide.cards.slice(0, DASHBOARD_RECOMMENDATION_SNAPSHOT_LIMIT)
+                  }
+                : null,
+              concreteProvincePlans: concreteProvincePlans
+                .slice(0, DASHBOARD_RECOMMENDATION_SNAPSHOT_LIMIT)
+                .map((plan) => ({
+                  title: plan.title,
+                  badge: plan.badge,
+                  comparisonLabel: plan.comparisonLabel || plan.badge,
+                  summary: plan.summary,
+                  steps: plan.steps.slice(0, 3)
+                })),
+              timelineTitle,
+              timeline: timeline.slice(0, 3)
+            };
 
             return [
               '<article class="wizard-result-card" data-recommendation-id="' + escapeHtmlClient(insight.id) + '" data-route-type="' + escapeHtmlClient(routeTypeLabel) + '">',
@@ -7862,11 +8009,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               '<div class="result-summary-card">',
               '<strong>내가 이미 가진 것</strong>',
               '<ul class="result-summary-list">'
-                + (profileStrengthItems.length
-                  ? profileStrengthItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                  : pathwayCurrentItems.length
-                    ? pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
-                  : '<li>강점 정리를 더 해보는 게 좋아요.</li>')
+                + summaryStrengthItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
                 + '</ul>',
               '</div>',
               '<div class="result-summary-card">',
@@ -8085,6 +8228,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               resultsSections.push(renderRecommendationCard(federalEntry, null, "federal"));
             }
 
+            lastRecommendationSnapshots = recommendationSnapshots;
+            persistQuickStartState({
+              recommendationSnapshots,
+              recommendationContextSummary: buildRecommendationContextSummary(answers)
+            });
             quickStartResults.innerHTML = resultsSections.join("");
             bindRecommendationInteractions();
 
@@ -8433,6 +8581,165 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         });
 
         setSelectionCard(null);
+      } else if (PAGE === "jurisdiction") {
+        const personalizedRegionPlan = document.getElementById("jurisdiction-personalized-plan");
+        const savedState = readStoredDashboardState();
+        const jurisdictionId = personalizedRegionPlan?.dataset?.jurisdictionId ?? "";
+        const snapshot = savedState?.recommendationSnapshots?.[jurisdictionId] ?? null;
+
+        function renderSnapshotActionItems(items = []) {
+          if (!items.length) {
+            return "";
+          }
+
+          return items.map((item) => [
+            '<li class="compact-action-item">',
+            '<span class="improvement-delta is-' + escapeHtmlClient(item.tone || "neutral") + '">' + escapeHtmlClient(item.badge || "준비") + '</span>',
+            '<div class="compact-action-copy">',
+            '<strong>' + escapeHtmlClient(item.title || "") + '</strong>',
+            '<p>' + escapeHtmlClient(item.detail || "") + '</p>',
+            item.note ? '<p>' + escapeHtmlClient(item.note) + '</p>' : "",
+            '</div>',
+            '</li>'
+          ].join("")).join("");
+        }
+
+        function renderSnapshotPlans(plans = []) {
+          if (!plans.length) {
+            return "";
+          }
+
+          return [
+            '<section class="plan-variants-panel">',
+            '<div class="plan-variants-head">',
+            '<strong>이 주에서 가능한 현실 플랜</strong>',
+            '<p class="wizard-freshness">메인 추천에서 계산한 이 사람 기준 플랜을 그대로 이어서 보여줍니다.</p>',
+            '</div>',
+            '<div class="plan-variant-grid">',
+            plans.map((plan, index) => [
+              '<article class="plan-variant-card">',
+              '<div class="plan-variant-topline">',
+              '<span class="compare-pill">플랜 ' + escapeHtmlClient(String.fromCharCode(65 + index)) + ' · ' + escapeHtmlClient(plan.comparisonLabel || plan.badge || "현실 플랜") + '</span>',
+              '<span class="plan-variant-highlight">' + escapeHtmlClient(plan.badge || "플랜") + '</span>',
+              '</div>',
+              '<strong>' + escapeHtmlClient(plan.title || "") + '</strong>',
+              '<p>' + escapeHtmlClient(plan.summary || "") + '</p>',
+              '<ul class="reason-list">' + (plan.steps || []).map((step) => '<li>' + escapeHtmlClient(step) + '</li>').join("") + '</ul>',
+              '</article>'
+            ].join("")).join(""),
+            '</div>',
+            '</section>'
+          ].join("");
+        }
+
+        function renderSnapshotStreamGuide(streamGuide) {
+          if (!streamGuide) {
+            return "";
+          }
+
+          return [
+            '<section class="selection-model-panel">',
+            '<div class="selection-model-head">',
+            '<strong>이 주의 stream 현실 가이드</strong>',
+            '<span class="selection-model-badge">메인 추천 연동</span>',
+            '</div>',
+            '<p class="selection-model-detail">' + escapeHtmlClient(streamGuide.overview || "") + '</p>',
+            streamGuide.titleHitLine ? '<p class="wizard-freshness">' + escapeHtmlClient(streamGuide.titleHitLine) + '</p>' : "",
+            '<div class="plan-variant-grid">',
+            (streamGuide.cards || []).map((card) => [
+              '<article class="plan-variant-card">',
+              '<div class="plan-variant-topline">',
+              '<span class="compare-pill">' + escapeHtmlClient(card.title || "") + '</span>',
+              '<span class="plan-variant-highlight">' + escapeHtmlClient(card.badge || "지금 비교 가능") + '</span>',
+              '</div>',
+              '<p class="plan-variant-stream">' + escapeHtmlClient(card.fitLine || "") + '</p>',
+              '<p class="wizard-freshness">맞는 이유: ' + escapeHtmlClient(card.reasonLine || "") + '</p>',
+              '<p>' + escapeHtmlClient(card.note || "") + '</p>',
+              '</article>'
+            ].join("")).join(""),
+            '</div>',
+            '</section>'
+          ].join("");
+        }
+
+        function renderSnapshotEeBridge(eeBridge) {
+          if (!eeBridge) {
+            return "";
+          }
+
+          return [
+            '<section class="ee-bridge-panel">',
+            '<div class="selection-model-head">',
+            '<strong>연방 / EE 같이 보면</strong>',
+            '<span class="selection-model-badge">EE-linked</span>',
+            '</div>',
+            '<ul class="reason-list">',
+            '<li>' + escapeHtmlClient(eeBridge.currentLine || "") + '</li>',
+            '<li>' + escapeHtmlClient(eeBridge.nominationLine || "") + '</li>',
+            '<li>' + escapeHtmlClient(eeBridge.clb9Line || "") + '</li>',
+            '<li>' + escapeHtmlClient(eeBridge.canadianExpLine || "") + '</li>',
+            '</ul>',
+            '</section>'
+          ].join("");
+        }
+
+        if (personalizedRegionPlan && snapshot) {
+          personalizedRegionPlan.hidden = false;
+          personalizedRegionPlan.innerHTML = [
+            '<div class="panel-head">',
+            '<div>',
+            '<p class="panel-kicker">From Your Main Answers</p>',
+            '<h2>메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것</h2>',
+            '</div>',
+            '<p class="panel-note">지도 허브에서 입력한 사람 정보를 기준으로, 이 지역에서 먼저 볼 방향을 다시 정리했습니다.</p>',
+            '</div>',
+            '<div class="route-reality-banner is-' + escapeHtmlClient(snapshot.routeReality?.tone || "neutral") + '">',
+            '<span class="route-reality-badge">' + escapeHtmlClient(snapshot.routeReality?.badge || snapshot.routeTypeLabel || "추천") + '</span>',
+            '<div class="route-reality-copy">',
+            '<strong>' + escapeHtmlClient(snapshot.routeReality?.title || snapshot.labelKo || "") + '</strong>',
+            '<p>' + escapeHtmlClient(snapshot.routeReality?.summary || snapshot.leadSummary || "") + '</p>',
+            '</div>',
+            '</div>',
+            snapshot.recommendationContextSummary ? '<p class="wizard-freshness">입력 기준: ' + escapeHtmlClient(snapshot.recommendationContextSummary) + '</p>' : "",
+            '<div class="fit-band-row">',
+            '<span class="fit-score">예상 적합도 ' + escapeHtmlClient(snapshot.fitPercent) + '%</span>',
+            '<span class="chance-score">현재 진입 가능성 ' + escapeHtmlClient(snapshot.immigrationChancePercent) + '%</span>',
+            '<span class="compare-pill">' + escapeHtmlClient(snapshot.routeSummaryLabel || "") + '</span>',
+            '</div>',
+            '<div class="result-summary-stack">',
+            '<div class="result-summary-card">',
+            '<strong>왜 이 주를 같이 봤는가</strong>',
+            '<ul class="result-summary-list">' + (snapshot.whyRankItems || []).map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("") + '</ul>',
+            '</div>',
+            '<div class="result-summary-card">',
+            '<strong>내가 이미 가진 것</strong>',
+            '<ul class="result-summary-list">' + (snapshot.strengthItems || []).map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("") + '</ul>',
+            '</div>',
+            '<div class="result-summary-card">',
+            '<div class="improvement-head">',
+            '<strong>지금 먼저 할 것</strong>',
+            '<span class="improvement-total">' + escapeHtmlClient(snapshot.improvementSummaryLabel || "") + '</span>',
+            '</div>',
+            '<ul class="compact-action-list">' + renderSnapshotActionItems(snapshot.quickActions || []) + '</ul>',
+            '</div>',
+            '</div>',
+            renderSnapshotEeBridge(snapshot.provinceEeBridge),
+            renderSnapshotStreamGuide(snapshot.provinceStreamGuide),
+            renderSnapshotPlans(snapshot.concreteProvincePlans),
+            (snapshot.timeline || []).length > 0
+              ? '<section class="career-check-panel"><strong>' + escapeHtmlClient(snapshot.timelineTitle || "이 주라면 이런 순서") + '</strong><ul class="reason-list">' + snapshot.timeline.map((step) => '<li>' + escapeHtmlClient(step) + '</li>').join("") + '</ul></section>'
+              : "",
+            '<div class="hero-actions">',
+            '<a class="btn ghost" href="' + ((BASE_PATH || "") + '/#section-start') + '">메인 추천으로 돌아가기</a>',
+            '</div>'
+          ].join("");
+
+          trackAnalytics("jurisdiction_personalized_viewed", {
+            recommendation_id: snapshot.id || jurisdictionId,
+            route_type: snapshot.routeTypeLabel || "",
+            jurisdiction_id: jurisdictionId
+          });
+        }
       }
     </script>
   `;
