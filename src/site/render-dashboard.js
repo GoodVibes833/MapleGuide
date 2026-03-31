@@ -24,6 +24,39 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
 
+export const DASHBOARD_REQUIRED_FIELD_LABELS = {
+  path: "가장 가까운 현재 상황",
+  base: "현재 캐나다 체류 상태",
+  age: "나이",
+  household: "배우자 포함 여부",
+  education: "최종 학력",
+  languageProfile: "영어 상태",
+  foreignExp: "해외 숙련 경력",
+  canadianExp: "캐나다 경력",
+  canadianJobSkill: "캐나다 경력의 성격",
+  ecaStatus: "ECA / 학력평가 상태"
+};
+
+export function hasDashboardAnswerValue(value) {
+  return !(typeof value === "undefined" || value === null || String(value).trim() === "");
+}
+
+export function getDashboardMissingRequiredFieldLabels(
+  rawAnswers,
+  requiredFieldLabels = DASHBOARD_REQUIRED_FIELD_LABELS
+) {
+  return Object.entries(requiredFieldLabels)
+    .filter(([field]) => !hasDashboardAnswerValue(rawAnswers[field]))
+    .map(([, label]) => label);
+}
+
+export function getDashboardAnsweredRequiredFieldCount(
+  rawAnswers,
+  requiredFieldLabels = DASHBOARD_REQUIRED_FIELD_LABELS
+) {
+  return Object.keys(requiredFieldLabels).filter((field) => hasDashboardAnswerValue(rawAnswers[field])).length;
+}
+
 export const JURISDICTION_META = [
   { id: "federal", labelKo: "연방 / EE", labelEn: "Federal / EE", chipLabelEn: "Federal / EE", shortLabel: "EE", svgId: null },
   { id: "yukon", labelKo: "유콘", labelEn: "Yukon", chipLabelEn: "Yukon", shortLabel: "YT", svgId: "CA-YT" },
@@ -1809,18 +1842,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return ["working-holiday", "pgwp", "worker"].includes(base);
         }
 
-        const REQUIRED_FIELD_LABELS = {
-          path: "가장 가까운 현재 상황",
-          base: "현재 캐나다 체류 상태",
-          age: "나이",
-          household: "배우자 포함 여부",
-          education: "최종 학력",
-          languageProfile: "영어 상태",
-          foreignExp: "해외 숙련 경력",
-          canadianExp: "캐나다 경력",
-          canadianJobSkill: "캐나다 경력의 성격",
-          ecaStatus: "ECA / 학력평가 상태"
-        };
+        const REQUIRED_FIELD_LABELS = ${JSON.stringify(DASHBOARD_REQUIRED_FIELD_LABELS)};
 
         function getMissingRequiredFields(rawAnswers) {
           return Object.entries(REQUIRED_FIELD_LABELS)
