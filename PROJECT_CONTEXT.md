@@ -140,6 +140,7 @@ Province recommendations currently show:
 - what the user already has
 - immediate actions
 - detailed eligibility snapshot
+- job reality check
 - federal / EE bridge section when the province has EE linkage
 - multiple concrete plan variants:
   - score route
@@ -239,3 +240,8 @@ node src/server.js --fixtures --port 3012
 - if a new session sees weird raw HTML in updates, first check source blocking and parser health before changing UI copy
 - if users complain that a province recommendation conflicts with their metro preference, inspect lifestyle weighting first
 - if users complain about province cards showing federal scores, keep federal scores only in explicitly labeled EE-linkage sections
+- if users say the job options are too broad, keep expanding occupation cases with real-world examples like cook, server, office admin, bookkeeping, warehouse, retail supervisor
+- for non-skilled Canadian work, prefer explaining three branches explicitly:
+  - province-specific low-skill or TEER 4 exceptions
+  - TEER 0-3 job pivot
+  - school -> PGWP -> skilled work route
