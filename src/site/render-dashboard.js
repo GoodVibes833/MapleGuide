@@ -1919,6 +1919,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           let score = 0;
           const policyReasons = [];
           const lifestyleReasons = [];
+          const occupationLens = buildProvinceOccupationLens(answers, insight);
 
           function add(points, reason) {
             score += points;
@@ -2087,21 +2088,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             add(2, "기술직·trade 경로와 연결 가능");
           }
 
-          if (occupationHasAnyTag(answers, ["health", "care-support"]) && statusSupports(insight.statuses.health)) {
-            add(3, "현재 직군과 지역 경로가 잘 맞음");
+          if (occupationLens.scoreAdjustment !== 0) {
+            add(occupationLens.scoreAdjustment, occupationLens.rankReasonKo);
           }
-          if (occupationHasTag(answers, "trades") && statusSupports(insight.statuses.trades)) {
-            add(3, "기술직 성격과 잘 맞는 지역");
-          }
-          if (occupationHasTag(answers, "stem") && statusSupports(insight.statuses.ee)) {
-            add(2, "STEM 배경이 EE 또는 주정부 경로와 연결될 가능성이 있음");
-          }
-          if (occupationHasTag(answers, "education") && insight.id === "federal") {
-            add(2, "연방 category-based selection의 현재 교육 직군과 같이 봐야 함");
-          }
-          if (occupationHasTag(answers, "transport") && insight.id === "federal") {
-            add(2, "연방 category-based selection의 현재 운송 직군과 같이 보는 편이 좋음");
-          }
+
           if (answers.occupation === "physician-canada" && insight.id === "federal" && answers.canadianExp !== "0") {
             add(3, "현재 연방 category-based selection의 의사 + 캐나다 경력 축과 연결됨");
           }
@@ -2110,12 +2100,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
           if (answers.occupation === "researcher-canada" && insight.id === "federal" && answers.canadianExp !== "0") {
             add(3, "현재 연방 category-based selection의 researcher + 캐나다 경력 축과 연결됨");
-          }
-          if (occupationHasTag(answers, "hospitality") && insight.id === "alberta") {
-            add(2, "알버타는 tourism and hospitality stream을 별도 운영");
-          }
-          if (occupationHasAnyTag(answers, ["business-admin", "office", "sales"]) && statusSupports(insight.statuses.jobOffer)) {
-            add(1, "비즈니스·행정직은 고용주 중심 경로와 같이 보는 편이 좋음");
           }
 
           if (answers.path === "unsure" && score === 0 && insight.updateCount > 0) {
@@ -2924,8 +2908,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return items.slice(0, 4);
         }
 
-        function buildRecommendationLeadSummary(insight, evaluation, eeSnapshot) {
+        function buildRecommendationLeadSummary(answers, insight, evaluation, eeSnapshot) {
           const firstPolicyReason = evaluation.policyReasons[0];
+          const occupationLens = buildProvinceOccupationLens(answers, insight);
 
           if (eeSnapshot.isFederal) {
             return firstPolicyReason
@@ -2935,16 +2920,16 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
           if (insight.selectionModel.badgeKo.includes("요건")) {
             return (firstPolicyReason ?? "현재 조건상 이 주정부 경로도 볼 만해요.")
-              + " 이 주는 점수보다 stream 자격과 연결 조건을 먼저 봐야 해요.";
+              + " " + occupationLens.summary;
           }
 
           if (insight.selectionModel.badgeKo.includes("EOI")) {
             return (firstPolicyReason ?? "현재 조건상 이 주정부 경로도 볼 만해요.")
-              + " 이 주는 EOI와 노동시장 우선순위를 같이 보는 편이에요.";
+              + " " + occupationLens.summary;
           }
 
           return (firstPolicyReason ?? "현재 조건상 이 주정부 경로도 볼 만해요.")
-            + " 이 주의 선발 방식과 요구 조건을 같이 읽는 게 중요해요.";
+            + " " + occupationLens.summary;
         }
 
         function buildConclusionSummaryHtml(answers, ranked) {
@@ -3977,6 +3962,371 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
         }
 
+        function getOccupationSkillBand(occupation) {
+          const meta = getOccupationMeta(occupation);
+
+          if (meta.tags.includes("skilled-likely")) {
+            return "skilled";
+          }
+
+          if (meta.tags.includes("non-skilled-likely")) {
+            return "entry";
+          }
+
+          return "mixed";
+        }
+
+        function getOccupationNocExamples(occupation) {
+          switch (occupation) {
+            case "office-admin":
+              return ["office administrator / administrative assistant", "operations coordinator / office coordinator"];
+            case "accounting-bookkeeping":
+              return ["bookkeeper", "payroll administrator", "accounting technician"];
+            case "accountant-finance":
+              return ["accountant", "financial analyst", "controller / finance manager"];
+            case "sales-marketing":
+              return ["account manager", "sales representative", "marketing coordinator"];
+            case "customer-service":
+              return ["client service coordinator", "customer service representative", "office support / service lead"];
+            case "software-it":
+              return ["software developer", "programmer / analyst", "IT specialist"];
+            case "engineer-tech":
+              return ["engineer", "engineering technologist", "quality / process specialist"];
+            case "nurse-allied-health":
+              return ["registered nurse", "licensed practical nurse", "allied health practitioner"];
+            case "caregiver-psw":
+              return ["personal support worker", "home support worker", "care aide"];
+            case "ece-childcare":
+              return ["early childhood educator", "childcare worker", "ECE assistant"];
+            case "teacher-education-support":
+              return ["teacher assistant", "education assistant", "school support worker"];
+            case "cook-chef":
+              return ["cook", "chef", "line cook / kitchen lead"];
+            case "baker-pastry":
+              return ["baker", "pastry baker", "production baker"];
+            case "food-service-supervisor":
+              return ["food service supervisor", "shift supervisor", "restaurant supervisor"];
+            case "server-counter":
+              return ["server / bartender", "food counter attendant", "barista / cashier"];
+            case "retail-supervisor":
+              return ["retail supervisor", "store supervisor", "assistant store manager"];
+            case "retail-sales":
+              return ["retail salesperson", "sales associate", "store clerk"];
+            case "warehouse-logistics":
+              return ["warehouse associate", "material handler", "inventory / shipping support"];
+            case "shipping-dispatch":
+              return ["dispatcher", "shipping / receiving clerk", "logistics coordinator"];
+            case "truck-driver":
+              return ["transport truck driver", "delivery driver", "commercial driver"];
+            case "construction-trade":
+              return ["electrician / plumber / carpenter", "construction trade worker", "apprentice / journeyperson"];
+            case "industrial-trade":
+              return ["welder", "machinist", "industrial mechanic"];
+            case "mechanic-technician":
+              return ["automotive service technician", "mechanic", "service advisor / diagnostic technician"];
+            case "physician-canada":
+              return ["physician", "family doctor", "specialist with Canadian experience"];
+            case "senior-manager-canada":
+              return ["senior manager", "operations director", "department head"];
+            case "researcher-canada":
+              return ["research scientist", "research associate", "postdoctoral / lab researcher"];
+            default:
+              return ["가장 가까운 NOC 1-2개를 먼저 찾아야 함"];
+          }
+        }
+
+        function getOccupationFederalReadiness(occupation) {
+          switch (getOccupationSkillBand(occupation)) {
+            case "skilled":
+              return "연방 EE/CEC 기준으로는 대체로 TEER 0-3 skilled 축으로 읽힐 가능성이 큰 편입니다.";
+            case "entry":
+              return "현재 직무 title 그대로는 연방 EE/CEC skilled 경력으로 바로 안 읽힐 가능성이 큽니다.";
+            default:
+              return "job title과 실제 duties에 따라 skilled 여부가 갈릴 수 있어 NOC를 더 좁혀야 합니다.";
+          }
+        }
+
+        function buildProvinceOccupationLens(answers, insight) {
+          const routeOccupationId = getPrimaryOccupationId(answers);
+          const routeMeta = getOccupationMeta(routeOccupationId);
+          const canadaMeta = getCanadaOccupationMeta(answers);
+          const usingKoreaRoute = answers.targetOccupationPlan === "previous-korea-job" && hasOccupationSelection(answers.koreaOccupation);
+          const routeLabel = usingKoreaRoute
+            ? "한국 " + routeMeta.labelKo
+            : hasOccupationSelection(answers.canadaOccupation)
+              ? "현재 캐나다 " + routeMeta.labelKo
+              : routeMeta.labelKo;
+          const routeTags = routeMeta.tags;
+          const nocExamples = getOccupationNocExamples(routeOccupationId);
+          const canUseKoreaSkilled = hasOccupationSelection(answers.koreaOccupation) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
+          const hasCurrentCanadaSkill = hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
+          const canadaIsNonSkilled = answers.canadianJobSkill === "non-skilled";
+          const isServiceEntry = routeTags.some((tag) => ["service-entry", "retail"].includes(tag));
+          const isHospitality = routeTags.includes("hospitality");
+          const isTrades = routeTags.includes("trades");
+          const isTransport = routeTags.includes("transport");
+          const isHealth = routeTags.includes("health") || routeTags.includes("care-support");
+          const isEducation = routeTags.includes("education");
+          const isBusiness = routeTags.some((tag) => ["office", "business-admin", "sales", "stem"].includes(tag));
+          let badge = "직무 축 확인";
+          let tone = "neutral";
+          let summary = routeLabel + " 기준으로 어느 stream이 열리는지 먼저 비교해야 합니다.";
+          let primaryRoute = insight.labelKo + "에서 맞는 stream 1개를 먼저 좁히기";
+          let fallbackRoute = "직접 연결이 약하면 같은 업종 안의 supervisor / skilled 직무 전환이나 학교 경유도 같이 봅니다.";
+          let rankReasonKo = "현재 직무를 이 주 구조에 넣어봤을 때 완전히 동떨어지지는 않아요.";
+          let scoreAdjustment = 0;
+
+          if (insight.id === "federal") {
+            if (getOccupationSkillBand(routeOccupationId) === "skilled" && (hasCurrentCanadaSkill || usingKoreaRoute || answers.foreignExp !== "0")) {
+              badge = "연방 skilled 축";
+              tone = "positive";
+              summary = routeLabel + "은 연방 EE/CEC에서 대체로 skilled 축으로 바로 비교할 수 있는 편입니다.";
+              primaryRoute = "CRS 점수 + category-based selection + CEC/FSW 자격 같이 보기";
+              fallbackRoute = "점수가 약하면 CLB 9, 캐나다 skilled 경력 추가, EE-linked nomination을 같이 계산합니다.";
+              rankReasonKo = routeLabel + "을 연방 EE skilled 축으로 바로 비교할 수 있어요.";
+              scoreAdjustment = 2;
+            } else if (getOccupationSkillBand(routeOccupationId) === "entry") {
+              badge = "연방 direct 약함";
+              tone = "negative";
+              summary = routeLabel + "은 연방 EE/CEC 기준으로는 직접 연결이 약한 편이라, 직무 전환이나 한국 경력 축 재정리가 더 중요합니다.";
+              primaryRoute = "현재 role 그대로보다 supervisor / skilled 전환 또는 한국 경력 축 정리";
+              fallbackRoute = canUseKoreaSkilled
+                ? "한국 경력을 primary occupation으로 다시 잡아 EE를 비교해 볼 수 있습니다."
+                : "그게 아니면 학교 -> PGWP -> skilled 경력 1년 경유가 더 현실적일 수 있습니다.";
+              rankReasonKo = "현재 직무 title 그대로는 연방 EE skilled로 읽히기 약해요.";
+              scoreAdjustment = -3;
+            } else {
+              badge = "연방 NOC 확인";
+              tone = "neutral";
+              summary = routeLabel + "은 duties를 어떻게 쓰느냐에 따라 연방 skilled 여부가 갈릴 수 있어 NOC를 먼저 좁혀야 합니다.";
+              primaryRoute = "현재 job title보다 실제 duties 기준으로 NOC 재확인";
+              fallbackRoute = "애매하면 같은 업종 안에서 coordinator / supervisor / technician급으로 올리는 게 더 안전합니다.";
+              rankReasonKo = "이 직무는 연방 기준으로 NOC를 더 좁혀야 판단이 선명해집니다.";
+              scoreAdjustment = 0;
+            }
+
+            return { badge, tone, summary, primaryRoute, fallbackRoute, rankReasonKo, scoreAdjustment, nocExamples, federalReadiness: getOccupationFederalReadiness(routeOccupationId) };
+          }
+
+          if (insight.id === "ontario") {
+            if (isHealth || routeOccupationId === "caregiver-psw" || routeOccupationId === "warehouse-logistics") {
+              badge = "예외 stream 확인";
+              tone = "positive";
+              summary = routeLabel + "은 온타리오에서는 일반 점수형보다 Employer Job Offer 또는 In-Demand Skills 예외 stream부터 확인하는 편이 현실적입니다.";
+              primaryRoute = "Employer Job Offer / In-Demand Skills / targeted NOI";
+              fallbackRoute = "NOC가 목록에 안 맞으면 같은 업종 안에서 supervisor·technician·regulated 경로로 올리는 게 좋습니다.";
+              rankReasonKo = "온타리오 예외 stream이나 targeted 직군과 비교해 볼 수 있어요.";
+              scoreAdjustment = 2;
+            } else if (isBusiness || isTrades || isTransport) {
+              badge = "도시형 취업 경로";
+              tone = "positive";
+              summary = routeLabel + "은 온타리오에서 Employer Job Offer 또는 EE NOI 쪽과 같이 읽는 편이 맞습니다.";
+              primaryRoute = "Employer Job Offer / EE NOI / local skilled work";
+              fallbackRoute = "job title이 broad하면 coordinator·lead·specialist duties로 더 좁혀야 읽히기 쉬워집니다.";
+              rankReasonKo = "온타리오 대도시 취업형 또는 EE NOl 쪽과 연결할 수 있는 직무예요.";
+              scoreAdjustment = 2;
+            } else if (isServiceEntry || routeOccupationId === "server-counter") {
+              badge = "직접 연결 약함";
+              tone = "negative";
+              summary = routeLabel + "은 온타리오에서 그대로는 약할 수 있어, supervisor 전환이나 학교 -> PGWP 경유가 더 현실적입니다.";
+              primaryRoute = "food service supervisor / retail supervisor / school route";
+              fallbackRoute = "현재 직무 그대로보다 같은 업종 안에서 한 단계 위 title을 만드는 쪽이 중요합니다.";
+              rankReasonKo = "온타리오에서는 현재 role 그대로보다 직무 업그레이드가 더 중요합니다.";
+              scoreAdjustment = -3;
+            }
+          } else if (insight.id === "alberta") {
+            if (isHospitality) {
+              badge = "알버타 hospitality";
+              tone = "positive";
+              summary = routeLabel + "은 알버타에서 hospitality worker, local employer, rural 연결과 함께 볼 때 현실성이 올라갑니다.";
+              primaryRoute = "Tourism and Hospitality / worker streams / Rural Renewal";
+              fallbackRoute = canadaIsNonSkilled
+                ? "server·counter 쪽이면 supervisor·cook 쪽으로 올리거나 지역 employer 연결이 중요합니다."
+                : "고용주와 지역 커뮤니티 연결을 붙이면 더 강해집니다.";
+              rankReasonKo = "알버타는 hospitality 쪽을 예외적으로 같이 볼 수 있는 편이에요.";
+              scoreAdjustment = routeOccupationId === "server-counter" ? 1 : 3;
+            } else if (isTrades || isTransport || routeOccupationId === "mechanic-technician") {
+              badge = "worker / rural 강함";
+              tone = "positive";
+              summary = routeLabel + "은 알버타 worker EOI, priority sector, Rural Renewal과 비교하기 좋은 직무군입니다.";
+              primaryRoute = "worker EOI / priority sector / Rural Renewal";
+              fallbackRoute = "trade certification, local employer, community endorsement를 같이 준비하면 더 현실적입니다.";
+              rankReasonKo = "알버타에서 실제 worker / rural 쪽으로 잘 읽히는 직무예요.";
+              scoreAdjustment = 3;
+            } else if (isBusiness || isHealth || isEducation) {
+              badge = "worker EOI";
+              tone = "neutral";
+              summary = routeLabel + "은 알버타 worker EOI 또는 local employer 연결과 같이 봐야 합니다.";
+              primaryRoute = "worker EOI / employer connection";
+              fallbackRoute = "직군 타깃이 약하면 지역 커뮤니티나 학교·현지경력 경유를 같이 봅니다.";
+              rankReasonKo = "알버타에서 worker EOI와 같이 비교할 수 있는 직무예요.";
+              scoreAdjustment = 1;
+            } else if (isServiceEntry) {
+              badge = "전환 먼저";
+              tone = "negative";
+              summary = routeLabel + "은 알버타에서도 바로 PR보다 supervisor 전환 또는 지역 고용주 연결이 먼저일 수 있습니다.";
+              primaryRoute = "regional employer / hospitality exception / supervisor pivot";
+              fallbackRoute = "직무 전환이 어렵다면 학교 -> PGWP 경유가 더 선명할 수 있습니다.";
+              rankReasonKo = "알버타에서도 현재 role 그대로보다 직무 전환이 먼저일 수 있어요.";
+              scoreAdjustment = -2;
+            }
+          } else if (insight.id === "nova-scotia") {
+            if (isHealth || isEducation || isTrades || isTransport) {
+              badge = "타깃 초청형";
+              tone = "positive";
+              summary = routeLabel + "은 노바스코샤에서 targeted stream, category, local employer 연결과 같이 읽기 좋습니다.";
+              primaryRoute = "targeted invitation / occupation-based stream / local experience";
+              fallbackRoute = "지역 정착 의사를 열어두면 더 현실적인 케이스가 많습니다.";
+              rankReasonKo = "노바스코샤의 타깃 초청 구조와 비교하기 좋은 직무예요.";
+              scoreAdjustment = 2;
+            } else if (isBusiness || isHospitality) {
+              badge = "고용주 / AIP";
+              tone = "neutral";
+              summary = routeLabel + "은 노바스코샤 local employer나 AIP, local experience 쪽과 같이 보는 편이 맞습니다.";
+              primaryRoute = "AIP / local employer / local experience";
+              fallbackRoute = "직접 약하면 같은 업종 안에서 supervisor·lead로 올리거나 지역 정착까지 여는 게 좋습니다.";
+              rankReasonKo = "노바스코샤에서는 employer-driven 또는 local experience와 같이 봐야 합니다.";
+              scoreAdjustment = 1;
+            } else if (isServiceEntry) {
+              badge = "학교/전환 권장";
+              tone = "negative";
+              summary = routeLabel + "은 노바스코샤에서도 현재 role 그대로보다 supervisor 전환이나 학교 경유가 더 현실적일 수 있습니다.";
+              primaryRoute = "school -> PGWP / supervisor pivot / AIP employer";
+              fallbackRoute = "같은 업종 안에서 leader급으로 올리거나 지역 employer를 먼저 찾는 게 좋습니다.";
+              rankReasonKo = "노바스코샤에서는 현재 role 그대로로는 약할 수 있어요.";
+              scoreAdjustment = -2;
+            }
+          } else if (insight.id === "prince-edward-island") {
+            if (isHospitality || isHealth || isTransport || routeTags.includes("supervisor")) {
+              badge = "EOI + 고용주형";
+              tone = "positive";
+              summary = routeLabel + "은 PEI에서 노동시장 우선순위 + 고용주 연결 + EOI로 읽히는 편입니다.";
+              primaryRoute = "EOI + labour market priority + employer connection";
+              fallbackRoute = "도시만 고집하기보다 지역 정착 의사와 employer 연결을 같이 보여주는 게 중요합니다.";
+              rankReasonKo = "PEI는 현재 직무와 고용주 연결을 같이 볼 때 현실성이 올라갑니다.";
+              scoreAdjustment = 2;
+            } else if (isBusiness || isTrades) {
+              badge = "EOI 비교 가능";
+              tone = "neutral";
+              summary = routeLabel + "은 PEI EOI에서 직군 우선순위와 employer 연결을 같이 확인해야 합니다.";
+              primaryRoute = "EOI + employer / EE-linked";
+              fallbackRoute = "직군 우선순위가 약하면 Atlantic employer-driven 경로도 같이 검토하는 게 좋습니다.";
+              rankReasonKo = "PEI EOI와 employer 연결형으로 비교할 수 있어요.";
+              scoreAdjustment = 1;
+            } else if (isServiceEntry) {
+              badge = "고용주/업그레이드";
+              tone = "negative";
+              summary = routeLabel + "은 PEI에서도 현재 role 그대로보다 supervisor·cook 전환이나 employer 연결이 먼저일 수 있습니다.";
+              primaryRoute = "employer-driven + title upgrade";
+              fallbackRoute = "직접 안 되면 Atlantic school / PGWP / employer route를 같이 보세요.";
+              rankReasonKo = "PEI에서는 현재 role 그대로보다 업그레이드가 더 중요합니다.";
+              scoreAdjustment = -2;
+            }
+          } else if (insight.id === "saskatchewan") {
+            if (isTrades || isTransport || isHealth || routeOccupationId === "cook-chef" || routeOccupationId === "food-service-supervisor") {
+              badge = "경로형 적합";
+              tone = "positive";
+              summary = routeLabel + "은 사스카츄완에서 occupation / pathway 자격과 연결해 보기 좋은 편입니다.";
+              primaryRoute = "worker / occupation / regional pathway";
+              fallbackRoute = "현지 고용주 또는 지역 연결이 있으면 더 강해집니다.";
+              rankReasonKo = "사스카츄완의 pathway 자격과 비교하기 좋은 직무예요.";
+              scoreAdjustment = 2;
+            } else if (isServiceEntry || routeOccupationId === "retail-sales") {
+              badge = "직접 약함";
+              tone = "negative";
+              summary = routeLabel + "은 사스카츄완에서도 현재 role 그대로보다 supervisor·trade·school 경유가 더 현실적일 수 있습니다.";
+              primaryRoute = "title upgrade / school / regional employer";
+              fallbackRoute = canUseKoreaSkilled
+                ? "현재 캐나다 role보다 한국 경력 축으로 다시 짜는 방법도 같이 보세요."
+                : "직무 업그레이드가 어렵다면 학교 -> PGWP 경유를 같이 보세요.";
+              rankReasonKo = "사스카츄완에서도 현재 role 그대로로는 약할 수 있어요.";
+              scoreAdjustment = -2;
+            }
+          } else if (insight.id === "manitoba") {
+            if (hasCurrentCanadaSkill || isHealth || isTrades || isTransport) {
+              badge = "현지 연결형";
+              tone = "positive";
+              summary = routeLabel + "은 매니토바 local connection, employer, local work history와 연결할 때 현실성이 올라갑니다.";
+              primaryRoute = "local connection / employer / local work history";
+              fallbackRoute = "직접 연결이 약하면 학교나 지역 고용주 축을 같이 붙이는 게 좋습니다.";
+              rankReasonKo = "매니토바는 현지 연결이 붙을수록 잘 읽히는 직무예요.";
+              scoreAdjustment = 2;
+            } else if (isServiceEntry) {
+              badge = "연결 먼저";
+              tone = "negative";
+              summary = routeLabel + "은 매니토바에서도 단순 role보다 지역 고용주나 학교 연결이 먼저 필요할 수 있습니다.";
+              primaryRoute = "local employer / school / family or community connection";
+              fallbackRoute = "같은 업종 안에서 supervisor·lead로 올라가면 다시 비교하기 쉬워집니다.";
+              rankReasonKo = "매니토바는 직무보다 현지 연결이 먼저일 수 있어요.";
+              scoreAdjustment = -1;
+            }
+          } else if (insight.id === "british-columbia") {
+            if (routeTags.includes("stem") || isHealth || isTrades || isEducation) {
+              badge = "타깃/등록점수형";
+              tone = "positive";
+              summary = routeLabel + "은 BC에서 registration score + targeted invitation 쪽과 비교하기 좋은 직무군입니다.";
+              primaryRoute = "registration score + targeted invitation";
+              fallbackRoute = "직군 타깃에 안 들어가면 local employer와 experience 축을 더 붙여야 합니다.";
+              rankReasonKo = "BC의 타깃 초청 구조와 잘 맞는 직무예요.";
+              scoreAdjustment = 2;
+            } else if (isBusiness || isTransport || routeOccupationId === "cook-chef") {
+              badge = "등록점수 비교";
+              tone = "neutral";
+              summary = routeLabel + "은 BC registration score와 employer 연결을 같이 봐야 합니다.";
+              primaryRoute = "registration score + employer / experience";
+              fallbackRoute = "메트로 경쟁이 세면 지역까지 같이 열어보는 편이 좋습니다.";
+              rankReasonKo = "BC에서는 점수와 고용주 연결을 같이 봐야 하는 직무예요.";
+              scoreAdjustment = 1;
+            } else if (isServiceEntry) {
+              badge = "전환 권장";
+              tone = "negative";
+              summary = routeLabel + "은 BC에서도 현재 role 그대로보다 supervisor 전환이나 학교 경유가 더 현실적입니다.";
+              primaryRoute = "title upgrade / school / employer pivot";
+              fallbackRoute = "같은 업종 안에서 skilled로 읽히는 title을 먼저 만드는 게 중요합니다.";
+              rankReasonKo = "BC에서는 현재 role 그대로보다 전환이 더 중요해요.";
+              scoreAdjustment = -2;
+            }
+          } else if (isAtlanticProvinceId(insight.id)) {
+            if (answers.jobOffer === "yes" || isHospitality || isHealth || isTrades || isTransport) {
+              badge = "employer-driven";
+              tone = "positive";
+              summary = routeLabel + "은 이 지역에서 AIP 또는 local employer-driven 경로와 같이 보는 편이 맞습니다.";
+              primaryRoute = "AIP / local employer / local work";
+              fallbackRoute = "지역 정착 의사와 employer 연결을 함께 보여주면 훨씬 현실적입니다.";
+              rankReasonKo = "대서양권은 employer-driven으로 읽기 좋은 직무예요.";
+              scoreAdjustment = 2;
+            } else if (isServiceEntry) {
+              badge = "고용주 먼저";
+              tone = "negative";
+              summary = routeLabel + "은 대서양권에서도 designated employer나 title upgrade가 없으면 바로는 약할 수 있습니다.";
+              primaryRoute = "designated employer + title upgrade";
+              fallbackRoute = "학교 -> 졸업자 또는 supervisor / cook 전환을 같이 봐야 합니다.";
+              rankReasonKo = "대서양권도 현재 role 그대로보다 employer와 title이 더 중요합니다.";
+              scoreAdjustment = -2;
+            }
+          }
+
+          if (usingKoreaRoute && canUseKoreaSkilled) {
+            badge = badge === "직무 축 확인" ? "한국 경력 축" : badge;
+            summary = "이 주는 현재 캐나다 role보다 한국 " + routeMeta.labelKo + " 경력 축으로 읽는 편이 더 현실적입니다. " + summary;
+            fallbackRoute = "현재 캐나다 일은 보조 축으로 두고, 한국 경력 NOC와 job duties를 primary occupation 기준으로 정리합니다.";
+            rankReasonKo = "한국 경력 축으로 다시 짜면 이 주에서 더 선명하게 읽힐 수 있어요.";
+            scoreAdjustment += 1;
+          }
+
+          if (canadaIsNonSkilled && statusSupports(insight.statuses.graduate) && !canUseKoreaSkilled && (isServiceEntry || routeTags.includes("mixed-skill"))) {
+            badge = "학교 경유 가능";
+            tone = "deferred";
+            summary = routeLabel + "은 지금 바로보다, 이 주에서 학교 -> PGWP -> local skilled 경력으로 이어가는 플랜이 더 현실적일 수 있습니다.";
+            primaryRoute = insight.labelKo + " 학교 / graduate / local experience";
+            fallbackRoute = "학교를 가지 않는다면 supervisor·technician·coordinator급 전환을 같이 봐야 합니다.";
+            rankReasonKo = "이 주는 학교 -> PGWP 플랜으로 읽는 게 더 현실적일 수 있어요.";
+            scoreAdjustment = Math.min(scoreAdjustment, 0);
+          }
+
+          return { badge, tone, summary, primaryRoute, fallbackRoute, rankReasonKo, scoreAdjustment, nocExamples, federalReadiness: getOccupationFederalReadiness(routeOccupationId) };
+        }
+
         function occupationHasTag(answers, tag) {
           return getActiveOccupationMeta(answers).tags.includes(tag);
         }
@@ -4282,6 +4632,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         function buildProvinceSpecificPlanLabel(answers, insight) {
+          const occupationLens = buildProvinceOccupationLens(answers, insight);
+
+          if (occupationLens.primaryRoute) {
+            return occupationLens.primaryRoute;
+          }
+
           if (insight.id === "ontario" && hasOccupationSelection(answers.canadaOccupation) && getCanadaOccupationMeta(answers).tags.some((tag) => ["care-support", "warehouse"].includes(tag))) {
             return "Ontario In-Demand Skills 또는 Employer Job Offer 쪽부터 확인";
           }
@@ -4305,6 +4661,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const plans = [];
           const canadaMeta = getCanadaOccupationMeta(answers);
           const koreaMeta = getKoreaOccupationMeta(answers);
+          const occupationLens = buildProvinceOccupationLens(answers, insight);
           const hasCanadaOccupation = hasOccupationSelection(answers.canadaOccupation);
           const hasKoreaOccupation = hasOccupationSelection(answers.koreaOccupation);
           const hasDirectCanadaSkilled = hasCanadaOccupation && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
@@ -4323,7 +4680,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               "현재 캐나다 경력이 이미 skilled 축이면, 이 주에서는 " + buildProvinceSpecificPlanLabel(answers, insight) + " 쪽을 먼저 비교하는 게 현실적입니다.",
               [
                 "현재 job title, job duties, 근무시간을 NOC 기준으로 다시 정리합니다.",
-                insight.labelKo + "에서 worker / EOI / EE-linked 중 맞는 stream 1개를 먼저 좁힙니다.",
+                insight.labelKo + "에서 " + occupationLens.primaryRoute + " 쪽으로 맞는 stream 1개를 먼저 좁힙니다.",
                 "그 다음 언어점수, 추가 경력, nomination 가능성을 같이 계산합니다."
               ]
             );
@@ -4337,7 +4694,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               "현재 캐나다 일만으로는 약할 수 있어 같은 업종 안에서 한 단계 위 직무나 skilled로 읽히는 직무로 옮기는 플랜이 현실적입니다.",
               [
                 canadaMeta.labelKo + "가 이 주에서 바로 읽히는지 먼저 확인하고, 안 되면 " + canadaMeta.upgradeKo + " 쪽 job title을 찾습니다.",
-                "전환한 직무가 이 주의 targeted NOC, worker stream, EE-linked 경로와 맞는지 확인합니다.",
+                "전환한 직무가 이 주의 " + occupationLens.primaryRoute + "와 맞는지 확인합니다.",
                 "전환 후 6-12개월 경력을 만들거나 잡오퍼를 붙여 다시 계산합니다."
               ]
             );
@@ -4859,6 +5216,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const pathwayGuideBundle = buildEvaluatedPathwayGuide(answers, insight, eeSnapshot);
             const eligibilitySnapshot = buildEligibilitySnapshot(answers, insight, pathwayGuideBundle);
             const jobRealityItems = buildJobRealityCheck(answers, insight);
+            const occupationLens = buildProvinceOccupationLens(answers, insight);
             const concreteProvincePlans = isFederalCard ? [] : buildConcreteProvincePlans(answers, insight);
             const provinceEeBridge = buildProvinceEeBridge(answers, insight, eeSnapshot);
             const profileStrengthItems = buildProfileStrengths(answers);
@@ -4872,13 +5230,14 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               .map((criterion) => criterion.label)
               .slice(0, 3);
             const topActionItems = improvementPlan.items.slice(0, 2);
-            const leadSummary = buildRecommendationLeadSummary(insight, evaluation, eeSnapshot);
+            const leadSummary = buildRecommendationLeadSummary(answers, insight, evaluation, eeSnapshot);
             const routeTypeLabel = isFederalCard ? "연방" : "주정부";
             const routeSummaryLabel = isFederalCard
               ? "연방 / EE · " + selectionModel.badgeKo
               : "주정부 경로 · " + selectionModel.badgeKo;
             const whyRankItems = [
-              ...evaluation.policyReasons.slice(0, 2),
+              occupationLens.rankReasonKo,
+              ...evaluation.policyReasons.slice(0, 1),
               isFederalCard
                 ? "연방은 EE 점수와 최근 컷오프를 직접 비교합니다."
                 : "이 지역은 " + selectionModel.focusKo + "을 먼저 보는 편이에요."
@@ -5118,6 +5477,19 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   + '<ul class="reason-list career-check-list">' + jobRealityItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("") + '</ul>'
                   + '</section>'
                 : ""),
+              '<section class="career-check-panel">'
+                + '<strong>' + escapeHtmlClient(isFederalCard ? "연방 기준으로 이 직무를 보면" : "이 직무를 이 주에서 보면") + '</strong>'
+                + '<div class="eligibility-snapshot">'
+                + '<span class="compare-pill">' + escapeHtmlClient(occupationLens.badge) + '</span>'
+                + '<p>' + escapeHtmlClient(occupationLens.summary) + '</p>'
+                + '<ul class="reason-list">'
+                + '<li>연방 기준: ' + escapeHtmlClient(occupationLens.federalReadiness) + '</li>'
+                + '<li>NOC 예시: ' + escapeHtmlClient(occupationLens.nocExamples.join(" / ")) + '</li>'
+                + '<li>' + escapeHtmlClient(isFederalCard ? "지금 먼저 볼 것" : "이 주에서 먼저 볼 것") + ': ' + escapeHtmlClient(occupationLens.primaryRoute) + '</li>'
+                + '<li>직접 안 되면: ' + escapeHtmlClient(occupationLens.fallbackRoute) + '</li>'
+                + '</ul>'
+                + '</div>'
+                + '</section>',
               (!isFederalCard && concreteProvincePlans.length > 0
                 ? '<section class="plan-variants-panel">'
                   + '<div class="plan-variants-head"><strong>이 주에서 가능한 현실 플랜</strong><p class="wizard-freshness">지금 직무 그대로 가는지, 같은 업종 안에서 올려야 하는지, 학교가 먼저인지 비교해 보세요.</p></div>'

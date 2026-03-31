@@ -184,6 +184,11 @@ Province recommendations currently show:
 - province selection model
 - what the user already has
 - immediate actions
+- occupation lens:
+  - whether the current role is immediately usable
+  - whether the province reads it as targeted / employer-driven / exception route
+  - whether school / PGWP or supervisor pivot is more realistic
+  - NOC-like example job titles for explanation
 - concrete province plans:
   - direct current-job route
   - same-industry upgrade / supervisor / skilled pivot

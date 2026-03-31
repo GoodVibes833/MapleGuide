@@ -97,6 +97,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.doesNotMatch(dashboardResponse.body, /<strong>연방 EE 참고<\/strong>/);
   assert.doesNotMatch(dashboardResponse.body, /이 주 자체 점수 아님/);
   assert.match(dashboardResponse.body, /왜 이 순위인가/);
+  assert.match(dashboardResponse.body, /이 직무를 이 주에서 보면/);
   assert.match(dashboardResponse.body, /이 주에서 가능한 현실 플랜/);
   assert.match(dashboardResponse.body, /이 경로가 실제로 보는 것/);
   assert.match(dashboardResponse.body, /자세히 보기/);
