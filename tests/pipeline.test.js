@@ -150,6 +150,10 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /한국에서 실제로 하던 job title/);
   assert.match(dashboardHtml, /지금 캐나다에서 하는 일/);
   assert.match(dashboardHtml, /지금 캐나다에서 실제로 하는 job title/);
+  assert.match(dashboardHtml, /id="korea-title-hint"/);
+  assert.match(dashboardHtml, /id="canada-title-hint"/);
+  assert.match(dashboardHtml, /실제 title을 적으면 어떤 직무군으로 읽히는지 바로 보여줍니다/);
+  assert.match(dashboardHtml, /실제 title을 적으면 TEER 해석과 전환 후보를 같이 보여줍니다/);
   assert.match(dashboardHtml, /이민에 쓸 주력 경력 축/);
   assert.match(dashboardHtml, /요리사 \/ cook \/ chef/);
   assert.match(dashboardHtml, /레스토랑 매니저 \/ restaurant manager/);

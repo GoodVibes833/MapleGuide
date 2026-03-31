@@ -52,11 +52,13 @@ These are intentional decisions. Do not casually undo them in a new session.
 - federal / EE must stay visually separate from province ranking
 - province cards can mention EE linkage, but must label it clearly as federal reference logic
 - province cards should not lead with raw federal point deltas in the main action area; point math belongs mainly to the federal card or a clearly labeled EE-bridge section
+- when the current role is non-skilled or ambiguous, province quick actions should prioritize route steps like job-title upgrade, school/PGWP, employer-driven, or local connection before generic score boosting
 - questionnaire should separate:
   - Korean previous job
   - current Canadian job
   - which career axis the user wants to anchor the application on
 - actual job titles for both Korea and Canada, because category labels alone are too broad
+- live helper hints under both title fields should explain how the typed title is currently being interpreted
 - persona presets should stay opinionated and few in number; they are meant to help users start, not replace the full questionnaire
 - beginners should see:
   - current fit
@@ -179,6 +181,7 @@ The recommendation engine currently considers:
 - Korea experience alignment
 - degree usage plan
 - typed Korea / Canada job titles with inferred occupation candidates
+- live Korea / Canada title interpretation hints under the form fields
 - expanded service / hospitality / retail / manufacturing role families
 - starter persona preset selection
 
