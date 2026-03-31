@@ -2780,7 +2780,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               if (occupationHasAnyTag(answers, ["health", "trades", "education", "transport"]) || ["physician-canada", "senior-manager-canada", "researcher-canada"].includes(answers.occupation) || answers.advantage === "french") {
                 return { state: "has", detail: "현재 입력상 카테고리 기반 선발 축을 같이 볼 수 있어요." };
               }
-              if (hasOccupationSelection(answers.canadaOccupation) || hasOccupationSelection(answers.koreaOccupation)) {
+              if (hasResolvedCanadaOccupation(answers) || hasResolvedKoreaOccupation(answers)) {
                 return { state: "partial", detail: "직군 축은 있지만 카테고리 직접 해당은 더 확인이 필요해요." };
               }
               return { state: "missing", detail: "카테고리 기반 선발 강점은 아직 뚜렷하지 않아요." };
@@ -2788,7 +2788,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               if (answers.targetOccupationPlan && answers.targetOccupationPlan !== "unsure") {
                 return { state: "has", detail: "어느 경력 축으로 볼지 방향이 정해져 있어요." };
               }
-              if (hasOccupationSelection(answers.canadaOccupation) || hasOccupationSelection(answers.koreaOccupation)) {
+              if (hasResolvedCanadaOccupation(answers) || hasResolvedKoreaOccupation(answers)) {
                 return { state: "partial", detail: "직무 축은 있지만 한국 경력과 캐나다 현재 일 중 어느 축이 주력인지 더 정해야 해요." };
               }
               if (answers.path && answers.path !== "unsure") {
@@ -2817,10 +2817,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               }
               return { state: "missing", detail: "이 주와 연결되는 현지 요소를 더 만들어야 할 수 있어요." };
             case "priority-occupation":
-              if (hasOccupationSelection(answers.canadaOccupation) && hasOccupationSelection(answers.koreaOccupation)) {
+              if (hasResolvedCanadaOccupation(answers) && hasResolvedKoreaOccupation(answers)) {
                 return { state: "has", detail: "한국 직무와 캐나다 현재 직무가 둘 다 있어 어느 축이 열리는지 비교하기 쉬워요." };
               }
-              if (hasOccupationSelection(answers.canadaOccupation) || hasOccupationSelection(answers.koreaOccupation)) {
+              if (hasResolvedCanadaOccupation(answers) || hasResolvedKoreaOccupation(answers)) {
                 return { state: "has", detail: "직군 축이 잡혀 있어 타깃 초청과 비교하기 쉬워요." };
               }
               if (answers.targetOccupationPlan && answers.targetOccupationPlan !== "unsure") {
@@ -2911,10 +2911,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           if (answers.advantage === "french") {
             items.push("프랑스어 강점");
           }
-          if (hasOccupationSelection(answers.canadaOccupation)) {
+          if (hasResolvedCanadaOccupation(answers)) {
             items.push("캐나다 현재 직무 축");
           }
-          if (hasOccupationSelection(answers.koreaOccupation)) {
+          if (hasResolvedKoreaOccupation(answers)) {
             items.push("한국 경력 직무 축");
           }
 
@@ -3122,7 +3122,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               if (occupationHasAnyTag(answers, ["health", "trades", "education", "transport"]) || ["physician-canada", "senior-manager-canada", "researcher-canada"].includes(answers.occupation) || answers.advantage === "french") {
                 return { state: "has", detail: "현재 입력상 category-based selection 축을 같이 볼 수 있어요." };
               }
-              if (hasOccupationSelection(answers.canadaOccupation) || hasOccupationSelection(answers.koreaOccupation)) {
+              if (hasResolvedCanadaOccupation(answers) || hasResolvedKoreaOccupation(answers)) {
                 return { state: "partial", detail: "직군 축은 있지만 현재 category 직접 해당 여부는 더 확인이 필요해요." };
               }
               return { state: "missing", detail: "카테고리 기반 선발과 바로 맞물리는 강점은 아직 뚜렷하지 않아요." };
@@ -3198,10 +3198,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               }
               return { state: "partial", detail: "EOI 비교 전 기본 프로필 입력을 더 채우면 좋아요." };
             case "priority-occupation":
-              if (hasOccupationSelection(answers.canadaOccupation) && hasOccupationSelection(answers.koreaOccupation)) {
+              if (hasResolvedCanadaOccupation(answers) && hasResolvedKoreaOccupation(answers)) {
                 return { state: "has", detail: "한국 직무와 캐나다 현재 직무를 같이 놓고 우선 sector·occupation과 비교하기 쉬워요." };
               }
-              if (hasOccupationSelection(answers.canadaOccupation) || hasOccupationSelection(answers.koreaOccupation)) {
+              if (hasResolvedCanadaOccupation(answers) || hasResolvedKoreaOccupation(answers)) {
                 return { state: "has", detail: "직군 축이 잡혀 있어 우선 sector·occupation과 비교하기 쉬워요." };
               }
               if (answers.targetOccupationPlan && answers.targetOccupationPlan !== "unsure") {
@@ -3265,7 +3265,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           if (pathway.id === "newfoundland-eoi") {
             score += activeQuickRegions.has("newfoundland-and-labrador") ? 3 : 0;
             score += answers.jobOffer === "yes" ? 2 : 0;
-            score += hasOccupationSelection(answers.canadaOccupation) || hasOccupationSelection(answers.koreaOccupation) ? 1 : 0;
+            score += hasResolvedCanadaOccupation(answers) || hasResolvedKoreaOccupation(answers) ? 1 : 0;
           }
 
           const currentItems = compared
@@ -3525,13 +3525,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           if (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0") {
-            if (hasOccupationSelection(answers.canadaOccupation)) {
+            if (hasResolvedCanadaOccupation(answers)) {
               items.push("현재 캐나다 " + canadaMeta.labelKo + " skilled 경력이 있으면 CEC와 일부 주정부 경로를 현실적으로 같이 볼 수 있습니다.");
             } else {
               items.push("현재 캐나다 skilled 경력이 있으면 CEC와 일부 주정부 경로를 현실적으로 같이 볼 수 있습니다.");
             }
           } else if (hasCanadianWorkBase(answers.base) && answers.canadianJobSkill === "non-skilled") {
-            if (hasOccupationSelection(answers.canadaOccupation)) {
+            if (hasResolvedCanadaOccupation(answers)) {
               items.push("현재 캐나다 " + canadaMeta.labelKo + " 일이 TEER 4-5 쪽이면 CEC 연결은 약할 수 있어 " + canadaMeta.upgradeKo + " 쪽 전환이 핵심입니다.");
             } else {
               items.push("현재 캐나다 일이 TEER 4-5 쪽이면 CEC 연결은 약할 수 있어 skilled 직무 전환이 핵심입니다.");
@@ -3793,6 +3793,14 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           return inferOccupationCandidatesFromTitle(title)[0] || selectedOccupation || "general";
+        }
+
+        function hasResolvedCanadaOccupation(answers) {
+          return hasOccupationSelection(resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle));
+        }
+
+        function hasResolvedKoreaOccupation(answers) {
+          return hasOccupationSelection(resolveOccupationId(answers.koreaOccupation, answers.koreaJobTitle));
         }
 
         function getOccupationInferenceSummary(selectedOccupation, title) {
@@ -4301,16 +4309,16 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const canadaMeta = getCanadaOccupationMeta(answers);
           const koreaInference = getOccupationInferenceSummary(answers.koreaOccupation, answers.koreaJobTitle);
           const canadaInference = getOccupationInferenceSummary(answers.canadaOccupation, answers.canadaJobTitle);
-          const usingKoreaRoute = answers.targetOccupationPlan === "previous-korea-job" && hasOccupationSelection(answers.koreaOccupation);
+          const usingKoreaRoute = answers.targetOccupationPlan === "previous-korea-job" && hasResolvedKoreaOccupation(answers);
           const routeLabel = usingKoreaRoute
             ? "한국 " + routeMeta.labelKo
-            : hasOccupationSelection(answers.canadaOccupation)
+            : hasResolvedCanadaOccupation(answers)
               ? "현재 캐나다 " + routeMeta.labelKo
               : routeMeta.labelKo;
           const routeTags = routeMeta.tags;
           const nocExamples = getOccupationNocExamples(routeOccupationId);
           const candidateProfiles = getOccupationCandidateProfiles(routeOccupationId);
-          const canUseKoreaSkilled = hasOccupationSelection(answers.koreaOccupation) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
+          const canUseKoreaSkilled = hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
           const hasCurrentCanadaSkill = hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
           const canadaIsNonSkilled = answers.canadianJobSkill === "non-skilled";
           const isServiceEntry = routeTags.some((tag) => ["service-entry", "retail"].includes(tag));
@@ -4614,11 +4622,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         function getOccupationPivotLabel(answers, insight) {
-          if (answers.targetOccupationPlan === "current-canada-job" && hasOccupationSelection(answers.canadaOccupation)) {
+          if (answers.targetOccupationPlan === "current-canada-job" && hasResolvedCanadaOccupation(answers)) {
             return getCanadaOccupationMeta(answers).pivotKo;
           }
 
-          if (answers.targetOccupationPlan === "previous-korea-job" && hasOccupationSelection(answers.koreaOccupation)) {
+          if (answers.targetOccupationPlan === "previous-korea-job" && hasResolvedKoreaOccupation(answers)) {
             return getKoreaOccupationMeta(answers).pivotKo;
           }
 
@@ -4634,13 +4642,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const koreaInference = getOccupationInferenceSummary(answers.koreaOccupation, answers.koreaJobTitle);
           const canadaInference = getOccupationInferenceSummary(answers.canadaOccupation, answers.canadaJobTitle);
 
-          if (hasOccupationSelection(answers.koreaOccupation)) {
+          if (hasResolvedKoreaOccupation(answers)) {
             parts.push("한국: " + getKoreaOccupationMeta(answers).labelKo);
           } else if (koreaInference) {
             parts.push('한국 title "' + answers.koreaJobTitle + '" -> ' + koreaInference.labels[0]);
           }
 
-          if (hasOccupationSelection(answers.canadaOccupation)) {
+          if (hasResolvedCanadaOccupation(answers)) {
             parts.push("캐나다 현재: " + getCanadaOccupationMeta(answers).labelKo);
           } else if (canadaInference) {
             parts.push('캐나다 title "' + answers.canadaJobTitle + '" -> ' + canadaInference.labels[0]);
@@ -4850,11 +4858,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const koreaMeta = getKoreaOccupationMeta(answers);
           const items = [];
 
-          if (!hasOccupationSelection(answers.koreaOccupation) && !hasOccupationSelection(answers.canadaOccupation)) {
+          if (!hasResolvedKoreaOccupation(answers) && !hasResolvedCanadaOccupation(answers)) {
             items.push("한국 직무와 캐나다 현재 직무를 더 구체적으로 고르면, 이 직무가 skilled인지와 어떤 주 예외 경로가 있는지 훨씬 정확히 설명할 수 있어요.");
           }
 
-          if (answers.canadianJobSkill === "skilled" && answers.canadianExp !== "0" && hasOccupationSelection(answers.canadaOccupation)) {
+          if (answers.canadianJobSkill === "skilled" && answers.canadianExp !== "0" && hasResolvedCanadaOccupation(answers)) {
             items.push("지금 캐나다 " + canadaMeta.labelKo + " 경력은 EE/CEC 기준 skilled 경력으로 읽힐 가능성이 커요.");
 
             if (getCanadaOccupationMeta(answers).tags.some((tag) => ["office", "business-admin", "sales"].includes(tag))) {
@@ -4865,17 +4873,17 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               items.push("호스피탈리티 안에서도 cook·chef·supervisor처럼 skilled로 읽히는 직무는 그대로 밀어볼 수 있어요.");
             }
           } else if (answers.canadianJobSkill === "non-skilled") {
-            if (hasOccupationSelection(answers.canadaOccupation) && getCanadaOccupationMeta(answers).tags.some((tag) => ["service-entry", "retail"].includes(tag))) {
+            if (hasResolvedCanadaOccupation(answers) && getCanadaOccupationMeta(answers).tags.some((tag) => ["service-entry", "retail"].includes(tag))) {
               items.push(canadaMeta.labelKo + " 같은 front-line service 일은 보통 연방 EE skilled 경력으로는 안 잡힐 수 있어요.");
             } else {
               items.push("지금 캐나다 일은 연방 EE/CEC 기준 skilled 경력으로는 바로 안 들어갈 가능성이 커요.");
             }
 
-            if (insight.id === "alberta" && hasOccupationSelection(answers.canadaOccupation) && getCanadaOccupationMeta(answers).tags.some((tag) => ["hospitality", "service-entry"].includes(tag))) {
+            if (insight.id === "alberta" && hasResolvedCanadaOccupation(answers) && getCanadaOccupationMeta(answers).tags.some((tag) => ["hospitality", "service-entry"].includes(tag))) {
               items.push("알버타는 Tourism and Hospitality 또는 worker streams에서 현재 직무를 바로 볼 수 있는지 먼저 확인해 볼 만해요.");
             }
 
-            if (insight.id === "ontario" && hasOccupationSelection(answers.canadaOccupation) && getCanadaOccupationMeta(answers).tags.some((tag) => ["care-support", "warehouse"].includes(tag))) {
+            if (insight.id === "ontario" && hasResolvedCanadaOccupation(answers) && getCanadaOccupationMeta(answers).tags.some((tag) => ["care-support", "warehouse"].includes(tag))) {
               items.push("온타리오는 In-Demand Skills처럼 일부 TEER 4/5 직무를 별도 stream으로 보니, 현재 NOC가 목록에 들어가는지 확인해 볼 만해요.");
             }
 
@@ -4883,7 +4891,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               items.push("Atlantic 쪽은 designated employer + TEER 4 job offer로 볼 수 있는 경우가 있어 AIP 가능성을 따로 확인할 만해요.");
             }
 
-            if (hasOccupationSelection(answers.koreaOccupation) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated") {
+            if (hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated") {
               items.push("현재 캐나다 일은 non-skilled여도 한국 " + koreaMeta.labelKo + " 경력이 맞다면, 한국 경력 기준 primary occupation으로 다시 짜는 방법도 있어요.");
             } else if (statusSupports(insight.statuses.graduate)) {
               items.push("그게 아니면 학교 -> PGWP -> skilled 직무 1년 경유가 더 현실적인 플랜이 될 수 있어요.");
@@ -4896,7 +4904,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             items.push("캐나다 경력은 있지만 skilled 여부가 아직 안 정해져 있어, 먼저 현재 일의 NOC와 TEER를 확인해야 해요.");
           }
 
-          if (answers.targetOccupationPlan === "previous-korea-job" && hasOccupationSelection(answers.koreaOccupation)) {
+          if (answers.targetOccupationPlan === "previous-korea-job" && hasResolvedKoreaOccupation(answers)) {
             if (answers.foreignExpAlignment === "same-skilled") {
               items.push("한국 " + koreaMeta.labelKo + " 경력을 primary occupation으로 바로 설명하기 좋은 편이에요.");
             } else if (answers.foreignExpAlignment === "related-skilled") {
@@ -4918,11 +4926,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             return occupationLens.primaryRoute;
           }
 
-          if (insight.id === "ontario" && hasOccupationSelection(answers.canadaOccupation) && getCanadaOccupationMeta(answers).tags.some((tag) => ["care-support", "warehouse"].includes(tag))) {
+          if (insight.id === "ontario" && hasResolvedCanadaOccupation(answers) && getCanadaOccupationMeta(answers).tags.some((tag) => ["care-support", "warehouse"].includes(tag))) {
             return "Ontario In-Demand Skills 또는 Employer Job Offer 쪽부터 확인";
           }
 
-          if (insight.id === "alberta" && hasOccupationSelection(answers.canadaOccupation) && getCanadaOccupationMeta(answers).tags.some((tag) => ["hospitality", "service-entry"].includes(tag))) {
+          if (insight.id === "alberta" && hasResolvedCanadaOccupation(answers) && getCanadaOccupationMeta(answers).tags.some((tag) => ["hospitality", "service-entry"].includes(tag))) {
             return "Alberta Tourism and Hospitality / worker 축부터 확인";
           }
 
@@ -4942,8 +4950,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const canadaMeta = getCanadaOccupationMeta(answers);
           const koreaMeta = getKoreaOccupationMeta(answers);
           const occupationLens = buildProvinceOccupationLens(answers, insight);
-          const hasCanadaOccupation = hasOccupationSelection(answers.canadaOccupation);
-          const hasKoreaOccupation = hasOccupationSelection(answers.koreaOccupation);
+          const hasCanadaOccupation = hasResolvedCanadaOccupation(answers);
+          const hasKoreaOccupation = hasResolvedKoreaOccupation(answers);
           const hasDirectCanadaSkilled = hasCanadaOccupation && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
           const canUseKoreaSkilled = hasKoreaOccupation && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
           const canadaIsServiceEntry = hasCanadaOccupation && canadaMeta.tags.some((tag) => ["service-entry", "retail", "warehouse"].includes(tag));
