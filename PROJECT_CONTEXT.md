@@ -48,6 +48,7 @@ Recent high-signal progress already completed:
   - current Canadian work
   - transition / school route
   - or still needs more detail
+- added `title 단계` interpretation and wired actual typed job titles into recommendation scoring, so `Server`, `Administrative Assistant`, `Bookkeeper`, `Dispatcher`-type differences affect both ranking and route wording instead of only the broad occupation bucket
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
 - added occupation-specific planner focus for common ambiguous personas:
   - `server / barista / cashier -> food service supervisor or cook`
@@ -61,6 +62,10 @@ Recent high-signal progress already completed:
 Recent commit trail worth checking:
 
 - `b336563` Improve starter persona UX and add tests
+- `f00ae9f` Fix required field live-value bug
+- `bed5666` Add required field regression tests
+- `b418bab` Refine occupation-specific route planning
+- `94ea7d5` Add occupation anchor guidance
 - `064c6a0` Add title hints and route-first province actions
 - `781d1a3` Add starter persona presets to the questionnaire
 - `7d1f7a4` Add richer occupation routes and feasibility badges

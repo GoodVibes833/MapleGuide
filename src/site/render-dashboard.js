@@ -4207,6 +4207,24 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return getOccupationMeta(resolveOccupationId(answers.koreaOccupation, answers.koreaJobTitle));
         }
 
+        function getCanadaOccupationTitleStage(answers) {
+          const occupationId = resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle);
+          if (!hasOccupationSelection(occupationId)) {
+            return null;
+          }
+
+          return getOccupationTitleStage(occupationId, answers.canadaJobTitle);
+        }
+
+        function getKoreaOccupationTitleStage(answers) {
+          const occupationId = resolveOccupationId(answers.koreaOccupation, answers.koreaJobTitle);
+          if (!hasOccupationSelection(occupationId)) {
+            return null;
+          }
+
+          return getOccupationTitleStage(occupationId, answers.koreaJobTitle);
+        }
+
         function getOccupationMeta(occupation) {
           switch (occupation) {
             case "office-admin":
@@ -4726,6 +4744,121 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
         }
 
+        function getOccupationTitleStage(occupation, title) {
+          const normalizedTitle = (title || "").trim().toLowerCase();
+
+          if (!normalizedTitle) {
+            return {
+              label: "title 미입력",
+              scoreAdjustment: 0,
+              reason: "실제 title을 적으면 현재 role이 바로 비교 가능한지 더 정확히 읽을 수 있어요."
+            };
+          }
+
+          function hasAny(keywords) {
+            return keywords.some((keyword) => normalizedTitle.includes(keyword));
+          }
+
+          switch (occupation) {
+            case "office-admin":
+              if (hasAny(["coordinator", "administrator", "administrative assistant", "admin assistant", "office manager"])) {
+                return { label: "direct skilled 쪽", scoreAdjustment: 2, reason: "office administrator·coordinator처럼 바로 비교 가능한 title로 읽혀요." };
+              }
+              if (hasAny(["assistant", "clerk", "reception"])) {
+                return { label: "broad office 쪽", scoreAdjustment: 0, reason: "office 쪽이긴 하지만 duties를 더 명확히 써야 skilled로 읽히는 title이에요." };
+              }
+              break;
+            case "accounting-bookkeeping":
+              if (hasAny(["bookkeeper", "payroll", "accounting technician", "ap", "ar"])) {
+                return { label: "direct skilled 쪽", scoreAdjustment: 2, reason: "bookkeeper·payroll처럼 직무 축이 비교적 선명한 title이에요." };
+              }
+              break;
+            case "customer-service":
+              if (hasAny(["coordinator", "lead", "team lead", "office admin"])) {
+                return { label: "upgrade-ready", scoreAdjustment: 1, reason: "client service coordinator·lead 쪽으로 읽히면 더 유리한 title이에요." };
+              }
+              if (hasAny(["customer service", "call centre", "call center", "representative", "agent"])) {
+                return { label: "entry/broad 쪽", scoreAdjustment: -1, reason: "customer service rep·agent는 그대로보다 coordinator·lead 쪽으로 좁혀야 더 선명해져요." };
+              }
+              break;
+            case "server-counter":
+              if (hasAny(["supervisor", "shift lead", "lead", "cook", "kitchen"])) {
+                return { label: "upgrade-ready", scoreAdjustment: 2, reason: "server 자체보다 food service supervisor·cook 쪽에 가까운 title로 읽혀요." };
+              }
+              if (hasAny(["server", "barista", "cashier", "bartender", "counter"])) {
+                return { label: "entry-level 쪽", scoreAdjustment: -2, reason: "front-line service title이라 대부분 주에서 그대로는 약하게 읽혀요." };
+              }
+              break;
+            case "hotel-front-desk":
+              if (hasAny(["supervisor", "front office supervisor"])) {
+                return { label: "upgrade-ready", scoreAdjustment: 2, reason: "front office supervisor 쪽이면 바로 비교가 훨씬 쉬워져요." };
+              }
+              if (hasAny(["front desk", "guest service", "receptionist", "front office"])) {
+                return { label: "mixed direct", scoreAdjustment: 0, reason: "guest service agent는 가능한 편이지만 supervisor duty가 붙으면 더 유리해져요." };
+              }
+              break;
+            case "housekeeping-cleaning":
+              if (hasAny(["supervisor", "inspector", "lead"])) {
+                return { label: "upgrade-ready", scoreAdjustment: 2, reason: "housekeeping supervisor·inspection 쪽이면 훨씬 선명해져요." };
+              }
+              if (hasAny(["room attendant", "housekeeper", "cleaner", "janitor"])) {
+                return { label: "entry-level 쪽", scoreAdjustment: -2, reason: "cleaner·room attendant는 그대로보다 supervisor 쪽으로 올라가야 해요." };
+              }
+              break;
+            case "retail-sales":
+              if (hasAny(["supervisor", "assistant manager", "lead", "keyholder"])) {
+                return { label: "upgrade-ready", scoreAdjustment: 2, reason: "retail supervisor·assistant manager에 가까운 title이면 더 유리해져요." };
+              }
+              if (hasAny(["sales associate", "salesperson", "store clerk", "cashier"])) {
+                return { label: "entry-level 쪽", scoreAdjustment: -2, reason: "retail sales 자체는 그대로보다 supervisor 쪽으로 올라가야 읽히기 쉬워요." };
+              }
+              break;
+            case "warehouse-logistics":
+              if (hasAny(["dispatcher", "coordinator", "inventory", "shipping", "receiving", "lead"])) {
+                return { label: "upgrade-ready", scoreAdjustment: 2, reason: "dispatcher·inventory·shipping 쪽이면 창고 기본 role보다 훨씬 선명해져요." };
+              }
+              if (hasAny(["warehouse", "material handler", "forklift", "picker", "packer"])) {
+                return { label: "entry-level 쪽", scoreAdjustment: -1, reason: "warehouse associate·picker·packer는 그대로보다 dispatch·coordinator 쪽이 더 유리해요." };
+              }
+              break;
+            case "shipping-dispatch":
+              if (hasAny(["dispatcher", "logistics coordinator"])) {
+                return { label: "direct skilled 쪽", scoreAdjustment: 2, reason: "dispatcher·logistics coordinator는 바로 비교 가능한 쪽으로 읽혀요." };
+              }
+              if (hasAny(["shipping", "receiving clerk"])) {
+                return { label: "mixed direct", scoreAdjustment: 0, reason: "shipping/receiving clerk는 duties에 따라 TEER 해석이 갈릴 수 있어요." };
+              }
+              break;
+            case "caregiver-psw":
+              if (hasAny(["psw", "personal support worker", "home support", "support worker", "care aide"])) {
+                return { label: "예외 stream direct", scoreAdjustment: 1, reason: "PSW·home support worker 쪽이면 예외 stream이나 employer-driven 경로와 바로 비교해 볼 수 있어요." };
+              }
+              if (hasAny(["caregiver", "care worker"])) {
+                return { label: "broad care 쪽", scoreAdjustment: 0, reason: "caregiver만으로는 넓어서 PSW / support worker duties를 더 붙이는 게 좋아요." };
+              }
+              break;
+            case "cook-chef":
+              if (hasAny(["chef", "sous chef", "head cook", "kitchen lead"])) {
+                return { label: "direct skilled 쪽", scoreAdjustment: 2, reason: "chef·kitchen lead 쪽이면 skilled 축으로 바로 읽히기 좋은 title이에요." };
+              }
+              if (hasAny(["cook", "line cook"])) {
+                return { label: "direct skilled 쪽", scoreAdjustment: 1, reason: "cook·line cook도 충분히 비교 가능한 쪽이지만 duty를 더 선명하게 쓰면 더 좋아져요." };
+              }
+              break;
+            case "food-service-supervisor":
+              if (hasAny(["food service supervisor", "restaurant supervisor", "shift supervisor", "shift lead"])) {
+                return { label: "direct skilled 쪽", scoreAdjustment: 2, reason: "food service supervisor duty가 바로 보이는 title이라 비교하기 좋아요." };
+              }
+              break;
+          }
+
+          return {
+            label: "duty 확인 필요",
+            scoreAdjustment: 0,
+            reason: "job title만으로는 부족해서 실제 duties와 NOC를 같이 봐야 해요."
+          };
+        }
+
         function getOccupationPlannerFocus(occupation) {
           const meta = getOccupationMeta(occupation);
 
@@ -4820,6 +4953,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const routeTags = routeMeta.tags;
           const nocExamples = getOccupationNocExamples(routeOccupationId);
           const candidateProfiles = getOccupationCandidateProfiles(routeOccupationId);
+          const koreaTitleStage = getKoreaOccupationTitleStage(answers);
+          const canadaTitleStage = getCanadaOccupationTitleStage(answers);
           const canUseKoreaSkilled = hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
           const hasCurrentCanadaSkill = hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
           const canadaIsNonSkilled = answers.canadianJobSkill === "non-skilled";
@@ -4830,6 +4965,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const isHealth = routeTags.includes("health") || routeTags.includes("care-support");
           const isEducation = routeTags.includes("education");
           const isBusiness = routeTags.some((tag) => ["office", "business-admin", "sales", "stem"].includes(tag));
+          const routeTitleStage = usingKoreaRoute
+            ? koreaTitleStage
+            : hasResolvedCanadaOccupation(answers)
+              ? canadaTitleStage
+              : null;
           let badge = "직무 축 확인";
           let tone = "neutral";
           let summary = routeLabel + " 기준으로 어느 stream이 열리는지 먼저 비교해야 합니다.";
@@ -5088,6 +5228,15 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
           const titleLensLines = [];
 
+          if (routeTitleStage) {
+            titleLensLines.push("현재 주력 title 단계: " + routeTitleStage.label);
+            titleLensLines.push("현재 주력 title 메모: " + routeTitleStage.reason);
+            if (routeTitleStage.scoreAdjustment !== 0) {
+              scoreAdjustment += routeTitleStage.scoreAdjustment;
+              rankReasonKo = routeTitleStage.reason + " " + rankReasonKo;
+            }
+          }
+
           if (canadaInference) {
             titleLensLines.push('캐나다 title "' + answers.canadaJobTitle + '"로는 ' + canadaInference.labels.join(" / ") + " 쪽 후보를 먼저 비교할 수 있어요.");
           }
@@ -5191,6 +5340,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const profiles = getOccupationCandidateProfiles(resolvedOccupation).slice(0, 3);
             const upgradeTarget = profiles.find((profile) => /전환 목표|업그레이드 후보|한 단계 업그레이드/.test(profile.note)) || profiles[0];
             const inferredByTitle = getOccupationInferenceSummary(selectedOccupation, title);
+            const titleStage = getOccupationTitleStage(resolvedOccupation, title);
             const isAnchor = isKoreaSide
               ? ["previous-korea-job", "degree-field"].includes(answers.targetOccupationPlan)
               : answers.targetOccupationPlan === "current-canada-job";
@@ -5208,6 +5358,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 ? (upgradeTarget.label + " 쪽이 이민용으로 더 유리할 수 있어요.")
                 : "현재 title 그대로 밀 수 있는지 먼저 확인합니다.",
               inferredLine: inferredByTitle ? inferredByTitle.labels.join(" / ") : meta.labelKo,
+              titleStageLabel: titleStage.label,
+              titleStageReason: titleStage.reason,
               isAnchor
             });
           }
@@ -5223,6 +5375,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const hasCanadaOccupation = hasResolvedCanadaOccupation(answers);
           const koreaMeta = getKoreaOccupationMeta(answers);
           const canadaMeta = getCanadaOccupationMeta(answers);
+          const koreaTitleStage = getKoreaOccupationTitleStage(answers);
+          const canadaTitleStage = getCanadaOccupationTitleStage(answers);
           const hasCanadaSkilled = hasCanadaOccupation && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
           const canUseKoreaSkilled = hasKoreaOccupation && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
           const canadaNonSkilled = answers.canadianJobSkill === "non-skilled";
@@ -5233,7 +5387,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               summary: "지금은 캐나다 현재 직무 축을 주력으로 보는 쪽이 맞아요.",
               detail: canadaNonSkilled
                 ? canadaMeta.labelKo + "은 그대로보다 " + getOccupationPlannerFocus(resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle)).transitionTarget + "로 올라가는 플랜을 같이 봐야 해요."
-                : canadaMeta.labelKo + " 경력을 이민용 주력 축으로 설명할 수 있어요."
+                : (canadaTitleStage && canadaTitleStage.scoreAdjustment < 0
+                    ? canadaTitleStage.reason + " 그래서 현재 직무 축을 쓰더라도 전환 플랜을 같이 보여주는 게 좋아요."
+                    : canadaMeta.labelKo + " 경력을 이민용 주력 축으로 설명할 수 있어요.")
             };
           }
 
@@ -5247,7 +5403,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             };
           }
 
-          if (hasCanadaSkilled && !canadaNonSkilled) {
+          if (hasCanadaSkilled && !canadaNonSkilled && (!canadaTitleStage || canadaTitleStage.scoreAdjustment >= 0)) {
             return {
               anchorLabel: "캐나다 현재 직무 축",
               summary: "현재는 캐나다 현재 직무 축이 가장 자연스러워요.",
@@ -5255,7 +5411,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             };
           }
 
-          if (canUseKoreaSkilled && (canadaNonSkilled || !hasCanadaSkilled)) {
+          if (canUseKoreaSkilled && (canadaNonSkilled || !hasCanadaSkilled || (canadaTitleStage && canadaTitleStage.scoreAdjustment < 0))) {
             return {
               anchorLabel: "한국 경력 축",
               summary: "현재 캐나다 일보다 한국 경력 축이 더 유리해 보여요.",
@@ -5263,12 +5419,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             };
           }
 
-          if (canadaNonSkilled && hasCanadaOccupation) {
+          if ((canadaNonSkilled || (canadaTitleStage && canadaTitleStage.scoreAdjustment < 0)) && hasCanadaOccupation) {
             const plannerFocus = getOccupationPlannerFocus(resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle));
             return {
               anchorLabel: "전환/학교 축",
               summary: "지금 직무 그대로보다 전환이나 학교 경유를 먼저 보는 편이 맞아요.",
-              detail: canadaMeta.labelKo + "은 보통 그대로보다 " + plannerFocus.transitionTarget + " 또는 " + plannerFocus.schoolTrack + " 쪽이 더 현실적이에요."
+              detail: (canadaTitleStage && canadaTitleStage.scoreAdjustment < 0 ? canadaTitleStage.reason + " " : "")
+                + canadaMeta.labelKo + "은 보통 그대로보다 " + plannerFocus.transitionTarget + " 또는 " + plannerFocus.schoolTrack + " 쪽이 더 현실적이에요."
             };
           }
 
@@ -5319,6 +5476,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               '<ul class="reason-list">',
               '<li>현재 해석: ' + escapeHtmlClient(entry.metaLabel) + '</li>',
               '<li>title 후보: ' + escapeHtmlClient(entry.inferredLine) + '</li>',
+              '<li>title 단계: ' + escapeHtmlClient(entry.titleStageLabel) + '</li>',
+              '<li>title 해석 메모: ' + escapeHtmlClient(entry.titleStageReason) + '</li>',
               '<li>직무 상태: ' + escapeHtmlClient(entry.bandLabel) + '</li>',
               '<li>주요 후보: ' + escapeHtmlClient(entry.candidateLine) + '</li>',
               '<li>더 유리한 방향: ' + escapeHtmlClient(entry.targetLine) + '</li>',

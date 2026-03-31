@@ -107,6 +107,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /캐나다 현재 직무 축|한국 경력 축|전환\/학교 축|비교 진행 중/);
   assert.match(dashboardResponse.body, /현재 해석:/);
   assert.match(dashboardResponse.body, /title 후보:/);
+  assert.match(dashboardResponse.body, /title 단계:/);
+  assert.match(dashboardResponse.body, /title 해석 메모:/);
   assert.match(dashboardResponse.body, /직무 상태:/);
   assert.match(dashboardResponse.body, /주요 후보:/);
   assert.match(dashboardResponse.body, /더 유리한 방향:/);
@@ -125,6 +127,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /이 직무를 이 주에서 보면/);
   assert.match(dashboardResponse.body, /NOC 예시:/);
   assert.match(dashboardResponse.body, /해석 후보:/);
+  assert.match(dashboardResponse.body, /현재 주력 title 단계:/);
+  assert.match(dashboardResponse.body, /현재 주력 title 메모:/);
   assert.match(dashboardResponse.body, /이 주에서 가능한 현실 플랜/);
   assert.match(dashboardResponse.body, /이 경로가 실제로 보는 것/);
   assert.match(dashboardResponse.body, /자세히 보기/);
@@ -133,6 +137,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /점수형보다 예외 stream부터 확인하는 플랜/);
   assert.match(dashboardResponse.body, /대도시형 취업 플랜/);
   assert.match(dashboardResponse.body, /PSW·caregiver는 연방 direct보다 Ontario In-Demand, AIP, local employer 예외 경로를 먼저 보는 편이 현실적입니다/);
+  assert.match(dashboardResponse.body, /front-line service title이라 대부분 주에서 그대로는 약하게 읽혀요/);
   assert.match(dashboardResponse.body, /캐나다 한눈에 비교/);
   assert.match(dashboardResponse.body, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
 
