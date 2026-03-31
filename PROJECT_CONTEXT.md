@@ -61,6 +61,13 @@ Recent high-signal progress already completed:
 - extracted a shared raw-answer reader for dashboard form controls and added regression tests around selected age / disabled / unchecked inputs
 - added `input`-event re-rendering on the questionnaire form so the last required select, including ECA status, updates recommendations immediately in the browser
 - added regression coverage that treats `completed`, `canadian-degree`, and `unsure` ECA selections as answered required states
+- fixed a second, more subtle regression where all required fields were actually answered but the browser still showed `작성 필요` because recommendation rendering crashed later in the federal card path
+- root cause of that ECA-looking bug:
+  - `buildProvinceOccupationLens()` returned too early for the federal case without `titleLensLines` / `candidateProfiles`
+  - `renderRecommendationCard()` assumed those arrays always existed and threw while rendering the federal occupation lens
+  - a separate guard bug used `routeTitleStage?.scoreAdjustment !== 0`, which still evaluates true when `routeTitleStage` is undefined and then crashes when reading `.scoreAdjustment`
+- added a browser-level regression test with a fake DOM + `vm` script execution so this class of issue is caught even when the required-field helpers themselves pass
+- wrapped the main post-required recommendation render path in a `try/catch` so future downstream render bugs surface as `결과 계산 오류` instead of leaving stale `작성 필요` UI on screen
 
 Recent commit trail worth checking:
 
@@ -297,6 +304,17 @@ Federal recommendation currently shows:
 - latest EE cutoff
 - score gap
 - direct CRS-improvement actions
+
+## Important Bug Pattern
+
+If the page still shows `작성 필요 N개` after the visible required fields look complete, do not assume the required-field helper is wrong first.
+
+Check these in order:
+
+1. confirm the raw answers are actually complete with `getDashboardMissingRequiredFieldLabels()` and `canRenderDashboardRecommendations()`
+2. if those pass, inspect the browser console because the real issue may be a downstream render exception in recommendation card generation
+3. rerun `tests/dashboard-client-render.test.js` because it exercises the embedded browser script rather than only pure helper functions
+4. verify the federal card path specifically, because that path has already produced one stale-required-state regression after all fields were answered
 
 ## Important Current Implementation Detail
 

@@ -4815,6 +4815,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             : hasResolvedCanadaOccupation(answers)
               ? canadaTitleStage
               : null;
+          const titleLensLines = [];
           let badge = "직무 축 확인";
           let tone = "neutral";
           let summary = routeLabel + " 기준으로 어느 stream이 열리는지 먼저 비교해야 합니다.";
@@ -4822,6 +4823,19 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           let fallbackRoute = "직접 연결이 약하면 같은 업종 안의 supervisor / skilled 직무 전환이나 학교 경유도 같이 봅니다.";
           let rankReasonKo = "현재 직무를 이 주 구조에 넣어봤을 때 완전히 동떨어지지는 않아요.";
           let scoreAdjustment = 0;
+
+          if (routeTitleStage) {
+            titleLensLines.push("현재 주력 title 단계: " + routeTitleStage.label);
+            titleLensLines.push("현재 주력 title 메모: " + routeTitleStage.reason);
+          }
+
+          if (canadaInference) {
+            titleLensLines.push('캐나다 title "' + answers.canadaJobTitle + '"로는 ' + canadaInference.labels.join(" / ") + " 쪽 후보를 먼저 비교할 수 있어요.");
+          }
+
+          if (koreaInference) {
+            titleLensLines.push('한국 title "' + answers.koreaJobTitle + '"로는 ' + koreaInference.labels.join(" / ") + " 쪽 후보를 먼저 비교할 수 있어요.");
+          }
 
           if (insight.id === "federal") {
             if (getOccupationSkillBand(routeOccupationId) === "skilled" && (hasCurrentCanadaSkill || usingKoreaRoute || answers.foreignExp !== "0")) {
@@ -4852,7 +4866,19 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               scoreAdjustment = 0;
             }
 
-            return { badge, tone, summary, primaryRoute, fallbackRoute, rankReasonKo, scoreAdjustment, nocExamples, federalReadiness: getOccupationFederalReadiness(routeOccupationId) };
+            return {
+              badge,
+              tone,
+              summary,
+              primaryRoute,
+              fallbackRoute,
+              rankReasonKo,
+              scoreAdjustment,
+              nocExamples,
+              candidateProfiles,
+              federalReadiness: getOccupationFederalReadiness(routeOccupationId),
+              titleLensLines
+            };
           }
 
           if (insight.id === "ontario") {
@@ -5071,23 +5097,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             scoreAdjustment = Math.min(scoreAdjustment, 0);
           }
 
-          const titleLensLines = [];
-
-          if (routeTitleStage) {
-            titleLensLines.push("현재 주력 title 단계: " + routeTitleStage.label);
-            titleLensLines.push("현재 주력 title 메모: " + routeTitleStage.reason);
-            if (routeTitleStage.scoreAdjustment !== 0) {
-              scoreAdjustment += routeTitleStage.scoreAdjustment;
-              rankReasonKo = routeTitleStage.reason + " " + rankReasonKo;
-            }
-          }
-
-          if (canadaInference) {
-            titleLensLines.push('캐나다 title "' + answers.canadaJobTitle + '"로는 ' + canadaInference.labels.join(" / ") + " 쪽 후보를 먼저 비교할 수 있어요.");
-          }
-
-          if (koreaInference) {
-            titleLensLines.push('한국 title "' + answers.koreaJobTitle + '"로는 ' + koreaInference.labels.join(" / ") + " 쪽 후보를 먼저 비교할 수 있어요.");
+          if (routeTitleStage && routeTitleStage.scoreAdjustment !== 0) {
+            scoreAdjustment += routeTitleStage.scoreAdjustment;
+            rankReasonKo = routeTitleStage.reason + " " + rankReasonKo;
           }
 
           return {
@@ -6447,33 +6459,34 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             return;
           }
 
-          const completedRawAnswers = normalizeDependentAnswers(applyOptionalAnswerDefaults(rawAnswers));
-          const answers = {
-            ...completedRawAnswers,
-            ...normalizeLanguageAnswers(completedRawAnswers)
-          };
-          answers.occupation = getPrimaryOccupationId(answers);
-          const allEvaluated = DASHBOARD_INSIGHTS
-            .filter((insight) => insight.id !== "nunavut")
-            .filter((insight) => activeQuickRegions.size === 0 || activeQuickRegions.has(insight.id))
-            .map((insight) => ({
-              insight,
-              evaluation: scoreInsight(insight, answers)
-            }));
-          const sortedEvaluated = sortEvaluatedEntries(allEvaluated, answers);
-          const federalEntry = sortedEvaluated.find(({ insight }) => insight.id === "federal") ?? null;
-          const provinceRanked = sortedEvaluated
-            .filter(({ insight }) => insight.id !== "federal")
-            .slice(0, 3);
-          const regionalFallbackHint = buildRegionalFallbackHint(answers, allEvaluated);
-          trackFormCompleted(answers);
-          const recommendationSignature = [
-            ...provinceRanked.map(({ insight }) => insight.id),
-            federalEntry?.insight.id ?? "none",
-            answers.path,
-            answers.base,
-            answers.setting
-          ].join("|");
+          try {
+            const completedRawAnswers = normalizeDependentAnswers(applyOptionalAnswerDefaults(rawAnswers));
+            const answers = {
+              ...completedRawAnswers,
+              ...normalizeLanguageAnswers(completedRawAnswers)
+            };
+            answers.occupation = getPrimaryOccupationId(answers);
+            const allEvaluated = DASHBOARD_INSIGHTS
+              .filter((insight) => insight.id !== "nunavut")
+              .filter((insight) => activeQuickRegions.size === 0 || activeQuickRegions.has(insight.id))
+              .map((insight) => ({
+                insight,
+                evaluation: scoreInsight(insight, answers)
+              }));
+            const sortedEvaluated = sortEvaluatedEntries(allEvaluated, answers);
+            const federalEntry = sortedEvaluated.find(({ insight }) => insight.id === "federal") ?? null;
+            const provinceRanked = sortedEvaluated
+              .filter(({ insight }) => insight.id !== "federal")
+              .slice(0, 3);
+            const regionalFallbackHint = buildRegionalFallbackHint(answers, allEvaluated);
+            trackFormCompleted(answers);
+            const recommendationSignature = [
+              ...provinceRanked.map(({ insight }) => insight.id),
+              federalEntry?.insight.id ?? "none",
+              answers.path,
+              answers.base,
+              answers.setting
+            ].join("|");
 
           function renderRecommendationCard(entry, index = null, mode = "province") {
             const { insight, evaluation } = entry;
@@ -6765,10 +6778,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 + '<span class="compare-pill">' + escapeHtmlClient(occupationLens.badge) + '</span>'
                 + '<p>' + escapeHtmlClient(occupationLens.summary) + '</p>'
                 + '<ul class="reason-list">'
-                + occupationLens.titleLensLines.map((line) => '<li>' + escapeHtmlClient(line) + '</li>').join("")
+                + (occupationLens.titleLensLines || []).map((line) => '<li>' + escapeHtmlClient(line) + '</li>').join("")
                 + '<li>연방 기준: ' + escapeHtmlClient(occupationLens.federalReadiness) + '</li>'
-                + '<li>NOC 예시: ' + escapeHtmlClient(occupationLens.nocExamples.join(" / ")) + '</li>'
-                + '<li>해석 후보: ' + escapeHtmlClient(occupationLens.candidateProfiles.map((candidate) => candidate.label + " (" + candidate.teer + ", " + candidate.note + ")").join(" / ")) + '</li>'
+                + '<li>NOC 예시: ' + escapeHtmlClient((occupationLens.nocExamples || []).join(" / ")) + '</li>'
+                + '<li>해석 후보: ' + escapeHtmlClient((occupationLens.candidateProfiles || []).map((candidate) => candidate.label + " (" + candidate.teer + ", " + candidate.note + ")").join(" / ")) + '</li>'
                 + '<li>' + escapeHtmlClient(isFederalCard ? "지금 먼저 볼 것" : "이 주에서 먼저 볼 것") + ': ' + escapeHtmlClient(occupationLens.primaryRoute) + '</li>'
                 + '<li>직접 안 되면: ' + escapeHtmlClient(occupationLens.fallbackRoute) + '</li>'
                 + '</ul>'
@@ -6859,59 +6872,69 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             ].join("");
           }
 
-          const provinceHeaderNote = federalEntry
-            ? "주정부 추천은 아래 순위로 보고, 연방 EE는 따로 비교합니다."
-            : "지금 조건에서 먼저 볼 주정부 순서를 1순위부터 정리했습니다.";
-          const resultsSections = [];
+            const provinceHeaderNote = federalEntry
+              ? "주정부 추천은 아래 순위로 보고, 연방 EE는 따로 비교합니다."
+              : "지금 조건에서 먼저 볼 주정부 순서를 1순위부터 정리했습니다.";
+            const resultsSections = [];
 
-          if (provinceRanked.length > 0) {
-            resultsSections.push(
-              [
-                '<div class="wizard-section-heading">',
-                '<div>',
-                '<p class="panel-kicker">Recommendations</p>',
-                '<h3>현재 조건에서 먼저 볼 주정부 추천 순위</h3>',
-                '</div>',
-                '<p class="panel-note">' + escapeHtmlClient(provinceHeaderNote) + '</p>',
-                '</div>'
-              ].join("")
-            );
-            if (regionalFallbackHint) {
-              resultsSections.push(regionalFallbackHint);
+            if (provinceRanked.length > 0) {
+              resultsSections.push(
+                [
+                  '<div class="wizard-section-heading">',
+                  '<div>',
+                  '<p class="panel-kicker">Recommendations</p>',
+                  '<h3>현재 조건에서 먼저 볼 주정부 추천 순위</h3>',
+                  '</div>',
+                  '<p class="panel-note">' + escapeHtmlClient(provinceHeaderNote) + '</p>',
+                  '</div>'
+                ].join("")
+              );
+              if (regionalFallbackHint) {
+                resultsSections.push(regionalFallbackHint);
+              }
+              const titleInterpretationSection = renderTitleInterpretationSection(answers);
+              if (titleInterpretationSection) {
+                resultsSections.push(titleInterpretationSection);
+              }
+              resultsSections.push(provinceRanked.map((entry, index) => renderRecommendationCard(entry, index, "province")).join(""));
             }
-            const titleInterpretationSection = renderTitleInterpretationSection(answers);
-            if (titleInterpretationSection) {
-              resultsSections.push(titleInterpretationSection);
+
+            if (federalEntry) {
+              resultsSections.push(
+                [
+                  '<div class="wizard-section-heading federal-side-heading">',
+                  '<div>',
+                  '<p class="panel-kicker">Federal</p>',
+                  '<h3>연방 / EE는 따로 보기</h3>',
+                  '</div>',
+                  '<p class="panel-note">연방은 주정부와 다르게 CRS와 최근 컷오프를 따로 비교하는 편이 이해하기 쉽습니다.</p>',
+                  '</div>'
+                ].join("")
+              );
+              resultsSections.push(renderRecommendationCard(federalEntry, null, "federal"));
             }
-            resultsSections.push(provinceRanked.map((entry, index) => renderRecommendationCard(entry, index, "province")).join(""));
-          }
 
-          if (federalEntry) {
-            resultsSections.push(
-              [
-                '<div class="wizard-section-heading federal-side-heading">',
-                '<div>',
-                '<p class="panel-kicker">Federal</p>',
-                '<h3>연방 / EE는 따로 보기</h3>',
-                '</div>',
-                '<p class="panel-note">연방은 주정부와 다르게 CRS와 최근 컷오프를 따로 비교하는 편이 이해하기 쉽습니다.</p>',
-                '</div>'
-              ].join("")
-            );
-            resultsSections.push(renderRecommendationCard(federalEntry, null, "federal"));
-          }
+            quickStartResults.innerHTML = resultsSections.join("");
+            bindRecommendationInteractions();
 
-          quickStartResults.innerHTML = resultsSections.join("");
-          bindRecommendationInteractions();
-
-          if (recommendationSignature !== lastRenderedRecommendationSignature) {
-            lastRenderedRecommendationSignature = recommendationSignature;
-            trackAnalytics("recommendations_rendered", {
-              top_province: provinceRanked[0]?.insight.id ?? "none",
-              has_federal_card: Boolean(federalEntry),
-              selected_region_count: activeQuickRegions.size || MAP_REGION_DEFS.length,
-              metro_preference: answers.setting
-            });
+            if (recommendationSignature !== lastRenderedRecommendationSignature) {
+              lastRenderedRecommendationSignature = recommendationSignature;
+              trackAnalytics("recommendations_rendered", {
+                top_province: provinceRanked[0]?.insight.id ?? "none",
+                has_federal_card: Boolean(federalEntry),
+                selected_region_count: activeQuickRegions.size || MAP_REGION_DEFS.length,
+                metro_preference: answers.setting
+              });
+            }
+          } catch (error) {
+            console.error("MapleGuide quick-start render failed", error, rawAnswers);
+            quickStartResults.innerHTML = [
+              '<div class="wizard-empty wizard-empty-warning">',
+              '<span class="wizard-empty-badge">결과 계산 오류</span>',
+              '<strong>입력값은 읽었지만 결과를 그리는 중 문제가 생겼어요.</strong>',
+              '<span>다시 선택해도 계속 같다면, 마지막으로 고른 항목과 함께 알려주시면 바로 수정할게요.</span>',
+              '</div>'
+            ].join("");
           }
         }
 
