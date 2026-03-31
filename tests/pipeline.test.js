@@ -182,6 +182,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /직무 현실 체크/);
   assert.match(dashboardHtml, /이 직무를 이 주에서 보면/);
   assert.match(dashboardHtml, /NOC 예시:/);
+  assert.match(dashboardHtml, /해석 후보:/);
   assert.match(dashboardHtml, /캐나다 title "/);
   assert.match(dashboardHtml, /이 주에서 가능한 현실 플랜/);
   assert.match(dashboardHtml, /이 경로가 실제로 보는 것/);

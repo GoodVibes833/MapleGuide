@@ -191,6 +191,7 @@ Province recommendations currently show:
   - whether school / PGWP or supervisor pivot is more realistic
   - NOC-like example job titles for explanation
   - actual typed job title hints, even when the user did not choose a perfect category
+  - candidate role interpretations with TEER-like guidance (for example current role vs upgrade target)
 - concrete province plans:
   - direct current-job route
   - same-industry upgrade / supervisor / skilled pivot

@@ -4118,6 +4118,172 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
         }
 
+        function getOccupationCandidateProfiles(occupation) {
+          switch (occupation) {
+            case "office-admin":
+              return [
+                { label: "Office administrator", teer: "TEER 3", note: "현재 직무 그대로" },
+                { label: "Administrative assistant", teer: "TEER 3", note: "현재 직무 그대로" },
+                { label: "Office coordinator", teer: "TEER 2-3", note: "한 단계 업그레이드" }
+              ];
+            case "accounting-bookkeeping":
+              return [
+                { label: "Bookkeeper", teer: "TEER 2", note: "현재 직무 그대로" },
+                { label: "Payroll administrator", teer: "TEER 2", note: "현재 직무 그대로" },
+                { label: "Accounting technician", teer: "TEER 2", note: "한 단계 업그레이드" }
+              ];
+            case "accountant-finance":
+              return [
+                { label: "Accountant", teer: "TEER 1", note: "현재 직무 그대로" },
+                { label: "Financial analyst", teer: "TEER 1", note: "현재 직무 그대로" },
+                { label: "Finance manager", teer: "TEER 0-1", note: "경력 확장" }
+              ];
+            case "sales-marketing":
+              return [
+                { label: "Account manager", teer: "TEER 1-2", note: "직무 좁히기" },
+                { label: "Sales representative", teer: "TEER 2", note: "현재 직무 그대로" },
+                { label: "Marketing coordinator", teer: "TEER 2", note: "현재 직무 그대로" }
+              ];
+            case "customer-service":
+              return [
+                { label: "Customer service representative", teer: "TEER 3-4", note: "직무 확인 필요" },
+                { label: "Client service coordinator", teer: "TEER 2-3", note: "업그레이드 후보" },
+                { label: "Office support lead", teer: "TEER 2-3", note: "업그레이드 후보" }
+              ];
+            case "software-it":
+              return [
+                { label: "Software developer", teer: "TEER 1", note: "현재 직무 그대로" },
+                { label: "Programmer / analyst", teer: "TEER 1", note: "현재 직무 그대로" },
+                { label: "IT specialist", teer: "TEER 1-2", note: "현재 직무 그대로" }
+              ];
+            case "engineer-tech":
+              return [
+                { label: "Engineer", teer: "TEER 1", note: "현재 직무 그대로" },
+                { label: "Engineering technologist", teer: "TEER 2", note: "기술직 축" },
+                { label: "Quality / process specialist", teer: "TEER 1-2", note: "현재 직무 그대로" }
+              ];
+            case "nurse-allied-health":
+              return [
+                { label: "Registered nurse", teer: "TEER 1", note: "면허 필요" },
+                { label: "Licensed practical nurse", teer: "TEER 2", note: "면허 필요" },
+                { label: "Allied health practitioner", teer: "TEER 1-2", note: "면허 필요" }
+              ];
+            case "caregiver-psw":
+              return [
+                { label: "Personal support worker", teer: "TEER 4", note: "주 예외 stream 확인" },
+                { label: "Home support worker", teer: "TEER 4", note: "employer-driven 확인" },
+                { label: "Care aide", teer: "TEER 4", note: "주 예외 stream 확인" }
+              ];
+            case "ece-childcare":
+              return [
+                { label: "Early childhood educator", teer: "TEER 2", note: "자격 필요" },
+                { label: "ECE assistant", teer: "TEER 3-4", note: "지역별 다름" },
+                { label: "Childcare worker", teer: "TEER 3-4", note: "지역별 다름" }
+              ];
+            case "teacher-education-support":
+              return [
+                { label: "Teacher assistant", teer: "TEER 3", note: "현실적 우회로" },
+                { label: "Education assistant", teer: "TEER 3", note: "현실적 우회로" },
+                { label: "School support worker", teer: "TEER 3-4", note: "현실적 우회로" }
+              ];
+            case "cook-chef":
+              return [
+                { label: "Cook", teer: "TEER 3", note: "현재 직무 그대로" },
+                { label: "Chef", teer: "TEER 2", note: "현재 직무 그대로" },
+                { label: "Kitchen lead", teer: "TEER 2-3", note: "업그레이드 후보" }
+              ];
+            case "baker-pastry":
+              return [
+                { label: "Baker", teer: "TEER 3", note: "현재 직무 그대로" },
+                { label: "Pastry baker", teer: "TEER 3", note: "현재 직무 그대로" },
+                { label: "Production baker", teer: "TEER 2-3", note: "업그레이드 후보" }
+              ];
+            case "food-service-supervisor":
+              return [
+                { label: "Food service supervisor", teer: "TEER 2", note: "현재 직무 그대로" },
+                { label: "Restaurant supervisor", teer: "TEER 2", note: "현재 직무 그대로" },
+                { label: "Shift supervisor", teer: "TEER 2-3", note: "현재 직무 그대로" }
+              ];
+            case "server-counter":
+              return [
+                { label: "Server / bartender", teer: "TEER 4-5", note: "현재 role" },
+                { label: "Food counter attendant", teer: "TEER 5", note: "현재 role" },
+                { label: "Food service supervisor", teer: "TEER 2", note: "전환 목표" }
+              ];
+            case "retail-supervisor":
+              return [
+                { label: "Retail supervisor", teer: "TEER 2", note: "현재 직무 그대로" },
+                { label: "Store supervisor", teer: "TEER 2", note: "현재 직무 그대로" },
+                { label: "Assistant store manager", teer: "TEER 1-2", note: "업그레이드 후보" }
+              ];
+            case "retail-sales":
+              return [
+                { label: "Retail salesperson", teer: "TEER 4", note: "현재 role" },
+                { label: "Sales associate", teer: "TEER 4", note: "현재 role" },
+                { label: "Retail supervisor", teer: "TEER 2", note: "전환 목표" }
+              ];
+            case "warehouse-logistics":
+              return [
+                { label: "Warehouse associate", teer: "TEER 4", note: "현재 role" },
+                { label: "Material handler", teer: "TEER 4", note: "현재 role" },
+                { label: "Inventory coordinator", teer: "TEER 2-3", note: "전환 목표" }
+              ];
+            case "shipping-dispatch":
+              return [
+                { label: "Dispatcher", teer: "TEER 2", note: "현재 직무 그대로" },
+                { label: "Shipping / receiving clerk", teer: "TEER 3-4", note: "직무 확인 필요" },
+                { label: "Logistics coordinator", teer: "TEER 2", note: "업그레이드 후보" }
+              ];
+            case "truck-driver":
+              return [
+                { label: "Transport truck driver", teer: "TEER 3", note: "현재 직무 그대로" },
+                { label: "Delivery driver", teer: "TEER 3-4", note: "직무 확인 필요" },
+                { label: "Commercial driver", teer: "TEER 3", note: "현재 직무 그대로" }
+              ];
+            case "construction-trade":
+              return [
+                { label: "Electrician / plumber / carpenter", teer: "TEER 2-3", note: "인증 중요" },
+                { label: "Construction trade worker", teer: "TEER 2-3", note: "인증 중요" },
+                { label: "Journeyperson / apprentice", teer: "TEER 2-3", note: "인증 중요" }
+              ];
+            case "industrial-trade":
+              return [
+                { label: "Welder", teer: "TEER 2-3", note: "현재 직무 그대로" },
+                { label: "Machinist", teer: "TEER 2-3", note: "현재 직무 그대로" },
+                { label: "Industrial mechanic", teer: "TEER 2-3", note: "현재 직무 그대로" }
+              ];
+            case "mechanic-technician":
+              return [
+                { label: "Automotive service technician", teer: "TEER 2", note: "인증 중요" },
+                { label: "Mechanic", teer: "TEER 2-3", note: "현재 직무 그대로" },
+                { label: "Diagnostic technician", teer: "TEER 2", note: "업그레이드 후보" }
+              ];
+            case "physician-canada":
+              return [
+                { label: "Physician", teer: "TEER 1", note: "현재 직무 그대로" },
+                { label: "Family doctor", teer: "TEER 1", note: "현재 직무 그대로" },
+                { label: "Specialist physician", teer: "TEER 1", note: "현재 직무 그대로" }
+              ];
+            case "senior-manager-canada":
+              return [
+                { label: "Senior manager", teer: "TEER 0", note: "현재 직무 그대로" },
+                { label: "Operations director", teer: "TEER 0-1", note: "현재 직무 그대로" },
+                { label: "Department head", teer: "TEER 0-1", note: "현재 직무 그대로" }
+              ];
+            case "researcher-canada":
+              return [
+                { label: "Research scientist", teer: "TEER 1", note: "현재 직무 그대로" },
+                { label: "Research associate", teer: "TEER 1-2", note: "현재 직무 그대로" },
+                { label: "Postdoctoral researcher", teer: "TEER 1", note: "현재 직무 그대로" }
+              ];
+            default:
+              return [
+                { label: "가장 가까운 NOC 1개", teer: "확인 필요", note: "직무 좁히기 필요" },
+                { label: "같은 업종 안의 supervisor / technician", teer: "확인 필요", note: "업그레이드 후보" }
+              ];
+          }
+        }
+
         function getOccupationFederalReadiness(occupation) {
           switch (getOccupationSkillBand(occupation)) {
             case "skilled":
@@ -4143,6 +4309,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               : routeMeta.labelKo;
           const routeTags = routeMeta.tags;
           const nocExamples = getOccupationNocExamples(routeOccupationId);
+          const candidateProfiles = getOccupationCandidateProfiles(routeOccupationId);
           const canUseKoreaSkilled = hasOccupationSelection(answers.koreaOccupation) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
           const hasCurrentCanadaSkill = hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
           const canadaIsNonSkilled = answers.canadianJobSkill === "non-skilled";
@@ -4428,6 +4595,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             rankReasonKo,
             scoreAdjustment,
             nocExamples,
+            candidateProfiles,
             federalReadiness: getOccupationFederalReadiness(routeOccupationId),
             titleLensLines
           };
@@ -5598,6 +5766,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 + occupationLens.titleLensLines.map((line) => '<li>' + escapeHtmlClient(line) + '</li>').join("")
                 + '<li>연방 기준: ' + escapeHtmlClient(occupationLens.federalReadiness) + '</li>'
                 + '<li>NOC 예시: ' + escapeHtmlClient(occupationLens.nocExamples.join(" / ")) + '</li>'
+                + '<li>해석 후보: ' + escapeHtmlClient(occupationLens.candidateProfiles.map((candidate) => candidate.label + " (" + candidate.teer + ", " + candidate.note + ")").join(" / ")) + '</li>'
                 + '<li>' + escapeHtmlClient(isFederalCard ? "지금 먼저 볼 것" : "이 주에서 먼저 볼 것") + ': ' + escapeHtmlClient(occupationLens.primaryRoute) + '</li>'
                 + '<li>직접 안 되면: ' + escapeHtmlClient(occupationLens.fallbackRoute) + '</li>'
                 + '</ul>'
