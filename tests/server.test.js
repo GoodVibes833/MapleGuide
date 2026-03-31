@@ -81,13 +81,11 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /최종 학력/);
   assert.match(dashboardResponse.body, /영어 상태/);
   assert.match(dashboardResponse.body, /캐나다 경력의 성격/);
-  assert.match(dashboardResponse.body, /현재 입력 저장/);
-  assert.match(dashboardResponse.body, /저장값 불러오기/);
-  assert.match(dashboardResponse.body, /초기화/);
-  assert.match(dashboardResponse.body, /현재 입력은 이 브라우저 안에서만 저장됩니다/);
-  assert.match(dashboardResponse.body, /questionnaire_saved/);
-  assert.match(dashboardResponse.body, /questionnaire_loaded/);
-  assert.match(dashboardResponse.body, /questionnaire_reset/);
+  assert.doesNotMatch(dashboardResponse.body, /현재 입력 저장/);
+  assert.doesNotMatch(dashboardResponse.body, /저장값 불러오기/);
+  assert.doesNotMatch(dashboardResponse.body, /questionnaire_saved/);
+  assert.doesNotMatch(dashboardResponse.body, /questionnaire_loaded/);
+  assert.doesNotMatch(dashboardResponse.body, /questionnaire_reset/);
   assert.match(dashboardResponse.body, /comparison_table_opened/);
   assert.match(dashboardResponse.body, /한국에서 주로 하던 일/);
   assert.match(dashboardResponse.body, /한국에서 실제로 하던 job title/);
@@ -105,6 +103,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /제조 \/ production \/ factory worker/);
   assert.match(dashboardResponse.body, /현재 비자 \/ 퍼밋 남은 기간/);
   assert.match(dashboardResponse.body, /ECA \/ 학력평가 상태/);
+  assert.match(dashboardResponse.body, /해외에서 이민에 쓸 숙련 경력/);
+  assert.match(dashboardResponse.body, /한국 알바·비숙련 서비스 경력은 보통 여기 넣지 않고/);
   assert.match(dashboardResponse.body, /먼저 꼭 필요한 정보/);
   assert.match(dashboardResponse.body, /추가로 알려주면 더 정확해요/);
   assert.ok(dashboardResponse.body.indexOf("먼저 꼭 필요한 정보") < dashboardResponse.body.indexOf("추가로 알려주면 더 정확해요"));

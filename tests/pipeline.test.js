@@ -150,13 +150,11 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /trackFieldChange\(event\.target\);/);
   assert.match(dashboardHtml, /필수\* 항목을 먼저 골라주세요/);
   assert.match(dashboardHtml, /최종 학력/);
-  assert.match(dashboardHtml, /현재 입력 저장/);
-  assert.match(dashboardHtml, /저장값 불러오기/);
-  assert.match(dashboardHtml, /초기화/);
-  assert.match(dashboardHtml, /현재 입력은 이 브라우저 안에서만 저장됩니다/);
-  assert.match(dashboardHtml, /questionnaire_saved/);
-  assert.match(dashboardHtml, /questionnaire_loaded/);
-  assert.match(dashboardHtml, /questionnaire_reset/);
+  assert.doesNotMatch(dashboardHtml, /현재 입력 저장/);
+  assert.doesNotMatch(dashboardHtml, /저장값 불러오기/);
+  assert.doesNotMatch(dashboardHtml, /questionnaire_saved/);
+  assert.doesNotMatch(dashboardHtml, /questionnaire_loaded/);
+  assert.doesNotMatch(dashboardHtml, /questionnaire_reset/);
   assert.match(dashboardHtml, /comparison_table_opened/);
   assert.match(dashboardHtml, /한국에서 주로 하던 일/);
   assert.match(dashboardHtml, /한국에서 실제로 하던 job title/);
@@ -181,6 +179,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /캐나다 경력의 성격/);
   assert.match(dashboardHtml, /현재 비자 \/ 퍼밋 남은 기간/);
   assert.match(dashboardHtml, /ECA \/ 학력평가 상태/);
+  assert.match(dashboardHtml, /해외에서 이민에 쓸 숙련 경력/);
+  assert.match(dashboardHtml, /한국 알바·비숙련 서비스 경력은 보통 여기 넣지 않고/);
   assert.match(dashboardHtml, /먼저 꼭 필요한 정보/);
   assert.match(dashboardHtml, /추가로 알려주면 더 정확해요/);
   assert.ok(dashboardHtml.indexOf("먼저 꼭 필요한 정보") < dashboardHtml.indexOf("추가로 알려주면 더 정확해요"));

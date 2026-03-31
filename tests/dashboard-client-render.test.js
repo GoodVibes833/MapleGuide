@@ -487,31 +487,6 @@ test("saved questionnaire state restores recommendations and required markers on
   assert.match(harness.quickStartResults.innerHTML, /현재 조건에서 먼저 볼 주정부 추천 순위/);
 });
 
-test("save, load, and reset controls preserve and clear questionnaire state", () => {
-  const harness = buildDashboardClientHarness(buildCompleteControls());
-
-  harness.saveButton.click();
-  assert.match(harness.quickFormStatus.textContent, /저장했어요/);
-  assert.ok(harness.sessionStorage.getItem("mapleguide.dashboard.state.v2"));
-
-  harness.controlByName.path.value = "";
-  harness.controlByName.ecaStatus.value = "";
-  harness.loadButton.click();
-
-  assert.equal(harness.controlByName.path.value, "working-holiday");
-  assert.equal(harness.controlByName.ecaStatus.value, "completed");
-  assert.match(harness.quickFormStatus.textContent, /불러왔어요/);
-  assert.doesNotMatch(harness.quickStartResults.innerHTML, /작성 필요|결과 계산 오류/);
-
-  harness.resetButton.click();
-
-  assert.equal(harness.controlByName.path.value, "");
-  assert.equal(harness.controlByName.ecaStatus.value, "");
-  assert.equal(harness.sessionStorage.getItem("mapleguide.dashboard.state.v2"), null);
-  assert.match(harness.quickFormStatus.textContent, /초기화/);
-  assert.match(harness.quickStartResults.innerHTML, /작성 필요/);
-});
-
 test("typed supervisor title overrides broad service bucket with direct candidate guidance", () => {
   const html = renderClientResults(
     buildCompleteControls({
@@ -531,6 +506,24 @@ test("typed supervisor title overrides broad service bucket with direct candidat
   assert.match(html, /맞는 이유: 현재 title Food service supervisor/);
 });
 
+test("broad Korea service history is not treated as usable foreign skilled experience", () => {
+  const html = renderClientResults(
+    buildCompleteControls({
+      koreaOccupation: "server-counter",
+      koreaJobTitle: "Server",
+      targetOccupationPlan: "previous-korea-job",
+      foreignExp: "5",
+      foreignExpAlignment: "same-skilled",
+      canadaOccupation: "general",
+      canadaJobTitle: ""
+    })
+  );
+
+  assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
+  assert.match(html, /해외 경력은 입력됐지만, 한국 role이 entry\/broad로 읽혀서 숙련 경력으로 바로 넣지 않고 있어요/);
+  assert.doesNotMatch(html, /해외 숙련 경력 5년/);
+});
+
 test("dispatcher title narrows warehouse planning toward direct logistics route", () => {
   const html = renderClientResults(
     buildCompleteControls({
@@ -547,6 +540,23 @@ test("dispatcher title narrows warehouse planning toward direct logistics route"
   assert.match(html, /dispatcher는 warehouse broad role보다 훨씬 직접 비교 가능한 title이에요/);
   assert.match(html, /Dispatcher title 기준으로는 .* 쪽이 먼저 맞아요/);
   assert.match(html, /맞는 이유: 현재 title Dispatcher/);
+});
+
+test("tight budget plus expiring permit favors low-cost and employer extension actions", () => {
+  const html = renderClientResults(
+    buildCompleteControls({
+      budget: "tight",
+      jobOffer: "yes",
+      permitRemaining: "6to12",
+      base: "worker",
+      path: "canadian-worker"
+    })
+  );
+
+  assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
+  assert.match(html, /가장 저비용 플랜부터: 영어·서류·직무 정리 먼저/);
+  assert.match(html, /고용주 기반 비자 연장 가능성부터 확인/);
+  assert.match(html, /비용 낮음|고용주 부담 중심/);
 });
 
 test("complete render persists recommendation snapshots with summed CRS lift", () => {

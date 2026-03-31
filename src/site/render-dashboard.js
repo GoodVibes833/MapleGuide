@@ -32,7 +32,7 @@ export const DASHBOARD_REQUIRED_FIELD_LABELS = {
   household: "배우자 포함 여부",
   education: "최종 학력",
   languageProfile: "영어 상태",
-  foreignExp: "해외 숙련 경력",
+  foreignExp: "해외에서 이민에 쓸 숙련 경력",
   canadianExp: "캐나다 경력",
   canadianJobSkill: "캐나다 경력의 성격",
   ecaStatus: "ECA / 학력평가 상태"
@@ -532,18 +532,6 @@ function renderSituationSection(insights) {
               <p class="panel-note">필수* 항목을 먼저 고르면 추천이 바로 열립니다.</p>
             </div>
           </div>
-          <div class="wizard-form-tools">
-            <div class="wizard-form-tools-copy">
-              <strong>현재 입력 저장</strong>
-              <span>브라우저에 저장했다가 나중에 다시 이어볼 수 있어요.</span>
-            </div>
-            <div class="wizard-form-tools-actions">
-              <button type="button" class="btn ghost btn-compact" id="quick-save-button">현재 입력 저장</button>
-              <button type="button" class="btn ghost btn-compact" id="quick-load-button">저장값 불러오기</button>
-              <button type="button" class="btn ghost btn-compact" id="quick-reset-button">초기화</button>
-            </div>
-            <p class="wizard-form-tools-status" id="quick-form-status" aria-live="polite">현재 입력은 이 브라우저 안에서만 저장됩니다.</p>
-          </div>
           <label class="wizard-field" data-required-field="path">
             <span class="wizard-field-label">지금 생각하는 큰 방향 <em class="required-mark">필수*</em></span>
             <select name="path">
@@ -635,7 +623,7 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field" data-required-field="foreignExp">
-            <span class="wizard-field-label">해외 숙련 경력 <em class="required-mark">필수*</em></span>
+            <span class="wizard-field-label">해외에서 이민에 쓸 숙련 경력 <em class="required-mark">필수*</em></span>
             <select name="foreignExp">
               <option value="">선택하세요</option>
               <option value="0">없음</option>
@@ -645,6 +633,7 @@ function renderSituationSection(insights) {
               <option value="4">4년</option>
               <option value="5">5년 이상</option>
             </select>
+            <small class="wizard-helper">한국 알바·비숙련 서비스 경력은 보통 여기 넣지 않고, 지금 이민에 쓸 직군과 연결되는 숙련 경력만 넣는 게 좋아요.</small>
           </label>
           <label class="wizard-field" data-required-field="canadianExp">
             <span class="wizard-field-label">캐나다 경력 <em class="required-mark">필수*</em></span>
@@ -775,7 +764,7 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
-            <span>한국 경력과 이민에 쓸 직군의 연결성</span>
+            <span>그 해외 경력이 지금 이민에 쓸 직군과 얼마나 연결되나요</span>
             <select name="foreignExpAlignment">
               <option value="">아직 잘 모르겠어요</option>
               <option value="same-skilled">같은 NOC 또는 매우 비슷한 숙련 경력이에요</option>
@@ -1747,10 +1736,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
         const quickStartResults = document.getElementById("quick-start-results");
-        const saveButton = document.getElementById("quick-save-button");
-        const loadButton = document.getElementById("quick-load-button");
-        const resetButton = document.getElementById("quick-reset-button");
-        const quickFormStatus = document.getElementById("quick-form-status");
         const koreaJobTitleInput = quickStartForm?.elements?.namedItem("koreaJobTitle");
         const canadaJobTitleInput = quickStartForm?.elements?.namedItem("canadaJobTitle");
         const koreaOccupationSelect = quickStartForm?.elements?.namedItem("koreaOccupation");
@@ -1973,12 +1958,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               ...extraState
             }));
           } catch {}
-        }
-
-        function setQuickFormStatus(message) {
-          if (quickFormStatus) {
-            quickFormStatus.textContent = message;
-          }
         }
 
         function trackFieldChange(control) {
@@ -2381,8 +2360,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             add(-1, "언어 점수 보완이 먼저 필요할 수 있음");
           }
 
-          if (["2", "3", "4", "5"].includes(answers.foreignExp)) {
-            add(2, "해외 숙련 경력이 활용될 수 있음");
+          if (getUsableForeignSkilledYears(answers) >= 2) {
+            add(2, "해외 숙련 경력이 실제 주력 경력으로 활용될 수 있음");
+          } else if (getDeclaredForeignExperienceYears(answers) > 0) {
+            add(-1, "해외 경력은 있지만 지금 이민에 쓸 숙련 경력으로 바로 쓰기엔 애매함");
           }
           if (["1", "2", "3", "4", "5"].includes(answers.canadianExp)) {
             add(3, "캐나다 경력은 많은 경로에서 직접 강점이 됨");
@@ -2407,7 +2388,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             }
           }
           if (answers.targetOccupationPlan === "previous-korea-job") {
-            if (answers.foreignExpAlignment === "same-skilled" && answers.foreignExp !== "0") {
+            if (answers.foreignExpAlignment === "same-skilled" && hasUsableForeignSkilledExperience(answers)) {
               add(3, "한국 경력을 primary occupation으로 정리하기 좋은 상태");
             } else if (answers.foreignExpAlignment === "related-skilled") {
               add(1, "한국 경력은 활용 가능하지만 NOC 정리를 더 정확히 해야 함");
@@ -2622,7 +2603,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           if (answers.targetOccupationPlan === "previous-korea-job") {
-            if (answers.foreignExpAlignment === "same-skilled" && answers.foreignExp !== "0") {
+            if (answers.foreignExpAlignment === "same-skilled" && hasUsableForeignSkilledExperience(answers)) {
               chance += 4;
             } else if (answers.foreignExpAlignment === "unrelated") {
               chance -= 8;
@@ -2894,7 +2875,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const educationMedium = ["one-year", "two-year"].includes(answers.education);
           const hasMediumLanguage = ["clb7", "clb8"].includes(answers.english);
           const hasStrongLanguage = answers.english === "clb9plus";
-          const foreignYears = Number.parseInt(answers.foreignExp, 10) || 0;
+          const foreignYears = getUsableForeignSkilledYears(answers);
           const canadianYears = hasSkilledCanadianTrack(answers) ? Number.parseInt(answers.canadianExp, 10) || 0 : 0;
           let total = 0;
 
@@ -2992,7 +2973,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             (answers.age === "20-29" ? 4 : ["30", "31"].includes(answers.age) ? 3 : ["32", "33", "34"].includes(answers.age) ? 2 : ["35", "36", "37", "38", "39"].includes(answers.age) ? 1 : 0) +
             (answers.education === "doctorate" ? 4 : ["master", "professional"].includes(answers.education) ? 4 : answers.education === "two-plus" ? 3 : answers.education === "bachelor" ? 3 : answers.education === "two-year" ? 2 : answers.education === "one-year" ? 1 : 0) +
             (answers.english === "clb9plus" ? 4 : answers.english === "clb8" ? 3 : answers.english === "clb7" ? 2 : 0) +
-            (["4", "5"].includes(answers.foreignExp) ? 3 : answers.foreignExp === "3" ? 3 : answers.foreignExp === "2" ? 2 : answers.foreignExp === "1" ? 1 : 0) +
+            (getUsableForeignSkilledYears(answers) >= 3 ? 3 : getUsableForeignSkilledYears(answers) === 2 ? 2 : getUsableForeignSkilledYears(answers) === 1 ? 1 : 0) +
             (["4", "5"].includes(answers.canadianExp) ? 4 : answers.canadianExp === "3" ? 4 : answers.canadianExp === "2" ? 3 : answers.canadianExp === "1" ? 2 : 0) +
             (answers.advantage === "french" ? 2 : 0);
 
@@ -3118,8 +3099,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               }
               return { state: "missing", detail: "ECA 또는 캐나다 학위 확인이 더 필요해요." };
             case "skilled-experience":
-              if ((answers.foreignExp && answers.foreignExp !== "0") || (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0")) {
+              if (hasUsableForeignSkilledExperience(answers) || (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0")) {
                 return { state: "has", detail: "숙련 경력을 현재 경로에 연결해 볼 수 있어요." };
+              }
+              if (getDeclaredForeignExperienceYears(answers) > 0) {
+                return { state: "partial", detail: "해외 경력은 있지만 지금 이민에 쓸 숙련 경력으로 바로 쓰려면 직군 연결부터 더 확인해야 해요." };
               }
               if (answers.canadianExp !== "0") {
                 return { state: "partial", detail: "캐나다 경력은 있지만 skilled 기준 확인이 더 필요해요." };
@@ -3259,7 +3243,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           if (["completed", "canadian-degree"].includes(answers.ecaStatus)) {
             items.push("ECA 또는 캐나다 학위");
           }
-          if (answers.foreignExp !== "0" || answers.canadianExp !== "0") {
+          if (hasUsableForeignSkilledExperience(answers) || answers.canadianExp !== "0") {
             items.push("숙련 경력");
           }
           if (hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0") {
@@ -3312,8 +3296,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             items.push("캐나다 경력 없음");
           }
 
-          if (answers.foreignExp && answers.foreignExp !== "0") {
-            items.push("해외 경력 " + answers.foreignExp + "년");
+          if (hasUsableForeignSkilledExperience(answers)) {
+            items.push("해외 숙련 경력 " + getUsableForeignSkilledYears(answers) + "년");
+          } else if (getDeclaredForeignExperienceYears(answers) > 0) {
+            items.push("해외 경력 있음(숙련으로 바로 쓰긴 애매)");
           }
 
           if (answers.ecaStatus === "completed") {
@@ -3472,8 +3458,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         function evaluateSpecialPathwayCriterion(criterion, answers, pathway, crsSnapshot) {
           const hasEducationReady = ["completed", "canadian-degree"].includes(answers.ecaStatus);
-          const hasSkilledExperience = answers.foreignExp !== "0" || hasSkilledCanadianTrack(answers);
-          const hasAnyExperience = answers.foreignExp !== "0" || answers.canadianExp !== "0";
+          const hasSkilledExperience = hasUsableForeignSkilledExperience(answers) || hasSkilledCanadianTrack(answers);
+          const hasAnyExperience = getDeclaredForeignExperienceYears(answers) > 0 || answers.canadianExp !== "0";
           const hasAtlanticSelection = pathway.regionIds?.some((regionId) => activeQuickRegions.has(regionId));
           const hasNlSelection = activeQuickRegions.has("newfoundland-and-labrador");
           const hasAlbertaSelection = activeQuickRegions.has("alberta");
@@ -3943,7 +3929,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           if (answers.targetOccupationPlan === "previous-korea-job") {
-            if (answers.foreignExpAlignment === "same-skilled" && answers.foreignExp !== "0") {
+            if (answers.foreignExpAlignment === "same-skilled" && hasUsableForeignSkilledExperience(answers)) {
               items.push("한국 " + koreaMeta.labelKo + " 경력으로 갈 경우, 목표 primary occupation과 같은 NOC의 숙련 경력을 기준으로 정리하는 편이 유리합니다.");
             } else if (answers.foreignExpAlignment === "related-skilled") {
               items.push("한국 경력과 목표 직군이 비슷해도 NOC가 다르면 설명을 더 정교하게 해야 할 수 있습니다.");
@@ -4881,6 +4867,72 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return getOccupationTitleStage(occupationId, answers.koreaJobTitle);
         }
 
+        function getDeclaredForeignExperienceYears(answers) {
+          return Number.parseInt(answers.foreignExp, 10) || 0;
+        }
+
+        function getUsableForeignSkilledYears(answers) {
+          const declaredYears = getDeclaredForeignExperienceYears(answers);
+
+          if (declaredYears <= 0) {
+            return 0;
+          }
+
+          if (["none", "unrelated"].includes(answers.foreignExpAlignment || "")) {
+            return 0;
+          }
+
+          const koreaOccupationId = resolveOccupationId(answers.koreaOccupation, answers.koreaJobTitle);
+          const koreaTitleStage = getKoreaOccupationTitleStage(answers);
+
+          if (koreaTitleStage && koreaTitleStage.scoreAdjustment < 0) {
+            return 0;
+          }
+
+          if (hasOccupationSelection(koreaOccupationId) && getOccupationSkillBand(koreaOccupationId) === "entry") {
+            return 0;
+          }
+
+          if (!hasResolvedKoreaOccupation(answers) && !normalizeTitleText(answers.koreaJobTitle)) {
+            return 0;
+          }
+
+          return declaredYears;
+        }
+
+        function hasUsableForeignSkilledExperience(answers) {
+          return getUsableForeignSkilledYears(answers) > 0;
+        }
+
+        function getForeignExperienceReadiness(answers) {
+          const declaredYears = getDeclaredForeignExperienceYears(answers);
+
+          if (declaredYears <= 0) {
+            return { declaredYears, usableYears: 0, mode: "none" };
+          }
+
+          if (!hasResolvedKoreaOccupation(answers) && !normalizeTitleText(answers.koreaJobTitle)) {
+            return { declaredYears, usableYears: 0, mode: "needs-occupation" };
+          }
+
+          if (["none", "unrelated"].includes(answers.foreignExpAlignment || "")) {
+            return { declaredYears, usableYears: 0, mode: "misaligned" };
+          }
+
+          const koreaOccupationId = resolveOccupationId(answers.koreaOccupation, answers.koreaJobTitle);
+          const koreaTitleStage = getKoreaOccupationTitleStage(answers);
+
+          if (koreaTitleStage && koreaTitleStage.scoreAdjustment < 0) {
+            return { declaredYears, usableYears: 0, mode: "non-skilled-title" };
+          }
+
+          if (hasOccupationSelection(koreaOccupationId) && getOccupationSkillBand(koreaOccupationId) === "entry") {
+            return { declaredYears, usableYears: 0, mode: "non-skilled-track" };
+          }
+
+          return { declaredYears, usableYears: declaredYears, mode: "usable" };
+        }
+
         function hasDirectCanadaSkilledTrack(answers) {
           const canadaTitleStage = getCanadaOccupationTitleStage(answers);
           return hasResolvedCanadaOccupation(answers)
@@ -5642,7 +5694,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             : getOccupationCandidateProfiles(routeOccupationId);
           const koreaTitleStage = getKoreaOccupationTitleStage(answers);
           const canadaTitleStage = getCanadaOccupationTitleStage(answers);
-          const canUseKoreaSkilled = hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
+          const canUseKoreaSkilled = hasUsableForeignSkilledExperience(answers);
           const hasCurrentCanadaSkill = hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
           const canadaIsNonSkilled = answers.canadianJobSkill === "non-skilled";
           const isServiceEntry = routeTags.some((tag) => ["service-entry", "retail"].includes(tag));
@@ -5684,7 +5736,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           if (insight.id === "federal") {
-            if (getOccupationSkillBand(routeOccupationId) === "skilled" && (hasCurrentCanadaSkill || usingKoreaRoute || answers.foreignExp !== "0")) {
+            if (getOccupationSkillBand(routeOccupationId) === "skilled" && (hasCurrentCanadaSkill || usingKoreaRoute || hasUsableForeignSkilledExperience(answers))) {
               badge = "연방 skilled 축";
               tone = "positive";
               summary = routeLabel + "은 연방 EE/CEC에서 대체로 skilled 축으로 바로 비교할 수 있는 편입니다.";
@@ -6128,7 +6180,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             answers.koreaJobTitle
           );
           const hasCanadaSkilled = hasCanadaOccupation && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
-          const canUseKoreaSkilled = hasKoreaOccupation && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
+          const canUseKoreaSkilled = hasUsableForeignSkilledExperience(answers);
           const canadaNonSkilled = answers.canadianJobSkill === "non-skilled";
 
           if (answers.targetOccupationPlan === "current-canada-job" && hasCanadaOccupation) {
@@ -6197,10 +6249,21 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         function renderTitleInterpretationSection(answers) {
           const entries = buildTitleInterpretationEntries(answers);
           const anchorGuidance = buildOccupationAnchorGuidance(answers);
+          const foreignExperienceReadiness = getForeignExperienceReadiness(answers);
 
           if (entries.length === 0) {
             return "";
           }
+
+          const foreignExperienceLine = foreignExperienceReadiness.mode === "usable"
+            ? "해외 숙련 경력은 현재 " + foreignExperienceReadiness.usableYears + "년을 이민용 경력으로 바로 비교 중이에요."
+            : foreignExperienceReadiness.mode === "none"
+              ? ""
+              : foreignExperienceReadiness.mode === "needs-occupation"
+                ? "해외 경력은 입력됐지만, 한국 직무/title이 넓어서 아직 이민용 숙련 경력으로 바로 계산하지 않고 있어요."
+                : foreignExperienceReadiness.mode === "misaligned"
+                  ? "해외 경력은 입력됐지만, 지금 이민에 쓸 직군과 연결성이 약해서 숙련 경력 점수로 바로 넣지 않고 있어요."
+                  : "해외 경력은 입력됐지만, 한국 role이 entry/broad로 읽혀서 숙련 경력으로 바로 넣지 않고 있어요.";
 
           return [
             '<section class="title-interpretation-panel">',
@@ -6214,6 +6277,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               + escapeHtmlClient(anchorGuidance.summary)
               + (anchorGuidance.detail ? " · " + escapeHtmlClient(anchorGuidance.detail) : "")
               + '</p>',
+            foreignExperienceLine ? '<p class="wizard-freshness">' + escapeHtmlClient(foreignExperienceLine) + '</p>' : '',
             '<div class="title-interpretation-grid">',
             entries.map((entry) => [
               '<article class="title-interpretation-card">',
@@ -6264,7 +6328,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const koreaMeta = getKoreaOccupationMeta(answers);
           const occupationLens = buildProvinceOccupationLens(answers, insight);
           const plannerFocus = getOccupationPlannerFocus(hasResolvedCanadaOccupation(answers) ? canadaOccupationId : routeOccupationId);
-          const canUseKoreaSkilled = hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
+          const canUseKoreaSkilled = hasUsableForeignSkilledExperience(answers);
           const canadaIsNonSkilled = answers.canadianJobSkill === "non-skilled";
           const needsTitleUpgrade = canadaTitleNeedsUpgrade(answers);
           const routeTags = routeMeta.tags;
@@ -6598,7 +6662,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               items.push("Atlantic 쪽은 designated employer + TEER 4 job offer로 볼 수 있는 경우가 있어 AIP 가능성을 따로 확인할 만해요.");
             }
 
-            if (hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated") {
+            if (hasUsableForeignSkilledExperience(answers)) {
               items.push("현재 캐나다 일은 non-skilled여도 한국 " + koreaMeta.labelKo + " 경력이 맞다면, 한국 경력 기준 primary occupation으로 다시 짜는 방법도 있어요.");
             } else if (statusSupports(insight.statuses.graduate)) {
               items.push("그게 아니면 " + plannerFocus.schoolTrack + "처럼 학교 -> PGWP -> skilled 직무 1년 경유가 더 현실적인 플랜이 될 수 있어요.");
@@ -6612,7 +6676,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           if (answers.targetOccupationPlan === "previous-korea-job" && hasResolvedKoreaOccupation(answers)) {
-            if (answers.foreignExpAlignment === "same-skilled") {
+            if (answers.foreignExpAlignment === "same-skilled" && hasUsableForeignSkilledExperience(answers)) {
               items.push("한국 " + koreaMeta.labelKo + " 경력을 primary occupation으로 바로 설명하기 좋은 편이에요.");
             } else if (answers.foreignExpAlignment === "related-skilled") {
               items.push("한국 " + koreaMeta.labelKo + " 경력은 비슷한 분야라 쓸 수 있지만, NOC와 job duties를 더 정교하게 맞춰야 해요.");
@@ -6664,7 +6728,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const hasKoreaOccupation = hasResolvedKoreaOccupation(answers);
           const canadaTitleStage = getCanadaOccupationTitleStage(answers);
           const hasDirectCanadaSkilled = hasDirectCanadaSkilledTrack(answers);
-          const canUseKoreaSkilled = hasKoreaOccupation && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
+          const canUseKoreaSkilled = hasUsableForeignSkilledExperience(answers);
           const canadaIsServiceEntry = hasCanadaOccupation && canadaMeta.tags.some((tag) => ["service-entry", "retail", "warehouse"].includes(tag));
           const needsTitleUpgrade = canadaTitleNeedsUpgrade(answers);
 
@@ -7300,6 +7364,26 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             );
           }
 
+          if (answers.budget === "tight") {
+            addAction(
+              12,
+              "가장 저비용 플랜부터: 영어·서류·직무 정리 먼저",
+              "지금 상태에서는 학교로 다시 가는 것보다 언어점수, ECA, 직무/NOC 정리가 직접 비용이 가장 적게 드는 편입니다.",
+              "low-cost-plan",
+              5
+            );
+
+            if (hasCanadianWorkBase(answers.base) && answers.jobOffer === "yes" && ["lt6", "6to12"].includes(answers.permitRemaining)) {
+              addAction(
+                11,
+                "고용주 기반 비자 연장 가능성부터 확인",
+                "비용을 아끼려면 새 학교보다 현재 고용주 기준 LMIA 또는 고용주 지원 기반 연장 가능성을 먼저 확인하는 편이 현실적일 수 있습니다.",
+                "permit-extension",
+                5
+              );
+            }
+          }
+
           if (activeQuickRegions.size > 0 && activeQuickRegions.size <= 2) {
             addAction(
               9,
@@ -7422,8 +7506,15 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             }
           }
 
-          if (["worker", "outside-worker"].includes(answers.path) && answers.foreignExp === "0") {
-            addAction(5, "숙련 경력 1년 채우기", "해외 숙련 경력 1년은 EE와 취업형 주정부 경로의 최소 판단선이 되는 경우가 많습니다.", "foreign-exp-1");
+          if (["worker", "outside-worker"].includes(answers.path) && getUsableForeignSkilledYears(answers) === 0) {
+            addAction(
+              5,
+              getDeclaredForeignExperienceYears(answers) > 0 ? "한국 경력을 이민용 숙련 경력으로 다시 정리" : "숙련 경력 1년 채우기",
+              getDeclaredForeignExperienceYears(answers) > 0
+                ? "해외 경력이 있어도 지금 이민에 쓸 직군과 연결되지 않으면 EE와 취업형 주정부 경력으로 바로 쓰기 어려울 수 있습니다."
+                : "해외 숙련 경력 1년은 EE와 취업형 주정부 경로의 최소 판단선이 되는 경우가 많습니다.",
+              "foreign-exp-1"
+            );
           }
 
           if (isStudyStartIntent(answers.path) && answers.base === "outside") {
@@ -7490,11 +7581,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
           const actionId = action.actionId ?? "";
           const groups = {
-            urgent: new Set(["permit-urgent", "permit-status"]),
+            urgent: new Set(["permit-urgent", "permit-status", "permit-extension"]),
             route: new Set(["job-offer", "pnp-nomination", "ee-profile", "aip-teer4", "ontario-indemand", "alberta-hospitality"]),
             document: new Set(["language-proof", "language-clb9", "eca-complete", "eca-finish", "eca-check", "french", "regulated-license"]),
             experience: new Set(["teer-upgrade", "canadian-exp-next", "canadian-exp-1", "canadian-exp-2", "foreign-exp-1", "degree-experience"]),
-            strategy: new Set(["focus-occupation", "korea-primary-noc", "korea-noc-detail", "regional-setting", "expand-regions", "study-route", "spouse-strategy"])
+            strategy: new Set(["focus-occupation", "korea-primary-noc", "korea-noc-detail", "regional-setting", "expand-regions", "study-route", "spouse-strategy", "low-cost-plan"])
           };
 
           if (groups.urgent.has(actionId)) {
@@ -7514,6 +7605,62 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           return { badge: "준비", tone: "neutral", label: action.detail };
+        }
+
+        function getActionCostLabel(actionId, answers) {
+          switch (actionId) {
+            case "language-proof":
+            case "language-clb9":
+            case "focus-occupation":
+            case "korea-primary-noc":
+            case "korea-noc-detail":
+            case "ee-profile":
+            case "french":
+            case "spouse-strategy":
+            case "regional-setting":
+            case "expand-regions":
+              return "비용 낮음";
+            case "eca-complete":
+            case "eca-finish":
+            case "eca-check":
+            case "permit-plan":
+            case "permit-status":
+            case "permit-urgent":
+              return "비용 낮음-보통";
+            case "permit-extension":
+              return "고용주 부담 중심";
+            case "job-offer":
+            case "aip-teer4":
+            case "ontario-indemand":
+            case "alberta-hospitality":
+            case "pnp-nomination":
+              return answers.jobOffer === "yes" ? "직접 비용 낮음" : "고용주 연결 필요";
+            case "study-route":
+            case "degree-experience":
+              return "비용 큼";
+            case "teer-upgrade":
+            case "canadian-exp-1":
+            case "canadian-exp-next":
+            case "foreign-exp-1":
+              return "시간 투자형";
+            default:
+              return "";
+          }
+        }
+
+        function buildActionMetaLine(action, answers, insight, eeSnapshot) {
+          const pieces = [];
+          const costLabel = getActionCostLabel(action.actionId ?? "", answers);
+
+          if (costLabel) {
+            pieces.push(costLabel);
+          }
+
+          if (eeSnapshot?.crsSnapshot?.gap != null && (insight.id === "federal" || statusSupports(insight.statuses.ee))) {
+            pieces.push((insight.id === "federal" ? "현재 점수 차이 " : "연방 EE 차이 ") + eeSnapshot.crsSnapshot.gapLabel + "점");
+          }
+
+          return pieces.join(" · ");
         }
 
         function getProvinceScenarioFocus(insight) {
@@ -7801,6 +7948,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                           label: item.scoreImpact?.label ?? item.detail
                         }
                       : getProvinceActionPresentation(item);
+                    const actionMetaLine = buildActionMetaLine(item, answers, insight, eeSnapshot);
 
                     return [
                       '<li class="compact-action-item">',
@@ -7808,6 +7956,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                       '<div class="compact-action-copy">',
                       '<strong>' + escapeHtmlClient(item.title) + '</strong>',
                       '<p>' + escapeHtmlClient(actionView.label) + '</p>',
+                      actionMetaLine ? '<p class="compact-action-meta">' + escapeHtmlClient(actionMetaLine) + '</p>' : "",
                       (!isFederalCard && actionView.note && actionView.note !== actionView.label
                         ? '<p>' + escapeHtmlClient(actionView.note) + '</p>'
                         : ""),
@@ -7836,15 +7985,16 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                         label: item.scoreImpact?.label ?? item.detail
                       }
                     : getProvinceActionPresentation(item);
+                  const actionMetaLine = buildActionMetaLine(item, answers, insight, eeSnapshot);
 
                   return {
                     badge: actionView.badge,
                     tone: actionView.tone,
                     title: item.title,
                     detail: actionView.label,
-                    note: !isFederalCard && actionView.note && actionView.note !== actionView.label
+                    note: [actionMetaLine, !isFederalCard && actionView.note && actionView.note !== actionView.label
                       ? actionView.note
-                      : ""
+                      : ""].filter(Boolean).join(" · ")
                   };
                 })
               : [{
@@ -8275,35 +8425,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           });
         }
 
-        if (saveButton) {
-          saveButton.addEventListener("click", () => {
-            persistQuickStartState();
-            setQuickFormStatus("현재 입력을 이 브라우저에 저장했어요.");
-            trackAnalytics("questionnaire_saved", {
-              selected_region_count: activeQuickRegions.size || MAP_REGION_DEFS.length
-            });
-          });
-        }
-
-        if (loadButton) {
-          loadButton.addEventListener("click", () => {
-            const restored = restoreQuickStartStateFromStorage({ force: true });
-            refreshQuickStartStateFromControls();
-            setQuickFormStatus(restored ? "저장된 입력을 다시 불러왔어요." : "아직 저장된 입력이 없어요.");
-            trackAnalytics("questionnaire_loaded", {
-              restored: restored ? "yes" : "no"
-            });
-          });
-        }
-
-        if (resetButton) {
-          resetButton.addEventListener("click", () => {
-            resetQuickStartForm();
-            setQuickFormStatus("입력을 초기화하고 기본 상태로 돌아왔어요.");
-            trackAnalytics("questionnaire_reset", {});
-          });
-        }
-
         const quickFilterMapEntries = Array.from(document.querySelectorAll("[data-quick-map-region]"))
           .map((regionNode) => {
             const regionId = regionNode.dataset.quickMapRegion;
@@ -8362,11 +8483,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         if (quickStartForm) {
-          const restoredOnLoad = restoreQuickStartStateFromStorage();
+          restoreQuickStartStateFromStorage();
           refreshQuickStartStateFromControls();
-          if (restoredOnLoad) {
-            setQuickFormStatus("이전에 저장한 입력을 자동으로 불러왔어요.");
-          }
 
           window.addEventListener("pageshow", () => {
             restoreQuickStartStateFromStorage();
@@ -9886,48 +10004,6 @@ function renderLayout({ title, page, body, updates, basePath = "", analyticsMeas
         margin-top: 6px;
       }
 
-      .wizard-form-tools {
-        display: grid;
-        gap: 10px;
-        padding: 14px;
-        border: 1px solid rgba(15, 61, 127, 0.08);
-        border-radius: var(--radius-md);
-        background: rgba(248, 251, 255, 0.88);
-      }
-
-      .wizard-form-tools-copy {
-        display: grid;
-        gap: 4px;
-      }
-
-      .wizard-form-tools-copy strong {
-        color: var(--accent-deep);
-        font-size: 0.92rem;
-      }
-
-      .wizard-form-tools-copy span,
-      .wizard-form-tools-status {
-        color: var(--muted);
-        font-size: 0.9rem;
-        line-height: 1.6;
-      }
-
-      .wizard-form-tools-status {
-        margin: 0;
-      }
-
-      .wizard-form-tools-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-
-      .btn.btn-compact {
-        min-height: 42px;
-        padding: 0 16px;
-        font-size: 0.92rem;
-      }
-
       .direction-summary-section {
         display: grid;
         gap: 14px;
@@ -10555,6 +10631,12 @@ function renderLayout({ title, page, body, updates, basePath = "", analyticsMeas
         line-height: 1.55;
       }
 
+      .compact-action-meta {
+        color: var(--accent-deep) !important;
+        font-size: 0.8rem !important;
+        font-weight: 700;
+      }
+
       .result-details {
         display: grid;
         gap: 12px;
@@ -10997,6 +11079,22 @@ function renderLayout({ title, page, body, updates, basePath = "", analyticsMeas
       .career-check-panel strong {
         color: var(--accent-deep);
         font-size: 0.96rem;
+      }
+
+      #jurisdiction-personalized-plan {
+        display: grid;
+        gap: 14px;
+        padding: 18px;
+      }
+
+      #jurisdiction-personalized-plan .panel-head {
+        display: grid;
+        gap: 8px;
+        align-items: start;
+      }
+
+      #jurisdiction-personalized-plan .panel-note {
+        margin: 0;
       }
 
       .career-check-list {

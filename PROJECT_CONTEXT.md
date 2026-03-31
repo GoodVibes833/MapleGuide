@@ -25,6 +25,7 @@ Current repo status:
 - typed titles now also use a structured title-profile layer, so exact inputs like `Food Service Supervisor`, `Dispatcher`, `Bookkeeper`, `Office Administrator` can override the broader occupation bucket
 - questionnaire answers can now be saved, loaded, and reset inside the same browser session
 - dashboard recommendation snapshots now persist in session storage, so jurisdiction pages can restore a user-specific top plan block from the latest main-page answers
+- visible save/load/reset controls were removed again; session persistence remains internal for browser back-navigation and dashboard -> jurisdiction -> back continuity
 - GA4 is prepared but only active if `MAPLEGUIDE_GA_MEASUREMENT_ID` is configured
 
 If a future session needs the full long-range build plan, read:
@@ -67,7 +68,17 @@ Recent high-signal progress already completed:
 - added `NOC-like 후보` to the title interpretation block and `정밀 title 기준 NOC-like` to province/federal occupation lens cards, so typed titles now show a more precise candidate-role translation instead of only a broad occupation family
 - added `exact title -> 먼저 붙는 stream` guidance inside `주별 stream 현실 가이드`, so users can see which province rules their exact typed title is hitting first
 - added mismatch handling for cases where the user marks the role as skilled but the typed title still looks broad or entry-level; these now shift province plans toward title upgrade / school / exception routes instead of over-trusting the broad category
+- changed `해외 숙련 경력` handling so MapleGuide no longer treats any foreign work history as usable skilled experience by default
+- foreign experience is now counted conservatively only when:
+  - the Korea-side role/title is specific enough
+  - the Korea-side role does not still read as clear entry / TEER 4-5 style work
+  - the user says that experience is actually connected to the occupation they want to immigrate with
+- this means examples like `한국 manager -> 현재 캐나다 server` or `한국 알바/서비스만 함` should no longer automatically behave like direct foreign skilled experience
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
+- added low-cost action nudges for budget-sensitive users, so MapleGuide can prefer:
+  - language + document + NOC tightening first
+  - employer-based permit extension checks when remaining time is short
+  - school routes later when they are clearly the more expensive fallback
 - changed the federal improvement summary so the header shows the summed lift from the currently proposed actions, e.g. `예상 CRS 423점 +89점 → 512점`, instead of hiding the delta inside only the sub-actions
 - added recommendation snapshot persistence from the main dashboard so recommendation cards can hand a user-specific action bundle to the matching jurisdiction page
 - added a new jurisdiction top panel, `메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것`, that restores:
@@ -206,6 +217,7 @@ These are intentional decisions. Do not casually undo them in a new session.
   - alternate plans
 - too much explanation at once hurts usability
 - save/load/reset should stay session-scoped and lightweight; do not turn it into account-based persistence unless the product direction changes
+- keep browser-state continuity, but do not re-introduce visible save/load/reset controls unless the product direction changes
 - province rules should remain transparent: show rule-family guidance, not fake certainty
 - spouse / school / regulated guidance should support the main recommendation, not replace it with a second full results page
 
