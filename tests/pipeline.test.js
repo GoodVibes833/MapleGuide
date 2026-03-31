@@ -143,10 +143,14 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /작성 필요/);
   assert.match(dashboardHtml, /필수\* 항목을 먼저 골라주세요/);
   assert.match(dashboardHtml, /최종 학력/);
-  assert.match(dashboardHtml, /현재 직군/);
+  assert.match(dashboardHtml, /한국에서 주로 하던 일/);
+  assert.match(dashboardHtml, /지금 캐나다에서 하는 일/);
+  assert.match(dashboardHtml, /이민에 쓸 주력 경력 축/);
   assert.match(dashboardHtml, /요리사 \/ cook \/ chef/);
   assert.match(dashboardHtml, /서버 \/ 캐셔 \/ 바리스타 \/ food counter/);
   assert.match(dashboardHtml, /사무행정 \/ 오피스 \/ 코디네이터/);
+  assert.match(dashboardHtml, /제빵 \/ 파티시에 \/ bakery/);
+  assert.match(dashboardHtml, /자동차 정비 \/ mechanic \/ technician/);
   assert.match(dashboardHtml, /영어 상태/);
   assert.match(dashboardHtml, /캐나다 경력의 성격/);
   assert.match(dashboardHtml, /현재 비자 \/ 퍼밋 남은 기간/);
@@ -174,6 +178,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /왜 이 순위인가/);
   assert.match(dashboardHtml, /현재 자격상태/);
   assert.match(dashboardHtml, /직무 현실 체크/);
+  assert.match(dashboardHtml, /이 주에서 가능한 현실 플랜/);
   assert.match(dashboardHtml, /이 경로가 실제로 보는 것/);
   assert.match(dashboardHtml, /연방\/EE 연계/);
   assert.match(dashboardHtml, /nomination 되면 대략 .*점까지 뛰어오를 수 있어요/);

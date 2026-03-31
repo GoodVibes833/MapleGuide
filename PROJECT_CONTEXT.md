@@ -50,6 +50,10 @@ These are intentional decisions. Do not casually undo them in a new session.
 - recommendation cards should be the main product surface
 - federal / EE must stay visually separate from province ranking
 - province cards can mention EE linkage, but must label it clearly as federal reference logic
+- questionnaire should separate:
+  - Korean previous job
+  - current Canadian job
+  - which career axis the user wants to anchor the application on
 - beginners should see:
   - current fit
   - missing requirements
@@ -164,7 +168,9 @@ The recommendation engine currently considers:
 - permit remaining time
 - job offer possibility
 - metro vs regional preference
-- occupation category
+- Korean previous occupation
+- current Canadian occupation
+- active anchor occupation
 - Korea experience alignment
 - degree usage plan
 
@@ -178,6 +184,11 @@ Province recommendations currently show:
 - province selection model
 - what the user already has
 - immediate actions
+- concrete province plans:
+  - direct current-job route
+  - same-industry upgrade / supervisor / skilled pivot
+  - Korea-experience anchor route
+  - school -> PGWP -> local skilled route when needed
 - detailed eligibility snapshot
 - job reality check
 - federal / EE bridge section when the province has EE linkage
@@ -249,6 +260,7 @@ node src/server.js --fixtures --port 3012
 - IELTS/CELPIP section-level input is not yet fully collected
 - spouse scoring is still shallow
 - provincial rules are not a full stream-by-stream rules database yet
+- province-specific occupation-to-stream matching is still heuristic, not a full official NOC rules DB
 - some official sources still block static cloud fetches, which is why fixture fallback exists
 - GitHub Pages cannot run the full dynamic refresh flow by itself
 
@@ -258,6 +270,10 @@ node src/server.js --fixtures --port 3012
    - required
    - preferred
    - scored
+2. move from occupation heuristics to stream-by-stream NOC rules
+   - what counts as immediately usable
+   - what needs supervisor / TEER 0-3 pivot
+   - what needs school / PGWP first
    - disqualifier
 
 2. improve detailed plans
