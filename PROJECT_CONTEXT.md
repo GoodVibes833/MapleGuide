@@ -49,6 +49,7 @@ Recent high-signal progress already completed:
   - transition / school route
   - or still needs more detail
 - added `title 단계` interpretation and wired actual typed job titles into recommendation scoring, so `Server`, `Administrative Assistant`, `Bookkeeper`, `Dispatcher`-type differences affect both ranking and route wording instead of only the broad occupation bucket
+- added mismatch handling for cases where the user marks the role as skilled but the typed title still looks broad or entry-level; these now shift province plans toward title upgrade / school / exception routes instead of over-trusting the broad category
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
 - added occupation-specific planner focus for common ambiguous personas:
   - `server / barista / cashier -> food service supervisor or cook`

@@ -4225,6 +4225,19 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return getOccupationTitleStage(occupationId, answers.koreaJobTitle);
         }
 
+        function hasDirectCanadaSkilledTrack(answers) {
+          const canadaTitleStage = getCanadaOccupationTitleStage(answers);
+          return hasResolvedCanadaOccupation(answers)
+            && hasSkilledCanadianTrack(answers)
+            && answers.canadianExp !== "0"
+            && (!canadaTitleStage || canadaTitleStage.scoreAdjustment >= 0);
+        }
+
+        function canadaTitleNeedsUpgrade(answers) {
+          const canadaTitleStage = getCanadaOccupationTitleStage(answers);
+          return Boolean(canadaTitleStage && canadaTitleStage.scoreAdjustment < 0);
+        }
+
         function getOccupationMeta(occupation) {
           switch (occupation) {
             case "office-admin":
@@ -5513,6 +5526,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const plannerFocus = getOccupationPlannerFocus(hasResolvedCanadaOccupation(answers) ? canadaOccupationId : routeOccupationId);
           const canUseKoreaSkilled = hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
           const canadaIsNonSkilled = answers.canadianJobSkill === "non-skilled";
+          const needsTitleUpgrade = canadaTitleNeedsUpgrade(answers);
           const routeTags = routeMeta.tags;
 
           function addPlan(priority, plan) {
@@ -5527,12 +5541,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const healthStreamNames = getTaggedStreamNames(insight, "보건");
           const tradeStreamNames = getTaggedStreamNames(insight, "기술직");
 
-          if (canadaIsNonSkilled && hasResolvedCanadaOccupation(answers)) {
+          if ((canadaIsNonSkilled || needsTitleUpgrade) && hasResolvedCanadaOccupation(answers)) {
             addPlan(12, {
               type: "전환형",
               title: "같은 업종 안에서 " + plannerFocus.transitionTarget + "로 올리는 플랜",
               highlight: plannerFocus.transitionTarget,
-              summary: plannerFocus.transitionSummary,
+              summary: (needsTitleUpgrade ? "현재 title 해석상 direct가 약해서, " : "") + plannerFocus.transitionSummary,
               streamLine: "같이 볼 경로: " + buildProvinceSpecificPlanLabel(answers, insight),
               steps: [
                 "현재 " + canadaMeta.labelKo + "에서 실제로 맡는 duty 중 leader·coordinator·cook·supervisor 성격을 먼저 정리합니다.",
@@ -5779,6 +5793,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const canadaMeta = getCanadaOccupationMeta(answers);
           const koreaMeta = getKoreaOccupationMeta(answers);
           const canadaOccupationId = resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle);
+          const canadaTitleStage = getCanadaOccupationTitleStage(answers);
           const plannerFocus = getOccupationPlannerFocus(canadaOccupationId);
           const items = [];
 
@@ -5786,7 +5801,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             items.push("한국 직무와 캐나다 현재 직무를 더 구체적으로 고르면, 이 직무가 skilled인지와 어떤 주 예외 경로가 있는지 훨씬 정확히 설명할 수 있어요.");
           }
 
-          if (answers.canadianJobSkill === "skilled" && answers.canadianExp !== "0" && hasResolvedCanadaOccupation(answers)) {
+          if (answers.canadianJobSkill === "skilled" && answers.canadianExp !== "0" && hasResolvedCanadaOccupation(answers) && hasDirectCanadaSkilledTrack(answers)) {
             items.push("지금 캐나다 " + canadaMeta.labelKo + " 경력은 EE/CEC 기준 skilled 경력으로 읽힐 가능성이 커요.");
 
             if (getCanadaOccupationMeta(answers).tags.some((tag) => ["office", "business-admin", "sales"].includes(tag))) {
@@ -5800,6 +5815,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             if (canadaOccupationId === "warehouse-logistics") {
               items.push("창고 쪽도 inventory coordinator·dispatcher처럼 duties가 더 명확해질수록 skilled 또는 mixed-skill 해석이 쉬워집니다.");
             }
+          } else if (answers.canadianJobSkill === "skilled" && answers.canadianExp !== "0" && hasResolvedCanadaOccupation(answers) && canadaTitleNeedsUpgrade(answers)) {
+            items.push("선택한 직군은 skilled 쪽이지만, 입력한 title은 아직 broad해서 전환 플랜을 같이 보는 게 좋아요.");
+            items.push(canadaTitleStage.reason);
+            items.push("지금 title 그대로 밀기보다 " + plannerFocus.transitionTarget + "처럼 더 선명한 title로 옮기면 주정부와 연방 해석이 안정됩니다.");
           } else if (answers.canadianJobSkill === "non-skilled") {
             if (hasResolvedCanadaOccupation(answers) && getCanadaOccupationMeta(answers).tags.some((tag) => ["service-entry", "retail"].includes(tag))) {
               items.push(canadaMeta.labelKo + " 같은 front-line service 일은 보통 연방 EE skilled 경력으로는 안 잡힐 수 있어요.");
@@ -5899,9 +5918,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const plannerFocus = getOccupationPlannerFocus(hasResolvedCanadaOccupation(answers) ? canadaOccupationId : routeOccupationId);
           const hasCanadaOccupation = hasResolvedCanadaOccupation(answers);
           const hasKoreaOccupation = hasResolvedKoreaOccupation(answers);
-          const hasDirectCanadaSkilled = hasCanadaOccupation && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
+          const canadaTitleStage = getCanadaOccupationTitleStage(answers);
+          const hasDirectCanadaSkilled = hasDirectCanadaSkilledTrack(answers);
           const canUseKoreaSkilled = hasKoreaOccupation && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
           const canadaIsServiceEntry = hasCanadaOccupation && canadaMeta.tags.some((tag) => ["service-entry", "retail", "warehouse"].includes(tag));
+          const needsTitleUpgrade = canadaTitleNeedsUpgrade(answers);
 
           function addPlan(priority, badge, title, summary, steps) {
             plans.push({ priority, badge, title, summary, steps });
@@ -5921,7 +5942,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             );
           }
 
-          if (answers.canadianJobSkill === "non-skilled" && hasCanadaOccupation) {
+          if ((answers.canadianJobSkill === "non-skilled" || needsTitleUpgrade) && hasCanadaOccupation) {
             if (["caregiver-psw", "warehouse-logistics"].includes(canadaOccupationId)) {
               addPlan(
                 10,
@@ -5939,10 +5960,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             }
 
             addPlan(
-              9,
+              needsTitleUpgrade ? 10 : 9,
               "전환 필요",
               "현재 캐나다 " + canadaMeta.labelKo + "에서 " + plannerFocus.transitionTarget,
-              plannerFocus.transitionSummary,
+              (needsTitleUpgrade && canadaTitleStage ? canadaTitleStage.reason + " " : "") + plannerFocus.transitionSummary,
               [
                 canadaMeta.labelKo + "가 이 주에서 바로 읽히는지 먼저 확인하고, 안 되면 " + plannerFocus.transitionTarget + " 쪽 job title을 찾습니다.",
                 "전환한 직무가 이 주의 " + occupationLens.primaryRoute + "와 맞는지 확인합니다.",
@@ -5965,7 +5986,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             );
           }
 
-          if ((answers.canadianJobSkill === "non-skilled" || !hasDirectCanadaSkilled) && statusSupports(insight.statuses.graduate)) {
+          if ((answers.canadianJobSkill === "non-skilled" || needsTitleUpgrade || !hasDirectCanadaSkilled) && statusSupports(insight.statuses.graduate)) {
             addPlan(
               7,
               "학교 경유",
@@ -5999,8 +6020,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         function buildRouteRealitySnapshot(answers, insight, occupationLens, concreteProvincePlans, isFederalCard) {
           const leadPlan = concreteProvincePlans[0] || null;
           const hasKoreaRoute = answers.targetOccupationPlan === "previous-korea-job" && hasResolvedKoreaOccupation(answers);
-          const hasCanadaSkilled = hasResolvedCanadaOccupation(answers) && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
-          const isCanadaNonSkilled = answers.canadianJobSkill === "non-skilled";
+          const hasCanadaSkilled = hasDirectCanadaSkilledTrack(answers);
+          const isCanadaNonSkilled = answers.canadianJobSkill === "non-skilled" || canadaTitleNeedsUpgrade(answers);
           const provinceFallback = leadPlan?.summary || occupationLens.summary;
 
           if (isFederalCard) {

@@ -138,6 +138,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /대도시형 취업 플랜/);
   assert.match(dashboardResponse.body, /PSW·caregiver는 연방 direct보다 Ontario In-Demand, AIP, local employer 예외 경로를 먼저 보는 편이 현실적입니다/);
   assert.match(dashboardResponse.body, /front-line service title이라 대부분 주에서 그대로는 약하게 읽혀요/);
+  assert.match(dashboardResponse.body, /선택한 직군은 skilled 쪽이지만, 입력한 title은 아직 broad해서 전환 플랜을 같이 보는 게 좋아요/);
+  assert.match(dashboardResponse.body, /현재 title 해석상 direct가 약해서/);
   assert.match(dashboardResponse.body, /캐나다 한눈에 비교/);
   assert.match(dashboardResponse.body, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
 
