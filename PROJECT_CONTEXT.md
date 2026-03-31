@@ -55,6 +55,14 @@ Recent high-signal progress already completed:
   - the skill-band explanation shown for the title
   - the province occupation lens NOC examples / candidate profiles
   - the province rules DB token hits used by `주별 stream 현실 가이드`
+- weighted exact-title token hits more heavily inside `주별 stream 현실 가이드`, so `Food Service Supervisor`, `Dispatcher`, `Bookkeeper`, `Office Administrator`-type titles now influence which province stream cards rise to the top
+- added a `맞는 이유:` line inside each province stream guide card so users can see whether the match came from:
+  - the exact typed title
+  - school / PGWP
+  - employer / job offer
+  - EE linkage
+  - local skilled work
+  - regional or other route tokens
 - added mismatch handling for cases where the user marks the role as skilled but the typed title still looks broad or entry-level; these now shift province plans toward title upgrade / school / exception routes instead of over-trusting the broad category
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
 - added occupation-specific planner focus for common ambiguous personas:

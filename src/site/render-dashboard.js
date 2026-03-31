@@ -6822,6 +6822,43 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return tokens;
         }
 
+        const PROVINCE_RULE_TOKEN_LABELS = {
+          ee: "EE 프로필 / EE 연계",
+          "job-offer": "고용주 오퍼 / employer 연결",
+          school: "학교 / PGWP 경유",
+          student: "학생 / 유학축",
+          graduate: "졸업자 / local graduate",
+          "local-skilled": "캐나다 skilled 경력",
+          "low-skill": "예외 stream 또는 low-skill 해석",
+          professional: "전문직 / 사무직 축",
+          spouse: "배우자 전략",
+          metro: "대도시 선호",
+          regional: "지역 / 커뮤니티 정착",
+          french: "불어 전략",
+          atlantic: "Atlantic 연결",
+          hospitality: "hospitality 직무",
+          "service-entry": "front-line service 직무",
+          retail: "retail 직무",
+          warehouse: "warehouse / logistics 직무",
+          "care-support": "care / support 직무",
+          health: "보건 직무",
+          education: "교육 / childcare 직무",
+          trades: "기술직 / trade 직무",
+          transport: "운송 / dispatch 직무",
+          office: "office / admin 직무",
+          "business-admin": "business admin 직무",
+          sales: "sales / marketing 직무",
+          stem: "STEM / IT 직무",
+          regulated: "license / registration 직무",
+          management: "management 축"
+        };
+
+        function describeProvinceRuleTokens(tokens) {
+          return (tokens || [])
+            .map((token) => PROVINCE_RULE_TOKEN_LABELS[token] || token)
+            .filter((label, index, list) => list.indexOf(label) === index);
+        }
+
         function buildProvinceStreamGuide(answers, insight) {
           const provinceRule = PROVINCE_STREAM_RULES[insight.id];
           const routeOccupationId = getPrimaryOccupationId(answers);
@@ -6829,6 +6866,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             ? answers.koreaJobTitle
             : answers.canadaJobTitle;
           const preferredTitleProfile = getPreferredTitleRoleProfile(routeOccupationId, routeTitle);
+          const titleTokens = new Set(preferredTitleProfile?.tokens || []);
 
           if (!provinceRule || !Array.isArray(provinceRule.rules) || provinceRule.rules.length === 0) {
             return null;
@@ -6838,10 +6876,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const rankedRules = provinceRule.rules
             .map((rule) => {
               const matchedTokens = (rule.tokens || []).filter((token) => contextTokens.has(token));
+              const titleMatchedTokens = (rule.tokens || []).filter((token) => titleTokens.has(token));
               return {
                 ...rule,
                 matchedTokens,
-                score: matchedTokens.length
+                titleMatchedTokens,
+                score: matchedTokens.length + (titleMatchedTokens.length * 2)
               };
             })
             .sort((left, right) => {
@@ -6858,6 +6898,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             let badge = "지금 비교 가능";
             let tone = "positive";
             let fitLine = rule.entryKo;
+            const reasonParts = [];
+
+            if (rule.titleMatchedTokens.length > 0 && preferredTitleProfile) {
+              reasonParts.push("현재 title " + preferredTitleProfile.label);
+            }
+
+            reasonParts.push(...describeProvinceRuleTokens(rule.matchedTokens));
 
             if ((rule.tokens || []).includes("job-offer") && answers.jobOffer !== "yes") {
               badge = "job offer 보완";
@@ -6890,6 +6937,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               badge,
               tone,
               fitLine,
+              reasonLine: reasonParts.length > 0 ? reasonParts.join(" / ") : "현재 조건과의 직접 연결은 더 확인 필요",
               note: rule.noteKo
             };
           });
@@ -7785,6 +7833,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                       '<span class="plan-variant-highlight">' + escapeHtmlClient(card.badge) + '</span>',
                       '</div>',
                       '<p class="plan-variant-stream">' + escapeHtmlClient(card.fitLine) + '</p>',
+                      '<p class="wizard-freshness">맞는 이유: ' + escapeHtmlClient(card.reasonLine) + '</p>',
                       '<p>' + escapeHtmlClient(card.note) + '</p>',
                       '</article>'
                     ].join("")).join("")

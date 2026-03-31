@@ -434,6 +434,7 @@ test("typed supervisor title overrides broad service bucket with direct candidat
   assert.match(html, /직군 축 후보: 서버 \/ 캐셔 \/ 바리스타 \/ food counter/);
   assert.match(html, /현재 title 기준으로는 lead \/ supervisor \/ coordinator 축으로 읽혀 비교가 쉬움/);
   assert.match(html, /food service supervisor는 front-line service보다 훨씬 직접 비교 가능한 title이에요/);
+  assert.match(html, /맞는 이유: 현재 title Food service supervisor/);
 });
 
 test("dispatcher title narrows warehouse planning toward direct logistics route", () => {
@@ -449,4 +450,5 @@ test("dispatcher title narrows warehouse planning toward direct logistics route"
   assert.match(html, /정밀 title 후보: Dispatcher \(TEER 2\)/);
   assert.match(html, /해석 후보: Dispatcher \(TEER 2, direct candidate\)/);
   assert.match(html, /dispatcher는 warehouse broad role보다 훨씬 직접 비교 가능한 title이에요/);
+  assert.match(html, /맞는 이유: 현재 title Dispatcher/);
 });
