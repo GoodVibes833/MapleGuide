@@ -63,6 +63,8 @@ Recent high-signal progress already completed:
   - EE linkage
   - local skilled work
   - regional or other route tokens
+- added `NOC-like 후보` to the title interpretation block and `정밀 title 기준 NOC-like` to province/federal occupation lens cards, so typed titles now show a more precise candidate-role translation instead of only a broad occupation family
+- added `exact title -> 먼저 붙는 stream` guidance inside `주별 stream 현실 가이드`, so users can see which province rules their exact typed title is hitting first
 - added mismatch handling for cases where the user marks the role as skilled but the typed title still looks broad or entry-level; these now shift province plans toward title upgrade / school / exception routes instead of over-trusting the broad category
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
 - added occupation-specific planner focus for common ambiguous personas:

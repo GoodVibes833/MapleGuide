@@ -230,6 +230,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /nomination 되면 대략 .*점까지 뛰어오를 수 있어요/);
   assert.match(dashboardHtml, /주별 stream 현실 가이드/);
   assert.match(dashboardHtml, /맞는 이유:/);
+  assert.match(dashboardHtml, /정밀 title 기준 NOC-like:/);
   assert.match(dashboardHtml, /배우자와 같이 본다면/);
   assert.match(dashboardHtml, /학교 경유를 같이 보면/);
   assert.match(dashboardHtml, /규제직 \/ 자격증 체크/);

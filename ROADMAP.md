@@ -186,6 +186,8 @@ MapleGuide를 `완성에 가깝다`고 볼 기준은 아래입니다.
 - `정밀 title 후보`와 `직군 축 후보`가 분리되어 보이고, 주별 rules DB token hit에도 반영됨
 - `주별 stream 현실 가이드`에서 exact title token이 broad occupation token보다 더 강하게 반영됨
 - 각 stream guide card에 `맞는 이유:`가 보여서 사용자가 왜 그 rule이 잡혔는지 바로 이해할 수 있음
+- `NOC-like 후보`와 `정밀 title 기준 NOC-like`가 보여서 exact title이 어떤 candidate role로 번역되는지 더 직접적으로 읽을 수 있음
+- `exact title -> 먼저 붙는 stream` 한 줄이 추가돼서 broad 직군보다 정확한 title이 어느 province rule을 먼저 치는지 설명할 수 있음
 
 ## Phase 2. 주별 rules DB 1차
 
@@ -224,6 +226,7 @@ MapleGuide를 `완성에 가깝다`고 볼 기준은 아래입니다.
 
 - 카드 안의 “주별 stream 현실 가이드”까지는 완료
 - stream guide는 이제 `맞는 이유:`를 통해 exact title / EE / 학교 / employer / local skilled / regional token을 함께 설명함
+- exact typed title이 있으면 `NOC-like 후보`와 `먼저 붙는 stream`까지 함께 설명함
 - 다음으로는 stream별 required / preferred / exception / blocker 필드를 더 구조화해야 함
 
 ## Phase 3. non-skilled 현실 플랜 엔진

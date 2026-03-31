@@ -145,6 +145,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /이 경로가 실제로 보는 것/);
   assert.match(dashboardResponse.body, /주별 stream 현실 가이드/);
   assert.match(dashboardResponse.body, /맞는 이유:/);
+  assert.match(dashboardResponse.body, /정밀 title 기준 NOC-like:/);
   assert.match(dashboardResponse.body, /배우자와 같이 본다면/);
   assert.match(dashboardResponse.body, /학교 경유를 같이 보면/);
   assert.match(dashboardResponse.body, /규제직 \/ 자격증 체크/);

@@ -4556,6 +4556,39 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
         ];
 
+        const TITLE_PROFILE_NOC_LIKE = {
+          "Office administrator": ["Office administrators", "Administrative officers"],
+          "Administrative assistant": ["Administrative assistants", "Executive assistants (if duties are senior-support heavy)"],
+          "Office coordinator": ["Administrative officers", "Office administrators"],
+          Receptionist: ["Receptionists", "Administrative assistants (if duties are broader)"],
+          Bookkeeper: ["Bookkeepers", "Accounting technicians and bookkeepers"],
+          "Payroll administrator": ["Payroll administrators", "Accounting technicians and bookkeepers"],
+          "Accounting technician": ["Accounting technicians and bookkeepers", "Bookkeepers"],
+          "Customer service representative": ["Customer and information services representatives", "Call centre / client support roles"],
+          "Client service coordinator": ["Customer and information services supervisors", "Administrative officers"],
+          "Food service supervisor": ["Food service supervisors", "Restaurant and food service managers (if management duties are stronger)"],
+          "Shift supervisor / shift lead": ["Food service supervisors", "Retail sales supervisors (if retail duties are primary)"],
+          "Cook / kitchen staff": ["Cooks", "Chefs (if menu / kitchen management duties are stronger)"],
+          "Server / bartender": ["Food and beverage servers", "Bartenders"],
+          "Barista / cashier / counter attendant": ["Food counter attendants / cashiers", "Baristas / counter service roles"],
+          "Front office supervisor": ["Accommodation service supervisors", "Hotel front desk / guest service supervisors"],
+          "Guest service agent": ["Hotel front desk clerks", "Customer and information services representatives"],
+          "Housekeeping supervisor": ["Accommodation / housekeeping service supervisors", "Cleaning supervisors"],
+          "Room attendant / cleaner": ["Light duty cleaners", "Room attendants / housekeepers"],
+          "Retail supervisor": ["Retail sales supervisors", "Assistant store manager (if management scope is wider)"],
+          "Sales associate / retail sales": ["Retail salespersons and visual merchandisers", "Store shelf / sales support roles"],
+          Dispatcher: ["Dispatchers", "Transportation route and crew schedulers"],
+          "Inventory / logistics coordinator": ["Production / logistics coordinators", "Shippers and receivers (if duties are narrower)"],
+          "Shipping / receiving clerk": ["Shippers and receivers", "Dispatch / logistics support clerks"],
+          "Warehouse associate / material handler": ["Material handlers", "Shippers and receivers (if duties are broader)"],
+          "Logistics coordinator": ["Production / logistics coordinators", "Dispatchers"],
+          "Personal support worker": ["Nurse aides / patient service associates", "Home support workers / caregivers"],
+          "Home support worker": ["Home support workers / caregivers", "Personal support workers / care aides"],
+          "Caregiver / care aide": ["Home support workers / caregivers", "Nurse aides / patient service associates"],
+          "Chef / sous-chef": ["Chefs", "Cooks (if duties are more execution-focused)"],
+          "Cook / line cook": ["Cooks", "Chefs (if higher-level kitchen duties are stronger)"]
+        };
+
         function normalizeTitleText(title) {
           return (title || "").trim().toLowerCase();
         }
@@ -4589,6 +4622,38 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         function getResolvedCandidateProfiles(occupation, title) {
           const inferredProfiles = inferTitleRoleProfiles(occupation, title);
           return inferredProfiles.length > 0 ? inferredProfiles.slice(0, 3) : getOccupationCandidateProfiles(occupation);
+        }
+
+        function getCandidateProfileNocLike(profile) {
+          if (!profile) {
+            return [];
+          }
+
+          return TITLE_PROFILE_NOC_LIKE[profile.label]
+            || getOccupationNocExamples(profile.occupation || "general").slice(0, 2);
+        }
+
+        function collectCandidateNocLikeLines(profiles, occupation) {
+          const lines = (profiles || [])
+            .flatMap((profile) => getCandidateProfileNocLike(profile))
+            .filter((line, index, list) => line && list.indexOf(line) === index);
+
+          if (lines.length > 0) {
+            return lines.slice(0, 3);
+          }
+
+          return getOccupationNocExamples(occupation).slice(0, 3);
+        }
+
+        function formatCandidateProfileDisplay(profile) {
+          const nocLike = getCandidateProfileNocLike(profile);
+          return profile.label
+            + " ("
+            + profile.teer
+            + ", "
+            + profile.note
+            + (nocLike.length > 0 ? ", NOC-like: " + nocLike.join(" / ") : "")
+            + ")";
         }
 
         function inferOccupationCandidatesFromTitle(title) {
@@ -4647,18 +4712,21 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const resolvedOccupation = resolveOccupationId(selectedOccupation, title);
           const inference = getOccupationInferenceSummary(selectedOccupation, title);
           const profiles = getResolvedCandidateProfiles(resolvedOccupation, title).slice(0, 2);
+          const nocLikeLines = collectCandidateNocLikeLines(profiles, resolvedOccupation);
 
           if (inference) {
             return "해석 후보: "
               + (inference.preciseProfiles.length > 0 ? inference.preciseProfiles.join(" / ") : inference.labels.join(" / "))
               + (inference.labels.length > 0 ? " · 직군축: " + inference.labels.join(" / ") : "")
+              + (nocLikeLines.length > 0 ? " · NOC-like: " + nocLikeLines.join(" / ") : "")
               + " · "
-              + profiles.map((profile) => profile.label + " (" + profile.teer + ", " + profile.note + ")").join(" / ");
+              + profiles.map(formatCandidateProfileDisplay).join(" / ");
           }
 
           if (hasOccupationSelection(selectedOccupation) && resolvedOccupation !== "general") {
             return "현재 선택 기준: "
               + getOccupationMeta(resolvedOccupation).labelKo
+              + (nocLikeLines.length > 0 ? " · NOC-like: " + nocLikeLines.join(" / ") : "")
               + " · "
               + profiles.map((profile) => profile.label + " (" + profile.teer + ")").join(" / ");
           }
@@ -5498,6 +5566,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const nocExamples = titleRoleProfiles.length > 0
             ? titleRoleProfiles.map((profile) => profile.label.toLowerCase())
             : getOccupationNocExamples(routeOccupationId);
+          const preciseNocLike = collectCandidateNocLikeLines(titleRoleProfiles, routeOccupationId);
           const candidateProfiles = titleRoleProfiles.length > 0
             ? titleRoleProfiles
             : getOccupationCandidateProfiles(routeOccupationId);
@@ -5819,6 +5888,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             scoreAdjustment,
             nocExamples,
             candidateProfiles,
+            preciseNocLike,
             federalReadiness: getOccupationFederalReadiness(routeOccupationId),
             titleLensLines
           };
@@ -5931,6 +6001,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const upgradeTarget = profiles.find((profile) => /전환 목표|업그레이드 후보|한 단계 업그레이드/.test(profile.note)) || profiles[0];
             const inferredByTitle = getOccupationInferenceSummary(selectedOccupation, title);
             const titleStage = getOccupationTitleStage(resolvedOccupation, title);
+            const nocLikeLines = collectCandidateNocLikeLines(profiles, resolvedOccupation);
             const isAnchor = isKoreaSide
               ? ["previous-korea-job", "degree-field"].includes(answers.targetOccupationPlan)
               : answers.targetOccupationPlan === "current-canada-job";
@@ -5947,6 +6018,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               exactLine: preciseProfiles.length > 0
                 ? preciseProfiles.slice(0, 2).map((profile) => profile.label + " (" + profile.teer + ")").join(" / ")
                 : "",
+              nocLikeLine: nocLikeLines.join(" / "),
               targetLine: upgradeTarget
                 ? (upgradeTarget.label + " 쪽이 이민용으로 더 유리할 수 있어요.")
                 : "현재 title 그대로 밀 수 있는지 먼저 확인합니다.",
@@ -6084,6 +6156,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               '<ul class="reason-list">',
               '<li>현재 해석: ' + escapeHtmlClient(entry.metaLabel) + '</li>',
               (entry.exactLine ? '<li>정밀 title 후보: ' + escapeHtmlClient(entry.exactLine) + '</li>' : ''),
+              (entry.nocLikeLine ? '<li>NOC-like 후보: ' + escapeHtmlClient(entry.nocLikeLine) + '</li>' : ''),
               '<li>title 후보: ' + escapeHtmlClient(entry.inferredLine) + '</li>',
               '<li>직군 축 후보: ' + escapeHtmlClient(entry.occupationLine) + '</li>',
               '<li>title 단계: ' + escapeHtmlClient(entry.titleStageLabel) + '</li>',
@@ -6890,6 +6963,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               }
               return left.labelKo.localeCompare(right.labelKo, "ko");
             });
+          const topTitleHitRules = rankedRules
+            .filter((rule) => rule.titleMatchedTokens.length > 0)
+            .slice(0, 2)
+            .map((rule) => rule.labelKo);
 
           const selectedRules = rankedRules.filter((rule) => rule.score > 0).slice(0, 3);
           const displayRules = selectedRules.length > 0 ? selectedRules : rankedRules.slice(0, 2);
@@ -6944,6 +7021,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
           return {
             overview: provinceRule.overviewKo,
+            titleHitLine: preferredTitleProfile && topTitleHitRules.length > 0
+              ? preferredTitleProfile.label + " title 기준으로는 " + topTitleHitRules.join(" / ") + " 쪽이 먼저 맞아요."
+              : "",
             cards
           };
         }
@@ -7825,6 +7905,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 ? '<section class="selection-model-panel">'
                   + '<div class="selection-model-head"><strong>주별 stream 현실 가이드</strong><span class="selection-model-badge">rules DB</span></div>'
                   + '<p class="selection-model-detail">' + escapeHtmlClient(provinceStreamGuide.overview) + '</p>'
+                  + (provinceStreamGuide.titleHitLine ? '<p class="wizard-freshness">' + escapeHtmlClient(provinceStreamGuide.titleHitLine) + '</p>' : '')
                   + '<div class="plan-variant-grid">'
                   + provinceStreamGuide.cards.map((card) => [
                       '<article class="plan-variant-card">',
@@ -7848,8 +7929,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 + '<ul class="reason-list">'
                 + (occupationLens.titleLensLines || []).map((line) => '<li>' + escapeHtmlClient(line) + '</li>').join("")
                 + '<li>연방 기준: ' + escapeHtmlClient(occupationLens.federalReadiness) + '</li>'
+                + '<li>정밀 title 기준 NOC-like: ' + escapeHtmlClient((occupationLens.preciseNocLike || occupationLens.nocExamples || []).join(" / ")) + '</li>'
                 + '<li>NOC 예시: ' + escapeHtmlClient((occupationLens.nocExamples || []).join(" / ")) + '</li>'
-                + '<li>해석 후보: ' + escapeHtmlClient((occupationLens.candidateProfiles || []).map((candidate) => candidate.label + " (" + candidate.teer + ", " + candidate.note + ")").join(" / ")) + '</li>'
+                + '<li>해석 후보: ' + escapeHtmlClient((occupationLens.candidateProfiles || []).map((candidate) => formatCandidateProfileDisplay(candidate)).join(" / ")) + '</li>'
                 + '<li>' + escapeHtmlClient(isFederalCard ? "지금 먼저 볼 것" : "이 주에서 먼저 볼 것") + ': ' + escapeHtmlClient(occupationLens.primaryRoute) + '</li>'
                 + '<li>직접 안 되면: ' + escapeHtmlClient(occupationLens.fallbackRoute) + '</li>'
                 + '</ul>'
