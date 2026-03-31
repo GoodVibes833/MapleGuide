@@ -54,6 +54,7 @@ These are intentional decisions. Do not casually undo them in a new session.
   - Korean previous job
   - current Canadian job
   - which career axis the user wants to anchor the application on
+  - actual job titles for both Korea and Canada, because category labels alone are too broad
 - beginners should see:
   - current fit
   - missing requirements
@@ -189,6 +190,7 @@ Province recommendations currently show:
   - whether the province reads it as targeted / employer-driven / exception route
   - whether school / PGWP or supervisor pivot is more realistic
   - NOC-like example job titles for explanation
+  - actual typed job title hints, even when the user did not choose a perfect category
 - concrete province plans:
   - direct current-job route
   - same-industry upgrade / supervisor / skilled pivot

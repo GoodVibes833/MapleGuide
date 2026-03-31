@@ -597,11 +597,19 @@ function renderSituationSection(insights) {
             </select>
           </label>
           <label class="wizard-field">
+            <span>한국에서 실제로 하던 job title</span>
+            <input type="text" name="koreaJobTitle" placeholder="예: Cook, Office Administrator, Accountant, Warehouse Associate" />
+          </label>
+          <label class="wizard-field">
             <span>지금 캐나다에서 하는 일</span>
             <select name="canadaOccupation">
               <option value="">아직 잘 모르겠어요</option>
               ${renderOccupationSelectOptions()}
             </select>
+          </label>
+          <label class="wizard-field">
+            <span>지금 캐나다에서 실제로 하는 job title</span>
+            <input type="text" name="canadaJobTitle" placeholder="예: Server, Food Service Supervisor, Retail Sales Associate, Bookkeeper" />
           </label>
           <label class="wizard-field">
             <span>이민에 쓸 주력 경력 축</span>
@@ -1681,6 +1689,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             budget: "medium",
             setting: "balanced",
             advantage: "none",
+            koreaJobTitle: "",
+            canadaJobTitle: "",
             koreaOccupation: "general",
             canadaOccupation: "general",
             occupation: "general",
@@ -1701,6 +1711,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         function normalizeDependentAnswers(rawAnswers) {
           const normalized = { ...rawAnswers };
+
+          normalized.koreaJobTitle = (normalized.koreaJobTitle || "").trim();
+          normalized.canadaJobTitle = (normalized.canadaJobTitle || "").trim();
 
           if (normalized.canadianExp === "0") {
             normalized.canadianJobSkill = "not-working";
@@ -3732,25 +3745,95 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return Boolean(occupation && occupation !== "general");
         }
 
+        const OCCUPATION_TITLE_HINTS = [
+          { occupation: "cook-chef", keywords: ["cook", "chef", "line cook", "kitchen", "요리", "주방"] },
+          { occupation: "food-service-supervisor", keywords: ["food service supervisor", "restaurant supervisor", "shift lead", "shift supervisor", "kitchen supervisor", "슈퍼바이저", "매니저"] },
+          { occupation: "server-counter", keywords: ["server", "waiter", "waitress", "barista", "cashier", "food counter", "counter", "서빙", "바리스타", "캐셔"] },
+          { occupation: "retail-supervisor", keywords: ["retail supervisor", "assistant manager", "store manager", "store supervisor", "점장", "매장관리"] },
+          { occupation: "retail-sales", keywords: ["retail", "sales associate", "store clerk", "salesperson", "판매", "매장", "샵"] },
+          { occupation: "office-admin", keywords: ["office", "administrator", "administrative assistant", "coordinator", "admin", "사무", "행정", "오피스", "코디네이터", "총무"] },
+          { occupation: "accounting-bookkeeping", keywords: ["bookkeeper", "bookkeeping", "payroll", "accounts payable", "accounts receivable", "북키핑", "회계보조", "급여", "경리"] },
+          { occupation: "accountant-finance", keywords: ["accountant", "financial analyst", "finance", "controller", "회계사", "재무", "finance manager"] },
+          { occupation: "sales-marketing", keywords: ["marketing", "sales representative", "account manager", "business development", "영업", "마케팅"] },
+          { occupation: "customer-service", keywords: ["customer service", "call centre", "call center", "csr", "client service", "고객지원", "콜센터", "cs"] },
+          { occupation: "software-it", keywords: ["developer", "software", "programmer", "it support", "it specialist", "개발", "프로그래머", "it"] },
+          { occupation: "engineer-tech", keywords: ["engineer", "technologist", "technician", "quality engineer", "process engineer", "엔지니어", "품질", "공정"] },
+          { occupation: "nurse-allied-health", keywords: ["nurse", "rn", "lpn", "rpn", "physiotherapist", "hygienist", "간호", "물리치료", "치위생"] },
+          { occupation: "caregiver-psw", keywords: ["caregiver", "psw", "home support", "support worker", "요양", "돌봄", "케어기버"] },
+          { occupation: "ece-childcare", keywords: ["ece", "childcare", "daycare", "early childhood", "보육", "유치원", "어린이집"] },
+          { occupation: "teacher-education-support", keywords: ["teacher", "education assistant", "school support", "교사", "강사", "교육지원"] },
+          { occupation: "baker-pastry", keywords: ["baker", "bakery", "pastry", "제빵", "파티시에"] },
+          { occupation: "warehouse-logistics", keywords: ["warehouse", "material handler", "forklift", "picker", "packer", "창고", "물류", "포크리프트", "피커", "패커"] },
+          { occupation: "shipping-dispatch", keywords: ["shipping", "receiving", "dispatcher", "dispatch", "logistics coordinator", "입출고", "배차", "디스패치", "출하"] },
+          { occupation: "truck-driver", keywords: ["truck", "driver", "delivery", "기사", "운전", "트럭", "배송"] },
+          { occupation: "construction-trade", keywords: ["electrician", "plumber", "carpenter", "construction", "전기", "배관", "목수", "건설"] },
+          { occupation: "industrial-trade", keywords: ["welder", "machinist", "millwright", "welding", "용접", "machinist", "산업"] },
+          { occupation: "mechanic-technician", keywords: ["mechanic", "automotive", "service technician", "technician", "정비", "메카닉"] },
+          { occupation: "physician-canada", keywords: ["physician", "doctor", "family doctor", "의사"] },
+          { occupation: "senior-manager-canada", keywords: ["director", "senior manager", "operations manager", "head of", "시니어 매니저", "디렉터"] },
+          { occupation: "researcher-canada", keywords: ["researcher", "scientist", "research associate", "postdoctoral", "연구원", "연구자"] }
+        ];
+
+        function inferOccupationCandidatesFromTitle(title) {
+          const normalizedTitle = (title || "").trim().toLowerCase();
+          if (!normalizedTitle) {
+            return [];
+          }
+
+          return OCCUPATION_TITLE_HINTS
+            .filter((rule) => rule.keywords.some((keyword) => normalizedTitle.includes(keyword.toLowerCase())))
+            .map((rule) => rule.occupation)
+            .filter((occupation, index, list) => list.indexOf(occupation) === index)
+            .slice(0, 3);
+        }
+
+        function resolveOccupationId(selectedOccupation, title) {
+          if (hasOccupationSelection(selectedOccupation)) {
+            return selectedOccupation;
+          }
+
+          return inferOccupationCandidatesFromTitle(title)[0] || selectedOccupation || "general";
+        }
+
+        function getOccupationInferenceSummary(selectedOccupation, title) {
+          const candidates = inferOccupationCandidatesFromTitle(title);
+
+          if (!title || candidates.length === 0) {
+            return null;
+          }
+
+          const labels = candidates.map((candidate) => getOccupationMeta(candidate).labelKo);
+          const selectedLabel = hasOccupationSelection(selectedOccupation) ? getOccupationMeta(selectedOccupation).labelKo : null;
+
+          return {
+            title,
+            labels,
+            selectedLabel
+          };
+        }
+
         function getPrimaryOccupationId(answers) {
-          if (answers.targetOccupationPlan === "current-canada-job" && hasOccupationSelection(answers.canadaOccupation)) {
-            return answers.canadaOccupation;
+          const resolvedCanadaOccupation = resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle);
+          const resolvedKoreaOccupation = resolveOccupationId(answers.koreaOccupation, answers.koreaJobTitle);
+
+          if (answers.targetOccupationPlan === "current-canada-job" && hasOccupationSelection(resolvedCanadaOccupation)) {
+            return resolvedCanadaOccupation;
           }
 
-          if (answers.targetOccupationPlan === "previous-korea-job" && hasOccupationSelection(answers.koreaOccupation)) {
-            return answers.koreaOccupation;
+          if (answers.targetOccupationPlan === "previous-korea-job" && hasOccupationSelection(resolvedKoreaOccupation)) {
+            return resolvedKoreaOccupation;
           }
 
-          if (answers.targetOccupationPlan === "degree-field" && hasOccupationSelection(answers.koreaOccupation)) {
-            return answers.koreaOccupation;
+          if (answers.targetOccupationPlan === "degree-field" && hasOccupationSelection(resolvedKoreaOccupation)) {
+            return resolvedKoreaOccupation;
           }
 
-          if (hasOccupationSelection(answers.canadaOccupation)) {
-            return answers.canadaOccupation;
+          if (hasOccupationSelection(resolvedCanadaOccupation)) {
+            return resolvedCanadaOccupation;
           }
 
-          if (hasOccupationSelection(answers.koreaOccupation)) {
-            return answers.koreaOccupation;
+          if (hasOccupationSelection(resolvedKoreaOccupation)) {
+            return resolvedKoreaOccupation;
           }
 
           return answers.occupation || "general";
@@ -3761,11 +3844,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         function getCanadaOccupationMeta(answers) {
-          return getOccupationMeta(answers.canadaOccupation);
+          return getOccupationMeta(resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle));
         }
 
         function getKoreaOccupationMeta(answers) {
-          return getOccupationMeta(answers.koreaOccupation);
+          return getOccupationMeta(resolveOccupationId(answers.koreaOccupation, answers.koreaJobTitle));
         }
 
         function getOccupationMeta(occupation) {
@@ -4050,6 +4133,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const routeOccupationId = getPrimaryOccupationId(answers);
           const routeMeta = getOccupationMeta(routeOccupationId);
           const canadaMeta = getCanadaOccupationMeta(answers);
+          const koreaInference = getOccupationInferenceSummary(answers.koreaOccupation, answers.koreaJobTitle);
+          const canadaInference = getOccupationInferenceSummary(answers.canadaOccupation, answers.canadaJobTitle);
           const usingKoreaRoute = answers.targetOccupationPlan === "previous-korea-job" && hasOccupationSelection(answers.koreaOccupation);
           const routeLabel = usingKoreaRoute
             ? "한국 " + routeMeta.labelKo
@@ -4324,7 +4409,28 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             scoreAdjustment = Math.min(scoreAdjustment, 0);
           }
 
-          return { badge, tone, summary, primaryRoute, fallbackRoute, rankReasonKo, scoreAdjustment, nocExamples, federalReadiness: getOccupationFederalReadiness(routeOccupationId) };
+          const titleLensLines = [];
+
+          if (canadaInference) {
+            titleLensLines.push('캐나다 title "' + answers.canadaJobTitle + '"로는 ' + canadaInference.labels.join(" / ") + " 쪽 후보를 먼저 비교할 수 있어요.");
+          }
+
+          if (koreaInference) {
+            titleLensLines.push('한국 title "' + answers.koreaJobTitle + '"로는 ' + koreaInference.labels.join(" / ") + " 쪽 후보를 먼저 비교할 수 있어요.");
+          }
+
+          return {
+            badge,
+            tone,
+            summary,
+            primaryRoute,
+            fallbackRoute,
+            rankReasonKo,
+            scoreAdjustment,
+            nocExamples,
+            federalReadiness: getOccupationFederalReadiness(routeOccupationId),
+            titleLensLines
+          };
         }
 
         function occupationHasTag(answers, tag) {
@@ -4357,13 +4463,19 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         function buildOccupationContextSummary(answers) {
           const parts = [];
+          const koreaInference = getOccupationInferenceSummary(answers.koreaOccupation, answers.koreaJobTitle);
+          const canadaInference = getOccupationInferenceSummary(answers.canadaOccupation, answers.canadaJobTitle);
 
           if (hasOccupationSelection(answers.koreaOccupation)) {
             parts.push("한국: " + getKoreaOccupationMeta(answers).labelKo);
+          } else if (koreaInference) {
+            parts.push('한국 title "' + answers.koreaJobTitle + '" -> ' + koreaInference.labels[0]);
           }
 
           if (hasOccupationSelection(answers.canadaOccupation)) {
             parts.push("캐나다 현재: " + getCanadaOccupationMeta(answers).labelKo);
+          } else if (canadaInference) {
+            parts.push('캐나다 title "' + answers.canadaJobTitle + '" -> ' + canadaInference.labels[0]);
           }
 
           if (parts.length === 0) {
@@ -5483,6 +5595,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 + '<span class="compare-pill">' + escapeHtmlClient(occupationLens.badge) + '</span>'
                 + '<p>' + escapeHtmlClient(occupationLens.summary) + '</p>'
                 + '<ul class="reason-list">'
+                + occupationLens.titleLensLines.map((line) => '<li>' + escapeHtmlClient(line) + '</li>').join("")
                 + '<li>연방 기준: ' + escapeHtmlClient(occupationLens.federalReadiness) + '</li>'
                 + '<li>NOC 예시: ' + escapeHtmlClient(occupationLens.nocExamples.join(" / ")) + '</li>'
                 + '<li>' + escapeHtmlClient(isFederalCard ? "지금 먼저 볼 것" : "이 주에서 먼저 볼 것") + ': ' + escapeHtmlClient(occupationLens.primaryRoute) + '</li>'

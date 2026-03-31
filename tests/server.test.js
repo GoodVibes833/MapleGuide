@@ -76,7 +76,9 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /영어 상태/);
   assert.match(dashboardResponse.body, /캐나다 경력의 성격/);
   assert.match(dashboardResponse.body, /한국에서 주로 하던 일/);
+  assert.match(dashboardResponse.body, /한국에서 실제로 하던 job title/);
   assert.match(dashboardResponse.body, /지금 캐나다에서 하는 일/);
+  assert.match(dashboardResponse.body, /지금 캐나다에서 실제로 하는 job title/);
   assert.match(dashboardResponse.body, /이민에 쓸 주력 경력 축/);
   assert.match(dashboardResponse.body, /현재 비자 \/ 퍼밋 남은 기간/);
   assert.match(dashboardResponse.body, /ECA \/ 학력평가 상태/);
@@ -98,6 +100,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.doesNotMatch(dashboardResponse.body, /이 주 자체 점수 아님/);
   assert.match(dashboardResponse.body, /왜 이 순위인가/);
   assert.match(dashboardResponse.body, /이 직무를 이 주에서 보면/);
+  assert.match(dashboardResponse.body, /NOC 예시:/);
   assert.match(dashboardResponse.body, /이 주에서 가능한 현실 플랜/);
   assert.match(dashboardResponse.body, /이 경로가 실제로 보는 것/);
   assert.match(dashboardResponse.body, /자세히 보기/);
