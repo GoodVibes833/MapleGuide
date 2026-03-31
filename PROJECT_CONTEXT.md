@@ -211,6 +211,8 @@ Correct behavior:
 
 ## Important Files
 
+- `/Users/alexhan/Documents/Alex_dev/Canada Imigration/PERSONAS.md`
+  - 30 common Korea-to-Canada immigration personas for product design and recommendation sanity checks
 - `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/site/render-dashboard.js`
   - main UI, recommendation logic, questionnaire, score logic, detailed cards
 - `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/config/sources.js`
@@ -278,6 +280,12 @@ node src/server.js --fixtures --port 3012
    - review whether event naming stays stable
    - consider adding compare-table open / province-page CTA events
    - if needed later, build an in-app summary page from GA exports
+
+6. persona-to-form follow-up
+   - convert `PERSONAS.md` into preset scenarios
+   - split Korea job / Canada job more explicitly
+   - improve non-skilled guidance for the most common Korean working holiday / PGWP cases
+   - use personas to test whether recommendation order feels realistic
 
 ## Session Notes
 
