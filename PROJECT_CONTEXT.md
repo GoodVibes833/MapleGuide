@@ -19,6 +19,7 @@ It should help a beginner answer these questions quickly:
 
 - compact latest-updates block at the top
 - `내 상황으로 먼저 찾기` questionnaire
+- starter persona presets for a few high-frequency Korea-to-Canada cases so users can begin from a familiar pattern instead of a blank form
 - province recommendations shown first
 - federal / EE shown as a separate card, not mixed into province ranking
 - province cards include:
@@ -55,7 +56,8 @@ These are intentional decisions. Do not casually undo them in a new session.
   - Korean previous job
   - current Canadian job
   - which career axis the user wants to anchor the application on
-  - actual job titles for both Korea and Canada, because category labels alone are too broad
+- actual job titles for both Korea and Canada, because category labels alone are too broad
+- persona presets should stay opinionated and few in number; they are meant to help users start, not replace the full questionnaire
 - beginners should see:
   - current fit
   - missing requirements
@@ -85,6 +87,7 @@ These are intentional decisions. Do not casually undo them in a new session.
 
 - `form_started`
 - `form_completed`
+- `starter_persona_used`
 - `recommendations_rendered`
 - `recommendation_detail_opened`
 - `recommendation_region_clicked`
@@ -177,6 +180,7 @@ The recommendation engine currently considers:
 - degree usage plan
 - typed Korea / Canada job titles with inferred occupation candidates
 - expanded service / hospitality / retail / manufacturing role families
+- starter persona preset selection
 
 ## Current Recommendation Output
 

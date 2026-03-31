@@ -125,6 +125,9 @@ test("fixture pipeline writes feed and dashboard", async () => {
   const dashboardHtml = await readFile(path.join(outputDir, "dashboard.html"), "utf8");
   assert.match(dashboardHtml, /캐나다 이민/);
   assert.match(dashboardHtml, /내 상황으로 먼저 찾기/);
+  assert.match(dashboardHtml, /흔한 케이스로 바로 시작/);
+  assert.match(dashboardHtml, /한국 요리사 -> 캐나다 cook/);
+  assert.match(dashboardHtml, /서버 -> supervisor로 올리기/);
   assert.match(dashboardHtml, /나이/);
   assert.match(dashboardHtml, /캐나다 밖에서 바로 EE\/취업이민을 보고 있어요/);
   assert.match(dashboardHtml, /캐나다에 먼저 와서 현지 경력 쌓는 방향이에요/);
