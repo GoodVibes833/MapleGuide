@@ -13,6 +13,47 @@ It should help a beginner answer these questions quickly:
 4. What is missing right now?
 5. If I change my language score, job, school path, or region choice, what path opens up?
 
+## Quick Snapshot
+
+Current repo status:
+
+- public GitHub Pages deployment is live
+- recommendation engine is centered in `src/site/render-dashboard.js`
+- province recommendations are primary, federal/EE is separate
+- persona presets exist
+- typed Korea/Canada job titles now feed occupation inference
+- GA4 is prepared but only active if `MAPLEGUIDE_GA_MEASUREMENT_ID` is configured
+
+If a future session needs the full long-range build plan, read:
+
+- `/Users/alexhan/Documents/Alex_dev/Canada Imigration/ROADMAP.md`
+
+If a future session needs persona sanity checks, read:
+
+- `/Users/alexhan/Documents/Alex_dev/Canada Imigration/PERSONAS.md`
+
+## Recent Milestones
+
+Recent high-signal progress already completed:
+
+- split Korea job vs Canada job vs anchor career axis
+- added province occupation lens and NOC-like examples
+- added job reality checks and route reality badges
+- added richer occupation families for hospitality, retail, warehouse, care, beauty, manufacturing, trades
+- added starter persona presets
+- added live title interpretation hints under Korea/Canada job title inputs
+- changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
+
+Recent commit trail worth checking:
+
+- `064c6a0` Add title hints and route-first province actions
+- `781d1a3` Add starter persona presets to the questionnaire
+- `7d1f7a4` Add richer occupation routes and feasibility badges
+- `1d5f471` Use job title inference throughout occupation scoring
+- `39e2676` Add province occupation lens and NOC guidance
+- `fb0ee2b` Split Korea and Canada job paths with concrete province plans
+- `ef2504b` Add Korean immigration persona library
+
 ## Current Site Shape
 
 ### Home

@@ -2,6 +2,12 @@
 
 캐나다 이민 공지를 공식 소스에서 수집하고, 한국어 요약과 지역별 상세 페이지로 보여주는 초기 MVP입니다.
 
+핵심 문서:
+
+- `PROJECT_CONTEXT.md`: 현재 상태, UX 원칙, 운영 메모, 다음 세션 handoff
+- `ROADMAP.md`: 완성까지의 상세 방향성과 단계별 계획
+- `PERSONAS.md`: 한국인 사용자 페르소나 30개
+
 ## 포함된 기능
 
 - `EE`, `Ontario`, `BC`, `Manitoba`, `PEI`, `New Brunswick` 소스 레지스트리
