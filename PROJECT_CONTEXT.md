@@ -19,8 +19,10 @@ Current repo status:
 
 - public GitHub Pages deployment is live
 - recommendation engine is centered in `src/site/render-dashboard.js`
+- province stream rule overlays now live in `src/config/province-stream-rules.js`
 - province recommendations are primary, federal/EE is separate
 - typed Korea/Canada job titles now feed occupation inference
+- questionnaire answers can now be saved, loaded, and reset inside the same browser session
 - GA4 is prepared but only active if `MAPLEGUIDE_GA_MEASUREMENT_ID` is configured
 
 If a future session needs the full long-range build plan, read:
@@ -66,6 +68,21 @@ Recent high-signal progress already completed:
 - added a regression test for the browser-history case where the user comes back with preserved values and the app must clear stale `is-missing` highlighting after re-reading the current controls
 - added session-scoped questionnaire persistence so dashboard answers and selected regions can be restored from `sessionStorage` instead of relying only on browser BFCache timing
 - storage restore now prefers live control values when the browser already restored them, so an older saved snapshot does not overwrite visibly restored answers
+- added explicit questionnaire save/load/reset controls in the form header instead of relying only on silent browser restore
+- added a dedicated province stream rules layer in `src/config/province-stream-rules.js` for:
+  - Ontario
+  - Alberta
+  - Nova Scotia
+  - Prince Edward Island
+  - Saskatchewan
+  - Newfoundland and Labrador
+- added `주별 stream 현실 가이드` inside province cards so each recommendation can show:
+  - which stream family fits now
+  - what the likely entry shape is
+  - whether employer / school / sector / local worker logic matters more
+- added spouse strategy, school-route guidance, and regulated-job guidance blocks inside detailed recommendation cards
+- added a `sourceExpansionWatchlist` so future sessions know which official pages should be wired next instead of rediscovering them from scratch
+- added explicit regression coverage for save/load/reset browser behavior so empty-state persistence bugs are caught by tests
 - updated required-field labels to match the current questionnaire wording (`지금 생각하는 큰 방향`, `현재 실제 체류 상태`) so the warning list and field headings stay consistent
 - root cause of that ECA-looking bug:
   - `buildProvinceOccupationLens()` returned too early for the federal case without `titleLensLines` / `candidateProfiles`
@@ -147,6 +164,9 @@ These are intentional decisions. Do not casually undo them in a new session.
   - concrete next steps
   - alternate plans
 - too much explanation at once hurts usability
+- save/load/reset should stay session-scoped and lightweight; do not turn it into account-based persistence unless the product direction changes
+- province rules should remain transparent: show rule-family guidance, not fake certainty
+- spouse / school / regulated guidance should support the main recommendation, not replace it with a second full results page
 
 ## Current Data Mode
 
@@ -154,6 +174,7 @@ These are intentional decisions. Do not casually undo them in a new session.
 - fixtures live in `/Users/alexhan/Documents/Alex_dev/Canada Imigration/fixtures`
 - generated output goes to `/Users/alexhan/Documents/Alex_dev/Canada Imigration/out`
 - GitHub Pages is static and currently relies on generated output
+- province stream rule scaffolding lives in `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/config/province-stream-rules.js`
 - when a live source is blocked or looks like anti-bot HTML, pipeline falls back to fixture-quality content instead of showing broken markup
 
 ## Current Analytics Mode
@@ -170,11 +191,16 @@ These are intentional decisions. Do not casually undo them in a new session.
 
 - `form_started`
 - `form_completed`
+- `field_answered`
 - `recommendations_rendered`
 - `recommendation_detail_opened`
 - `recommendation_region_clicked`
 - `latest_update_opened`
 - `older_updates_opened`
+- `questionnaire_saved`
+- `questionnaire_loaded`
+- `questionnaire_reset`
+- `comparison_table_opened`
 
 ### When User Asks About Traffic / Usage
 
@@ -217,6 +243,13 @@ These are important route families the product already references in logic or UX
 - Alberta Rural Renewal Stream
 - Newfoundland and Labrador 2-step EOI model
 - provincial EE-linked nomination logic
+
+Additional watchlist already scaffolded in code:
+
+- Alberta worker / priority sector draw pages
+- Nova Scotia targeted stream / program updates
+- Saskatchewan worker / employer pathway updates
+- Newfoundland EOI operational updates
 
 When future sessions expand the data layer, these are high-priority official directions to revisit.
 

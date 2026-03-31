@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { escapeHtml } from "../core/html.js";
 import { getJurisdictionProfile } from "../config/jurisdiction-profiles.js";
 import { specialPathways } from "../config/pathway-rules.js";
+import { provinceStreamRules } from "../config/province-stream-rules.js";
 import { sources } from "../config/sources.js";
 import {
   buildJurisdictionInsight,
@@ -531,6 +532,18 @@ function renderSituationSection(insights) {
               <p class="panel-note">필수* 항목을 먼저 고르면 추천이 바로 열립니다.</p>
             </div>
           </div>
+          <div class="wizard-form-tools">
+            <div class="wizard-form-tools-copy">
+              <strong>현재 입력 저장</strong>
+              <span>브라우저에 저장했다가 나중에 다시 이어볼 수 있어요.</span>
+            </div>
+            <div class="wizard-form-tools-actions">
+              <button type="button" class="btn ghost btn-compact" id="quick-save-button">현재 입력 저장</button>
+              <button type="button" class="btn ghost btn-compact" id="quick-load-button">저장값 불러오기</button>
+              <button type="button" class="btn ghost btn-compact" id="quick-reset-button">초기화</button>
+            </div>
+            <p class="wizard-form-tools-status" id="quick-form-status" aria-live="polite">현재 입력은 이 브라우저 안에서만 저장됩니다.</p>
+          </div>
           <label class="wizard-field" data-required-field="path">
             <span class="wizard-field-label">지금 생각하는 큰 방향 <em class="required-mark">필수*</em></span>
             <select name="path">
@@ -796,7 +809,7 @@ function renderComparisonTable(insights, basePath = "") {
 
   return `
     <section class="section panel">
-      <details class="panel-collapsible">
+      <details class="panel-collapsible" id="compare-table-details">
         <summary class="panel-collapsible-summary">
           <div>
             <p class="panel-kicker">Compare</p>
@@ -1661,6 +1674,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
       let hasTrackedFormStarted = false;
       let hasTrackedFormCompleted = false;
       let lastRenderedRecommendationSignature = "";
+      let suspendQuickStartPersistence = false;
+      const trackedFieldChanges = new Set();
 
       function trackAnalytics(eventName, params = {}) {
         if (!ANALYTICS_ENABLED || typeof window.gtag !== "function") {
@@ -1690,6 +1705,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
         const quickStartResults = document.getElementById("quick-start-results");
+        const saveButton = document.getElementById("quick-save-button");
+        const loadButton = document.getElementById("quick-load-button");
+        const resetButton = document.getElementById("quick-reset-button");
+        const quickFormStatus = document.getElementById("quick-form-status");
         const koreaJobTitleInput = quickStartForm?.elements?.namedItem("koreaJobTitle");
         const canadaJobTitleInput = quickStartForm?.elements?.namedItem("canadaJobTitle");
         const koreaOccupationSelect = quickStartForm?.elements?.namedItem("koreaOccupation");
@@ -1699,6 +1718,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         const requiredFieldNodes = Array.from(document.querySelectorAll("[data-required-field]"));
         const updatesMoreToggle = document.getElementById("updates-more-toggle");
         const olderUpdatesList = document.getElementById("older-updates-list");
+        const compareTableDetails = document.getElementById("compare-table-details");
         const quickRegionFederalButton = document.querySelector("[data-quick-region-toggle='federal']");
         const quickRegionClearButton = document.querySelector("[data-quick-region-clear]");
         const quickRegionSelection = document.getElementById("quick-region-selection");
@@ -1753,6 +1773,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         const REQUIRED_FIELD_LABELS = ${JSON.stringify(DASHBOARD_REQUIRED_FIELD_LABELS)};
         const OPTIONAL_ANSWER_DEFAULTS = ${JSON.stringify(DASHBOARD_OPTIONAL_DEFAULTS)};
+        const PROVINCE_STREAM_RULES = ${serializeForScript(provinceStreamRules)};
 
         function getMissingRequiredFields(rawAnswers) {
           return Object.entries(REQUIRED_FIELD_LABELS)
@@ -1888,7 +1909,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         function persistQuickStartState() {
           const storage = getSessionStorage();
-          if (!storage || !quickStartForm) {
+          if (!storage || !quickStartForm || suspendQuickStartPersistence) {
             return;
           }
 
@@ -1923,7 +1944,24 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           } catch {}
         }
 
-        function restoreQuickStartStateFromStorage() {
+        function setQuickFormStatus(message) {
+          if (quickFormStatus) {
+            quickFormStatus.textContent = message;
+          }
+        }
+
+        function trackFieldChange(control) {
+          if (!control?.name || !hasAnswerValue(control.value) || trackedFieldChanges.has(control.name)) {
+            return;
+          }
+
+          trackedFieldChanges.add(control.name);
+          trackAnalytics("field_answered", {
+            field_name: control.name
+          });
+        }
+
+        function restoreQuickStartStateFromStorage({ force = false } = {}) {
           const storage = getSessionStorage();
           if (!storage || !quickStartForm) {
             return false;
@@ -1958,12 +1996,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 return;
               }
 
-              if (
-                typeof fieldValue === "string"
-                && hasAnswerValue(fieldValue)
-                && !hasAnswerValue(control.value)
-              ) {
-                control.value = fieldValue;
+              if (typeof fieldValue === "string") {
+                if (force) {
+                  control.value = fieldValue;
+                } else if (hasAnswerValue(fieldValue) && !hasAnswerValue(control.value)) {
+                  control.value = fieldValue;
+                }
               }
             });
           }
@@ -1976,6 +2014,52 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           return true;
+        }
+
+        function clearQuickStartState() {
+          const storage = getSessionStorage();
+          if (storage) {
+            try {
+              storage.removeItem(DASHBOARD_STORAGE_KEY);
+            } catch {}
+          }
+        }
+
+        function resetQuickStartForm() {
+          if (!quickStartForm) {
+            return;
+          }
+
+          Array.from(quickStartForm.elements ?? []).forEach((control) => {
+            if (!control || !control.name || control.disabled) {
+              return;
+            }
+
+            const tagName = String(control.tagName || "").toLowerCase();
+            if (!["select", "input", "textarea"].includes(tagName)) {
+              return;
+            }
+
+            const controlType = String(control.type || "").toLowerCase();
+            if (controlType === "checkbox" || controlType === "radio") {
+              control.checked = false;
+              return;
+            }
+
+            control.value = "";
+          });
+
+          selectAllQuickRegions();
+          syncDependentSelects();
+          trackedFieldChanges.clear();
+          hasTrackedFormStarted = false;
+          hasTrackedFormCompleted = false;
+          lastRenderedRecommendationSignature = "";
+          clearQuickStartState();
+          syncOccupationTitleHints();
+          suspendQuickStartPersistence = true;
+          refreshQuickStartStateFromControls();
+          suspendQuickStartPersistence = false;
         }
 
         function toggleQuickRegion(regionId) {
@@ -2091,6 +2175,18 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             });
           });
         });
+
+        if (compareTableDetails) {
+          compareTableDetails.addEventListener("toggle", () => {
+            if (!compareTableDetails.open) {
+              return;
+            }
+
+            trackAnalytics("comparison_table_opened", {
+              selected_region_count: activeQuickRegions.size || MAP_REGION_DEFS.length
+            });
+          });
+        }
 
         if (canadianExpSelect) {
           canadianExpSelect.addEventListener("change", () => {
@@ -5687,7 +5783,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
           return plans
             .sort((left, right) => right.priority - left.priority)
-            .slice(0, 3);
+            .slice(0, 3)
+            .map((plan, index) => ({
+              comparisonLabel: ["가장 빠른 길", "가장 안정적인 길", "우회/백업 길"][index] || "다른 선택지",
+              ...plan
+            }));
         }
 
         function buildEligibilitySnapshot(answers, insight, guideBundle) {
@@ -5962,7 +6062,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             );
           }
 
-          return plans.sort((left, right) => right.priority - left.priority).slice(0, 3);
+          return plans
+            .sort((left, right) => right.priority - left.priority)
+            .slice(0, 3)
+            .map((plan, index) => ({
+              comparisonLabel: ["지금 가장 현실적", "다음 대안", "학교/우회 플랜"][index] || "다른 선택지",
+              ...plan
+            }));
         }
 
         function buildRouteRealitySnapshot(answers, insight, occupationLens, concreteProvincePlans, isFederalCard) {
@@ -6094,6 +6200,202 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             canadianExpLine: nextCanadianLift > 0
               ? "캐나다 skilled 경력을 " + nextCanadianYear + "년까지 채우면 약 " + nextCanadianScore + "점까지 볼 수 있어요."
               : "지금 단계에서는 경력 증가보다 nomination·직군 선택 영향이 더 커요."
+          };
+        }
+
+        function getProvinceRuleContextTokens(answers, insight) {
+          const routeOccupationId = getPrimaryOccupationId(answers);
+          const routeTags = getOccupationMeta(routeOccupationId).tags;
+          const tokens = new Set(routeTags);
+
+          if (statusSupports(insight.statuses.ee) || answers.ee === "yes") {
+            tokens.add("ee");
+          }
+
+          if (statusSupports(insight.statuses.jobOffer) || answers.jobOffer === "yes") {
+            tokens.add("job-offer");
+          }
+
+          if (statusSupports(insight.statuses.graduate) || ["student", "pgwp"].includes(answers.base) || ["study-plan", "pgwp-pr"].includes(answers.path)) {
+            tokens.add("school");
+          }
+
+          if (["student"].includes(answers.base) || answers.path === "study-plan") {
+            tokens.add("student");
+          }
+
+          if (["pgwp"].includes(answers.base) || answers.path === "pgwp-pr") {
+            tokens.add("graduate");
+          }
+
+          if (hasSkilledCanadianTrack(answers)) {
+            tokens.add("local-skilled");
+          }
+
+          if (answers.canadianJobSkill === "non-skilled" || routeTags.some((tag) => ["service-entry", "retail", "care-support", "warehouse", "mixed-skill"].includes(tag))) {
+            tokens.add("low-skill");
+          }
+
+          if (routeTags.some((tag) => ["office", "business-admin", "sales", "stem", "transport"].includes(tag))) {
+            tokens.add("professional");
+          }
+
+          if (answers.household === "with-spouse") {
+            tokens.add("spouse");
+          }
+
+          if (answers.setting === "metro") {
+            tokens.add("metro");
+          } else if (answers.setting === "regional") {
+            tokens.add("regional");
+          }
+
+          if (answers.advantage === "french") {
+            tokens.add("french");
+          }
+
+          if (isAtlanticProvinceId(insight.id)) {
+            tokens.add("atlantic");
+          }
+
+          return tokens;
+        }
+
+        function buildProvinceStreamGuide(answers, insight) {
+          const provinceRule = PROVINCE_STREAM_RULES[insight.id];
+
+          if (!provinceRule || !Array.isArray(provinceRule.rules) || provinceRule.rules.length === 0) {
+            return null;
+          }
+
+          const contextTokens = getProvinceRuleContextTokens(answers, insight);
+          const rankedRules = provinceRule.rules
+            .map((rule) => {
+              const matchedTokens = (rule.tokens || []).filter((token) => contextTokens.has(token));
+              return {
+                ...rule,
+                matchedTokens,
+                score: matchedTokens.length
+              };
+            })
+            .sort((left, right) => {
+              if (right.score !== left.score) {
+                return right.score - left.score;
+              }
+              return left.labelKo.localeCompare(right.labelKo, "ko");
+            });
+
+          const selectedRules = rankedRules.filter((rule) => rule.score > 0).slice(0, 3);
+          const displayRules = selectedRules.length > 0 ? selectedRules : rankedRules.slice(0, 2);
+
+          const cards = displayRules.map((rule) => {
+            let badge = "지금 비교 가능";
+            let tone = "positive";
+            let fitLine = rule.entryKo;
+
+            if ((rule.tokens || []).includes("job-offer") && answers.jobOffer !== "yes") {
+              badge = "job offer 보완";
+              tone = "neutral";
+              fitLine = "이 경로는 employer job offer가 붙을수록 훨씬 선명해져요.";
+            } else if ((rule.tokens || []).includes("ee") && answers.ee !== "yes") {
+              badge = "EE 프로필 열기";
+              tone = "neutral";
+              fitLine = "EE 프로필을 먼저 열어두면 이 경로와 연결해서 계산하기 쉬워져요.";
+            } else if ((rule.tokens || []).includes("school") && !["student", "pgwp"].includes(answers.base) && !["study-plan", "pgwp-pr"].includes(answers.path)) {
+              badge = "학교 경유 플랜";
+              tone = "neutral";
+              fitLine = "지금 바로보다 학교 -> PGWP -> local work 흐름을 염두에 두고 보는 게 맞아요.";
+            } else if ((rule.tokens || []).includes("regional") && answers.setting === "metro") {
+              badge = "지역 열면 강해짐";
+              tone = "neutral";
+              fitLine = "대도시만 보지 않고 지역까지 열면 이 경로가 더 현실적일 수 있어요.";
+            } else if ((rule.tokens || []).includes("low-skill") && answers.canadianJobSkill !== "non-skilled") {
+              badge = "예외 경로 참고";
+              tone = "neutral";
+              fitLine = "지금 직무가 stronger면 이 규칙은 보조 우회로로만 보면 돼요.";
+            }
+
+            return {
+              title: rule.labelKo,
+              badge,
+              tone,
+              fitLine,
+              note: rule.noteKo
+            };
+          });
+
+          return {
+            overview: provinceRule.overviewKo,
+            cards
+          };
+        }
+
+        function buildSpouseStrategy(answers, insight) {
+          if (answers.household !== "with-spouse") {
+            return null;
+          }
+
+          const provinceRule = PROVINCE_STREAM_RULES[insight.id];
+          const items = [];
+
+          items.push("배우자 언어점수와 ECA를 같이 넣어 두 사람 중 누가 주신청자로 더 유리한지 먼저 비교합니다.");
+
+          if (statusSupports(insight.statuses.ee)) {
+            items.push("한 명은 " + insight.labelKo + " 주정부, 다른 한 명은 EE 점수형 보조 전략으로 두고 더 빠른 쪽을 주신청자로 잡을 수 있어요.");
+          }
+
+          if (answers.canadianJobSkill === "non-skilled") {
+            items.push("현재 직무가 애매하면 배우자 학력·언어·경력 축이 더 선명한지 같이 보는 편이 현실적입니다.");
+          } else {
+            items.push("현재 local skilled 경력이 있는 쪽을 메인으로 두고, 배우자는 서류·언어 점수를 보조로 올리는 편이 안정적입니다.");
+          }
+
+          return {
+            summary: provinceRule?.spouseKo || "배우자와 같이 가면 한 사람만 보는 것보다 두 사람 중 누가 주신청자로 더 유리한지 먼저 비교하는 게 좋습니다.",
+            items: items.slice(0, 3)
+          };
+        }
+
+        function buildSchoolRouteGuidance(answers, insight) {
+          const provinceRule = PROVINCE_STREAM_RULES[insight.id];
+          const routeOccupationId = getPrimaryOccupationId(answers);
+          const plannerFocus = getOccupationPlannerFocus(routeOccupationId);
+          const schoolRelevant = statusSupports(insight.statuses.graduate)
+            || ["student", "pgwp"].includes(answers.base)
+            || ["study-plan", "pgwp-pr"].includes(answers.path)
+            || answers.canadianJobSkill === "non-skilled"
+            || canadaTitleNeedsUpgrade(answers);
+
+          if (!schoolRelevant) {
+            return null;
+          }
+
+          return {
+            summary: provinceRule?.schoolKo || (insight.labelKo + "는 학교를 간다면 PGWP 뒤 local employer나 졸업자 경로까지 같이 보는 편이 좋아요."),
+            items: [
+              insight.labelKo + "에서 PGWP 가능한 과정인지부터 먼저 확인합니다.",
+              "학교를 간다면 졸업 후 " + plannerFocus.transitionTarget + " 쪽으로 들어갈 수 있는지까지 같이 봅니다.",
+              "학업 자체보다 졸업 후 남는 체류기간, local employer, graduate/local experience stream 연결을 같이 계산합니다."
+            ]
+          };
+        }
+
+        function buildRegulatedRouteGuidance(answers, insight) {
+          const routeOccupationId = getPrimaryOccupationId(answers);
+          const routeMeta = getOccupationMeta(routeOccupationId);
+          const provinceRule = PROVINCE_STREAM_RULES[insight.id];
+
+          if (!routeMeta.tags.includes("regulated")) {
+            return null;
+          }
+
+          return {
+            summary: provinceRule?.regulatedKo || "이 직군은 점수만으로 끝나지 않고 license, registration, certification 준비가 같이 필요할 수 있어요.",
+            items: [
+              "현재 직무가 이 주에서 registration·license가 필요한지 먼저 확인합니다.",
+              "면허가 필요한 직군이면 employer job offer보다도 자격 인정 절차와 timing을 같이 계산합니다.",
+              "license 준비가 길다면 같은 분야의 비규제 support role이나 school -> local route도 같이 비교합니다."
+            ]
           };
         }
 
@@ -6304,6 +6606,26 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             addAction(5, "전공 기반 직무로 실제 경력 만들기", "전공을 살린 직군으로 실제 경력이 생기면 경력 연결성과 설명력이 좋아질 수 있습니다.", "degree-experience");
           }
 
+          if (answers.household === "with-spouse") {
+            addAction(
+              6,
+              "배우자 언어/ECA까지 같이 넣어 주신청자 비교",
+              "배우자와 같이 가면 두 사람 중 누가 EE, 주정부, 학교 경로에서 더 유리한지 먼저 비교하는 편이 전체 전략이 훨씬 선명해집니다.",
+              "spouse-strategy",
+              3
+            );
+          }
+
+          if (getActiveOccupationMeta(answers).tags.includes("regulated")) {
+            addAction(
+              7,
+              "이 주의 license / registration timeline 확인",
+              "규제직은 점수보다 자격 인정 절차가 병목이 될 수 있어 employer 지원보다 먼저 registration·certification 일정을 확인하는 편이 좋아요.",
+              "regulated-license",
+              4
+            );
+          }
+
           if (answers.jobOffer !== "yes" && ["중심", "있음", "일부"].includes(insight.statuses.jobOffer)) {
             const delta = insight.statuses.jobOffer === "중심" ? 9 : insight.statuses.jobOffer === "있음" ? 7 : 5;
             addAction(
@@ -6402,9 +6724,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const groups = {
             urgent: new Set(["permit-urgent", "permit-status"]),
             route: new Set(["job-offer", "pnp-nomination", "ee-profile", "aip-teer4", "ontario-indemand", "alberta-hospitality"]),
-            document: new Set(["language-proof", "language-clb9", "eca-complete", "eca-finish", "eca-check", "french"]),
+            document: new Set(["language-proof", "language-clb9", "eca-complete", "eca-finish", "eca-check", "french", "regulated-license"]),
             experience: new Set(["teer-upgrade", "canadian-exp-next", "canadian-exp-1", "canadian-exp-2", "foreign-exp-1", "degree-experience"]),
-            strategy: new Set(["focus-occupation", "korea-primary-noc", "korea-noc-detail", "regional-setting", "expand-regions", "study-route"])
+            strategy: new Set(["focus-occupation", "korea-primary-noc", "korea-noc-detail", "regional-setting", "expand-regions", "study-route", "spouse-strategy"])
           };
 
           if (groups.urgent.has(actionId)) {
@@ -6612,6 +6934,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const concreteProvincePlans = isFederalCard ? [] : buildConcreteProvincePlans(answers, insight);
             const routeReality = buildRouteRealitySnapshot(answers, insight, occupationLens, concreteProvincePlans, isFederalCard);
             const provinceEeBridge = buildProvinceEeBridge(answers, insight, eeSnapshot);
+            const provinceStreamGuide = isFederalCard ? null : buildProvinceStreamGuide(answers, insight);
+            const spouseStrategy = buildSpouseStrategy(answers, insight);
+            const schoolRouteGuidance = buildSchoolRouteGuidance(answers, insight);
+            const regulatedRouteGuidance = buildRegulatedRouteGuidance(answers, insight);
             const profileStrengthItems = buildProfileStrengths(answers);
             const occupationContextLine = buildOccupationContextSummary(answers);
             const pathwayCurrentItems = pathwayGuideBundle.evaluated
@@ -6650,7 +6976,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   .map((plan, planIndex) => [
                     '<article class="plan-variant-card">',
                     '<div class="plan-variant-topline">',
-                    '<span class="compare-pill">플랜 ' + escapeHtmlClient(String.fromCharCode(65 + planIndex)) + " · " + escapeHtmlClient(plan.type) + '</span>',
+                    '<span class="compare-pill">플랜 ' + escapeHtmlClient(String.fromCharCode(65 + planIndex)) + " · " + escapeHtmlClient(plan.comparisonLabel || plan.type) + '</span>',
                     plan.highlight ? '<span class="plan-variant-highlight">' + escapeHtmlClient(plan.highlight) + '</span>' : "",
                     '</div>',
                     '<strong>' + escapeHtmlClient(plan.title) + '</strong>',
@@ -6877,6 +7203,24 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   + '<ul class="reason-list career-check-list">' + jobRealityItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("") + '</ul>'
                   + '</section>'
                 : ""),
+              (!isFederalCard && provinceStreamGuide
+                ? '<section class="selection-model-panel">'
+                  + '<div class="selection-model-head"><strong>주별 stream 현실 가이드</strong><span class="selection-model-badge">rules DB</span></div>'
+                  + '<p class="selection-model-detail">' + escapeHtmlClient(provinceStreamGuide.overview) + '</p>'
+                  + '<div class="plan-variant-grid">'
+                  + provinceStreamGuide.cards.map((card) => [
+                      '<article class="plan-variant-card">',
+                      '<div class="plan-variant-topline">',
+                      '<span class="compare-pill">' + escapeHtmlClient(card.title) + '</span>',
+                      '<span class="plan-variant-highlight">' + escapeHtmlClient(card.badge) + '</span>',
+                      '</div>',
+                      '<p class="plan-variant-stream">' + escapeHtmlClient(card.fitLine) + '</p>',
+                      '<p>' + escapeHtmlClient(card.note) + '</p>',
+                      '</article>'
+                    ].join("")).join("")
+                  + '</div>'
+                  + '</section>'
+                : ""),
               '<section class="career-check-panel">'
                 + '<strong>' + escapeHtmlClient(isFederalCard ? "연방 기준으로 이 직무를 보면" : "이 직무를 이 주에서 보면") + '</strong>'
                 + '<div class="eligibility-snapshot">'
@@ -6899,7 +7243,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   + concreteProvincePlans.map((plan, planIndex) => [
                       '<article class="plan-variant-card">',
                       '<div class="plan-variant-topline">',
-                      '<span class="compare-pill">플랜 ' + escapeHtmlClient(String.fromCharCode(65 + planIndex)) + '</span>',
+                      '<span class="compare-pill">플랜 ' + escapeHtmlClient(String.fromCharCode(65 + planIndex)) + " · " + escapeHtmlClient(plan.comparisonLabel || plan.badge) + '</span>',
                       '<span class="plan-variant-highlight">' + escapeHtmlClient(plan.badge) + '</span>',
                       '</div>',
                       '<strong>' + escapeHtmlClient(plan.title) + '</strong>',
@@ -6936,6 +7280,27 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   + '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + "</p>"
                 : ""),
               provinceEeBridgeHtml,
+              (spouseStrategy
+                ? '<section class="career-check-panel">'
+                  + '<strong>배우자와 같이 본다면</strong>'
+                  + '<p class="wizard-freshness">' + escapeHtmlClient(spouseStrategy.summary) + '</p>'
+                  + '<ul class="reason-list career-check-list">' + spouseStrategy.items.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("") + '</ul>'
+                  + '</section>'
+                : ""),
+              (schoolRouteGuidance
+                ? '<section class="career-check-panel">'
+                  + '<strong>학교 경유를 같이 보면</strong>'
+                  + '<p class="wizard-freshness">' + escapeHtmlClient(schoolRouteGuidance.summary) + '</p>'
+                  + '<ul class="reason-list career-check-list">' + schoolRouteGuidance.items.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("") + '</ul>'
+                  + '</section>'
+                : ""),
+              (regulatedRouteGuidance
+                ? '<section class="career-check-panel">'
+                  + '<strong>규제직 / 자격증 체크</strong>'
+                  + '<p class="wizard-freshness">' + escapeHtmlClient(regulatedRouteGuidance.summary) + '</p>'
+                  + '<ul class="reason-list career-check-list">' + regulatedRouteGuidance.items.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("") + '</ul>'
+                  + '</section>'
+                : ""),
               pathwayGuideHtml,
               '<section class="career-check-panel">',
               '<strong>경력 인정 체크</strong>',
@@ -7044,14 +7409,49 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         if (quickStartForm) {
-          quickStartForm.addEventListener("change", renderQuickStartResults);
-          quickStartForm.addEventListener("input", renderQuickStartResults);
+          quickStartForm.addEventListener("change", (event) => {
+            trackFieldChange(event.target);
+            renderQuickStartResults();
+          });
+          quickStartForm.addEventListener("input", (event) => {
+            trackFieldChange(event.target);
+            renderQuickStartResults();
+          });
           quickStartForm.addEventListener("change", syncOccupationTitleHints);
           [koreaJobTitleInput, canadaJobTitleInput].forEach((inputNode) => {
             inputNode?.addEventListener("input", () => {
               syncOccupationTitleHints();
               renderQuickStartResults();
             });
+          });
+        }
+
+        if (saveButton) {
+          saveButton.addEventListener("click", () => {
+            persistQuickStartState();
+            setQuickFormStatus("현재 입력을 이 브라우저에 저장했어요.");
+            trackAnalytics("questionnaire_saved", {
+              selected_region_count: activeQuickRegions.size || MAP_REGION_DEFS.length
+            });
+          });
+        }
+
+        if (loadButton) {
+          loadButton.addEventListener("click", () => {
+            const restored = restoreQuickStartStateFromStorage({ force: true });
+            refreshQuickStartStateFromControls();
+            setQuickFormStatus(restored ? "저장된 입력을 다시 불러왔어요." : "아직 저장된 입력이 없어요.");
+            trackAnalytics("questionnaire_loaded", {
+              restored: restored ? "yes" : "no"
+            });
+          });
+        }
+
+        if (resetButton) {
+          resetButton.addEventListener("click", () => {
+            resetQuickStartForm();
+            setQuickFormStatus("입력을 초기화하고 기본 상태로 돌아왔어요.");
+            trackAnalytics("questionnaire_reset", {});
           });
         }
 
@@ -7113,8 +7513,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         if (quickStartForm) {
-          restoreQuickStartStateFromStorage();
+          const restoredOnLoad = restoreQuickStartStateFromStorage();
           refreshQuickStartStateFromControls();
+          if (restoredOnLoad) {
+            setQuickFormStatus("이전에 저장한 입력을 자동으로 불러왔어요.");
+          }
 
           window.addEventListener("pageshow", () => {
             restoreQuickStartStateFromStorage();
@@ -8473,6 +8876,48 @@ function renderLayout({ title, page, body, updates, basePath = "", analyticsMeas
 
       .wizard-form-group-heading-subtle {
         margin-top: 6px;
+      }
+
+      .wizard-form-tools {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border: 1px solid rgba(15, 61, 127, 0.08);
+        border-radius: var(--radius-md);
+        background: rgba(248, 251, 255, 0.88);
+      }
+
+      .wizard-form-tools-copy {
+        display: grid;
+        gap: 4px;
+      }
+
+      .wizard-form-tools-copy strong {
+        color: var(--accent-deep);
+        font-size: 0.92rem;
+      }
+
+      .wizard-form-tools-copy span,
+      .wizard-form-tools-status {
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.6;
+      }
+
+      .wizard-form-tools-status {
+        margin: 0;
+      }
+
+      .wizard-form-tools-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .btn.btn-compact {
+        min-height: 42px;
+        padding: 0 16px;
+        font-size: 0.92rem;
       }
 
       .direction-summary-section {

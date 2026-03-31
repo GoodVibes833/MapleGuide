@@ -11,6 +11,13 @@
 ## 포함된 기능
 
 - `EE`, `Ontario`, `BC`, `Manitoba`, `PEI`, `New Brunswick` 소스 레지스트리
+- 주별 stream rules scaffold
+  - `Ontario`
+  - `Alberta`
+  - `Nova Scotia`
+  - `PEI`
+  - `Saskatchewan`
+  - `Newfoundland and Labrador`
 - 정적 HTML 기반 파서 3종
   - 라벨형 메트릭 페이지
   - 기사형 업데이트 페이지
@@ -19,6 +26,7 @@
 - 규칙 기반 한국어 요약 생성
 - 지도 중심 메인 랜딩 페이지
 - 주/연방 상세 HTML 페이지 생성
+- 브라우저 세션 입력 저장 / 불러오기 / 초기화
 - fixture 기반 테스트
 
 ## 빠른 시작
@@ -86,21 +94,27 @@ MAPLEGUIDE_GA_MEASUREMENT_ID=G-XXXXXXXXXX npm run dev
 - 기본 page view
 - `form_started`
 - `form_completed`
+- `field_answered`
 - `recommendations_rendered`
 - `recommendation_detail_opened`
 - `recommendation_region_clicked`
 - `latest_update_opened`
 - `older_updates_opened`
+- `questionnaire_saved`
+- `questionnaire_loaded`
+- `questionnaire_reset`
+- `comparison_table_opened`
 
 ## 실제 운영 구조
 
 1. `src/config/sources.js`에서 공식 소스를 관리합니다.
-2. `src/core/fetcher.js`가 HTML을 가져옵니다.
-3. `src/adapters/*`가 소스별 구조를 정규화합니다.
-4. `src/translation/korean.js`가 한국어 요약을 만듭니다.
-5. `src/site/render-dashboard.js`가 메인 지도와 지역 상세 HTML을 생성합니다.
-6. `src/server.js`가 로컬 웹 서버와 새로고침 API를 제공합니다.
-7. `MAPLEGUIDE_GA_MEASUREMENT_ID`가 있으면 GA4 스크립트와 주요 UX 이벤트를 같이 보냅니다.
+2. `src/config/province-stream-rules.js`에서 주별 stream 현실 가이드 scaffold를 관리합니다.
+3. `src/core/fetcher.js`가 HTML을 가져옵니다.
+4. `src/adapters/*`가 소스별 구조를 정규화합니다.
+5. `src/translation/korean.js`가 한국어 요약을 만듭니다.
+6. `src/site/render-dashboard.js`가 메인 지도와 지역 상세 HTML을 생성합니다.
+7. `src/server.js`가 로컬 웹 서버와 새로고침 API를 제공합니다.
+8. `MAPLEGUIDE_GA_MEASUREMENT_ID`가 있으면 GA4 스크립트와 주요 UX 이벤트를 같이 보냅니다.
 
 ## 운영 시 다음으로 붙일 것
 

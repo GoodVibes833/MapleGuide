@@ -38,6 +38,7 @@ class DummyClassList {
 }
 
 function makeNode(overrides = {}) {
+  const listeners = new Map();
   return {
     dataset: {},
     style: {},
@@ -47,8 +48,33 @@ function makeNode(overrides = {}) {
     innerHTML: "",
     textContent: "",
     classList: new DummyClassList(),
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type, handler) {
+      if (!listeners.has(type)) {
+        listeners.set(type, []);
+      }
+      listeners.get(type).push(handler);
+    },
+    removeEventListener(type, handler) {
+      if (!listeners.has(type)) {
+        return;
+      }
+      listeners.set(
+        type,
+        listeners.get(type).filter((candidate) => candidate !== handler)
+      );
+    },
+    dispatchEvent(event = {}) {
+      const payload = {
+        target: this,
+        currentTarget: this,
+        type: event.type ?? "",
+        ...event
+      };
+      for (const handler of listeners.get(payload.type) || []) {
+        handler(payload);
+      }
+      return true;
+    },
     querySelector() {
       return null;
     },
@@ -66,6 +92,9 @@ function makeNode(overrides = {}) {
     appendChild() {},
     scrollIntoView() {},
     focus() {},
+    click() {
+      this.dispatchEvent({ type: "click" });
+    },
     matches() {
       return false;
     },
@@ -127,6 +156,10 @@ function buildDashboardClientHarness(rawControlValues, options = {}) {
       return [];
     }
   });
+  const quickRegionFederalButton = makeNode();
+  const quickRegionClearButton = makeNode();
+  const quickFormStatus = makeNode();
+  const compareTableDetails = makeNode();
   const quickStartForm = makeNode({
     elements: formElements,
     querySelectorAll(selector) {
@@ -142,6 +175,11 @@ function buildDashboardClientHarness(rawControlValues, options = {}) {
     {
       "quick-start-form": quickStartForm,
       "quick-start-results": quickStartResults,
+      "quick-save-button": makeNode(),
+      "quick-load-button": makeNode(),
+      "quick-reset-button": makeNode(),
+      "quick-form-status": quickFormStatus,
+      "compare-table-details": compareTableDetails,
       "quick-region-selection": genericNode(),
       "map-tooltip": genericNode(),
       "canada-title-hint": genericNode(),
@@ -172,7 +210,13 @@ function buildDashboardClientHarness(rawControlValues, options = {}) {
       }
       return [];
     },
-    querySelector() {
+    querySelector(selector) {
+      if (selector === "[data-quick-region-toggle='federal']") {
+        return quickRegionFederalButton;
+      }
+      if (selector === "[data-quick-region-clear]") {
+        return quickRegionClearButton;
+      }
       return null;
     },
     createElement() {
@@ -250,7 +294,12 @@ function buildDashboardClientHarness(rawControlValues, options = {}) {
     controlByName,
     requiredFieldNodes,
     dispatchWindowEvent,
-    sessionStorage
+    sessionStorage,
+    saveButton: idMap["quick-save-button"],
+    loadButton: idMap["quick-load-button"],
+    resetButton: idMap["quick-reset-button"],
+    quickFormStatus,
+    compareTableDetails
   };
 }
 
@@ -383,4 +432,53 @@ test("saved questionnaire state restores recommendations and required markers on
   assert.equal(harness.controlByName.ecaStatus.value, "completed");
   assert.doesNotMatch(harness.quickStartResults.innerHTML, /작성 필요|결과 계산 오류/);
   assert.match(harness.quickStartResults.innerHTML, /현재 조건에서 먼저 볼 주정부 추천 순위/);
+});
+
+test("save, load, and reset controls preserve and clear questionnaire state", () => {
+  const harness = buildDashboardClientHarness({
+    path: "working-holiday",
+    base: "student",
+    age: "20-29",
+    household: "with-spouse",
+    education: "two-year",
+    languageProfile: "guess:clb7",
+    foreignExp: "1",
+    canadianExp: "2",
+    canadianJobSkill: "skilled",
+    ee: "",
+    jobOffer: "",
+    ecaStatus: "completed",
+    permitRemaining: "",
+    budget: "",
+    setting: "",
+    advantage: "",
+    koreaOccupation: "",
+    koreaJobTitle: "",
+    canadaOccupation: "",
+    canadaJobTitle: "",
+    targetOccupationPlan: "",
+    foreignExpAlignment: "",
+    degreeCareerPlan: ""
+  });
+
+  harness.saveButton.click();
+  assert.match(harness.quickFormStatus.textContent, /저장했어요/);
+  assert.ok(harness.sessionStorage.getItem("mapleguide.dashboard.state.v2"));
+
+  harness.controlByName.path.value = "";
+  harness.controlByName.ecaStatus.value = "";
+  harness.loadButton.click();
+
+  assert.equal(harness.controlByName.path.value, "working-holiday");
+  assert.equal(harness.controlByName.ecaStatus.value, "completed");
+  assert.match(harness.quickFormStatus.textContent, /불러왔어요/);
+  assert.doesNotMatch(harness.quickStartResults.innerHTML, /작성 필요|결과 계산 오류/);
+
+  harness.resetButton.click();
+
+  assert.equal(harness.controlByName.path.value, "");
+  assert.equal(harness.controlByName.ecaStatus.value, "");
+  assert.equal(harness.sessionStorage.getItem("mapleguide.dashboard.state.v2"), null);
+  assert.match(harness.quickFormStatus.textContent, /초기화/);
+  assert.match(harness.quickStartResults.innerHTML, /작성 필요/);
 });
