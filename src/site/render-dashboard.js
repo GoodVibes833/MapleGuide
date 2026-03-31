@@ -1788,6 +1788,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           linkText: "연방 / EE 먼저 보기"
         };
 
+        function hasAnswerValue(value) {
+          return !(typeof value === "undefined" || value === null || String(value).trim() === "");
+        }
+
         function escapeHtmlClient(value) {
           return String(value)
             .replaceAll("&", "&amp;")
@@ -1820,12 +1824,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         function getMissingRequiredFields(rawAnswers) {
           return Object.entries(REQUIRED_FIELD_LABELS)
-            .filter(([field]) => !rawAnswers[field])
+            .filter(([field]) => !hasAnswerValue(rawAnswers[field]))
             .map(([, label]) => label);
         }
 
         function getAnsweredRequiredFieldCount(rawAnswers) {
-          return Object.keys(REQUIRED_FIELD_LABELS).filter((field) => Boolean(rawAnswers[field])).length;
+          return Object.keys(REQUIRED_FIELD_LABELS).filter((field) => hasAnswerValue(rawAnswers[field])).length;
         }
 
         function trackFormStarted(rawAnswers) {
@@ -1889,7 +1893,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         function syncMissingRequiredStates(rawAnswers) {
           requiredFieldNodes.forEach((fieldNode) => {
             const fieldName = fieldNode.dataset.requiredField;
-            const missing = Boolean(fieldName && !rawAnswers[fieldName]);
+            const missing = Boolean(fieldName && !hasAnswerValue(rawAnswers[fieldName]));
             fieldNode.classList.toggle("is-missing", missing);
 
             const control = fieldNode.querySelector("select, input, textarea");
@@ -1956,6 +1960,28 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           return normalized;
+        }
+
+        function readQuickStartRawAnswers() {
+          if (!quickStartForm) {
+            return {};
+          }
+
+          const rawAnswers = {};
+          quickStartForm.querySelectorAll("select[name], input[name], textarea[name]").forEach((control) => {
+            if (!control.name || control.disabled) {
+              return;
+            }
+
+            const controlType = (control.type || "").toLowerCase();
+            if ((controlType === "checkbox" || controlType === "radio") && !control.checked) {
+              return;
+            }
+
+            rawAnswers[control.name] = control.value;
+          });
+
+          return normalizeDependentAnswers(rawAnswers);
         }
 
         function applyStarterPersona(personaId) {
@@ -6040,8 +6066,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             return;
           }
 
-          const formData = new FormData(quickStartForm);
-          const rawAnswers = normalizeDependentAnswers(Object.fromEntries(formData.entries()));
+          const rawAnswers = readQuickStartRawAnswers();
           const missingRequiredFields = getMissingRequiredFields(rawAnswers);
           trackFormStarted(rawAnswers);
           syncMissingRequiredStates(rawAnswers);

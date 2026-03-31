@@ -44,6 +44,7 @@ Recent high-signal progress already completed:
 - added live title interpretation hints under Korea/Canada job title inputs
 - added a shared `입력한 직무를 이렇게 읽고 있어요` summary block above recommendations
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
+- changed required-field detection and recommendation rendering to read live form control values directly instead of relying on `FormData`, because browser-side select values could otherwise be misread and block results
 
 Recent commit trail worth checking:
 
@@ -101,6 +102,7 @@ These are intentional decisions. Do not casually undo them in a new session.
   - which career axis the user wants to anchor the application on
 - actual job titles for both Korea and Canada, because category labels alone are too broad
 - live helper hints under both title fields should explain how the typed title is currently being interpreted
+- required field checks should use the current control values directly, not a more fragile serialized form snapshot
 - persona presets should stay opinionated and few in number; they are meant to help users start, not replace the full questionnaire
 - beginners should see:
   - current fit

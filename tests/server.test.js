@@ -74,6 +74,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /필수\*/);
   assert.match(dashboardResponse.body, /data-required-field="path"/);
   assert.match(dashboardResponse.body, /작성 필요/);
+  assert.match(dashboardResponse.body, /function readQuickStartRawAnswers\(\)/);
+  assert.match(dashboardResponse.body, /querySelectorAll\("select\[name\], input\[name\], textarea\[name\]"\)/);
   assert.match(dashboardResponse.body, /최종 학력/);
   assert.match(dashboardResponse.body, /영어 상태/);
   assert.match(dashboardResponse.body, /캐나다 경력의 성격/);

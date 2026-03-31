@@ -144,6 +144,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /필수\*/);
   assert.match(dashboardHtml, /data-required-field="path"/);
   assert.match(dashboardHtml, /작성 필요/);
+  assert.match(dashboardHtml, /function readQuickStartRawAnswers\(\)/);
+  assert.match(dashboardHtml, /querySelectorAll\("select\[name\], input\[name\], textarea\[name\]"\)/);
   assert.match(dashboardHtml, /필수\* 항목을 먼저 골라주세요/);
   assert.match(dashboardHtml, /최종 학력/);
   assert.match(dashboardHtml, /한국에서 주로 하던 일/);
