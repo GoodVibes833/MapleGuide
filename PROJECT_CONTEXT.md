@@ -79,6 +79,10 @@ Recent high-signal progress already completed:
   - language + document + NOC tightening first
   - employer-based permit extension checks when remaining time is short
   - school routes later when they are clearly the more expensive fallback
+- federal and EE-linked cards now expose an `가능한 점수/경로 옵션 전체 보기` panel
+  - users can see more than the top 2 actions
+  - language / French / school / job-offer / nomination style options can be checked together
+  - the panel shows a rough selected-score summary like `예상 CRS 378점 +89점 → 467점`
 - changed the federal improvement summary so the header shows the summed lift from the currently proposed actions, e.g. `예상 CRS 423점 +89점 → 512점`, instead of hiding the delta inside only the sub-actions
 - added recommendation snapshot persistence from the main dashboard so recommendation cards can hand a user-specific action bundle to the matching jurisdiction page
 - added a new jurisdiction top panel, `메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것`, that restores:

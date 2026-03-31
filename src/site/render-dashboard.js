@@ -1854,6 +1854,47 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 });
               });
             });
+
+          quickStartResults
+            .querySelectorAll("[data-score-options-card]")
+            .forEach((cardNode) => {
+              const summaryNode = cardNode.querySelector("[data-score-options-summary]");
+              const optionNodes = Array.from(cardNode.querySelectorAll("[data-score-option]"));
+              const scoreLabel = cardNode.dataset.scoreLabel || "예상 CRS";
+              const baseScore = Number.parseInt(cardNode.dataset.baseScore || "0", 10) || 0;
+
+              function syncScoreOptionSummary() {
+                if (!summaryNode) {
+                  return;
+                }
+
+                const immediateLift = optionNodes.reduce((sum, optionNode) => (
+                  optionNode.checked
+                    ? sum + (Number.parseInt(optionNode.dataset.immediateLift || "0", 10) || 0)
+                    : sum
+                ), 0);
+                const futureLift = optionNodes.reduce((sum, optionNode) => (
+                  optionNode.checked
+                    ? sum + (Number.parseInt(optionNode.dataset.futureLift || "0", 10) || 0)
+                    : sum
+                ), 0);
+
+                summaryNode.textContent = buildOptionProjectionSummary(scoreLabel, baseScore, immediateLift, futureLift);
+              }
+
+              optionNodes.forEach((optionNode) => {
+                optionNode.addEventListener("change", () => {
+                  syncScoreOptionSummary();
+                  trackAnalytics("score_option_toggled", {
+                    recommendation_id: cardNode.dataset.recommendationId ?? "",
+                    action_id: optionNode.dataset.actionId ?? "",
+                    checked: optionNode.checked ? "yes" : "no"
+                  });
+                });
+              });
+
+              syncScoreOptionSummary();
+            });
         }
 
         function syncMissingRequiredStates(rawAnswers) {
@@ -4025,10 +4066,33 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   : { lift: null, badge: "나중에 반영", label: "경력 누적 후 점수 반영", tone: "deferred" };
               }
             case "degree-experience":
-            case "study-route":
               return { lift: null, badge: "나중에 반영", label: "경력 누적 후 점수 반영", tone: "deferred" };
+            case "study-route":
+              {
+                const futureLift = estimateProjectedCrsLift(answers, {
+                  ecaStatus: "canadian-degree",
+                  canadianJobSkill: answers.canadianJobSkill === "skilled" ? answers.canadianJobSkill : "skilled",
+                  canadianExp: answers.canadianExp === "0" ? "1" : answers.canadianExp
+                });
+
+                return futureLift > 0
+                  ? {
+                      lift: null,
+                      futureLift,
+                      badge: "최대 +" + futureLift + "점",
+                      label: "캐나다 학위/졸업 후 경력까지 가면 " + scorePlanLabel + " 최대 +" + futureLift + "점",
+                      tone: "deferred"
+                    }
+                  : { lift: null, badge: "나중에 반영", label: "학교 뒤 경력 누적 후 점수 반영", tone: "deferred" };
+              }
             case "job-offer":
-              return { lift: 0, badge: "변화 없음", label: noDirectScoreLabel, tone: "neutral" };
+              return {
+                lift: null,
+                futureLift: 50,
+                badge: "최대 +50점",
+                label: "LMIA급 잡오퍼면 " + scorePlanLabel + " 최대 +50점",
+                tone: "deferred"
+              };
             case "pnp-nomination":
               return {
                 lift: null,
@@ -4114,6 +4178,29 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             .filter((stream) => Array.isArray(stream.tags) && stream.tags.includes(tag))
             .slice(0, limit)
             .map((stream) => stream.nameKo);
+        }
+
+        function getActionProjectionNumbers(action) {
+          return {
+            immediateLift: Math.max(0, action.scoreImpact?.lift ?? 0),
+            futureLift: Math.max(0, action.scoreImpact?.futureLift ?? 0)
+          };
+        }
+
+        function buildOptionProjectionSummary(scoreLabel, baseScore, immediateLift, futureLift) {
+          if (immediateLift > 0 && futureLift > 0) {
+            return "선택한 옵션 기준 대략 " + scoreLabel + " " + baseScore + "점 +" + immediateLift + "점 → " + (baseScore + immediateLift) + "점 · 시간이 필요한 옵션까지 보면 최대 +" + (immediateLift + futureLift) + "점";
+          }
+
+          if (immediateLift > 0) {
+            return "선택한 옵션 기준 대략 " + scoreLabel + " " + baseScore + "점 +" + immediateLift + "점 → " + (baseScore + immediateLift) + "점";
+          }
+
+          if (futureLift > 0) {
+            return "선택한 옵션 기준 지금 " + scoreLabel + " " + baseScore + "점 · 시간이 필요한 옵션까지 보면 최대 +" + futureLift + "점";
+          }
+
+          return "선택한 옵션은 점수보다 경로 설계와 서류 준비에 더 영향을 줍니다.";
         }
 
         function getEnglishUpgradeTarget(answers) {
@@ -7236,6 +7323,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const canadaOccupationId = resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle);
           const canadaMeta = getCanadaOccupationMeta(answers);
           const plannerFocus = getOccupationPlannerFocus(canadaOccupationId);
+          const eeSnapshot = getEESnapshot(answers, insight);
 
           function addAction(delta, title, detail, actionId, priority = 0) {
             if (actions.some((action) => action.title === title)) {
@@ -7425,16 +7513,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           if (answers.canadianJobSkill === "non-skilled") {
-            if (statusSupports(insight.statuses.graduate)) {
-              addAction(
-                7,
-                "학교 -> PGWP -> skilled 직무 1년 경로 계산",
-                "현재 일이 non-skilled면 이 주의 학교·졸업자 경로를 거쳐 skilled 직무 1년으로 들어가는 편이 더 현실적인 경우가 많습니다.",
-                "study-route",
-                5
-              );
-            }
-
             if (isAtlanticProvinceId(insight.id) && answers.jobOffer === "yes") {
               addAction(8, "AIP designated employer + TEER 4 가능 여부 확인", "Atlantic 쪽은 designated employer job offer와 현재 NOC가 맞으면 TEER 4 축으로 들어가는 경우도 있어 AIP 가능성을 먼저 확인해 볼 만합니다.", "aip-teer4", 4);
             }
@@ -7446,6 +7524,34 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             if (insight.id === "alberta" && getCanadaOccupationMeta(answers).tags.some((tag) => ["hospitality", "service-entry"].includes(tag))) {
               addAction(8, "알버타 Tourism and Hospitality 또는 worker stream 확인", "알버타는 관광·호스피탈리티 쪽 예외 경로가 있어, 현재 고용주와 직무가 조건에 맞는지 바로 확인해 볼 수 있어요.", "alberta-hospitality", 4);
             }
+          }
+
+          const shouldOfferStudyRoute =
+            answers.ecaStatus !== "canadian-degree"
+            && (insight.id === "federal" || statusSupports(insight.statuses.graduate))
+            && (
+              answers.canadianJobSkill === "non-skilled"
+              || isStudyStartIntent(answers.path)
+              || answers.base === "student"
+              || insight.id === "federal"
+              || (eeSnapshot.crsSnapshot.gap != null && eeSnapshot.crsSnapshot.gap <= -40)
+            );
+
+          if (shouldOfferStudyRoute) {
+            const studyTitle = answers.canadianJobSkill === "non-skilled"
+              ? "학교 -> PGWP -> skilled 직무 1년 경로 계산"
+              : "캐나다 학교 1-2년 + 졸업 후 경력 플랜 같이 보기";
+            const studyDetail = answers.canadianJobSkill === "non-skilled"
+              ? "현재 일이 non-skilled면 이 주의 학교·졸업자 경로를 거쳐 skilled 직무 1년으로 들어가는 편이 더 현실적인 경우가 많습니다."
+              : "점수 차이가 큰 편이면 캐나다 학위 + 졸업 후 현지경력 1년을 같이 보는 플랜도 현실적인 우회 경로가 될 수 있습니다.";
+
+            addAction(
+              answers.canadianJobSkill === "non-skilled" ? 7 : 6,
+              studyTitle,
+              studyDetail,
+              "study-route",
+              answers.canadianJobSkill === "non-skilled" ? 5 : 1
+            );
           }
 
           if (answers.targetOccupationPlan === "previous-korea-job" && answers.foreignExpAlignment === "unrelated") {
@@ -7517,10 +7623,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             );
           }
 
-          if (isStudyStartIntent(answers.path) && answers.base === "outside") {
-            addAction(7, "학교와 주를 같이 고른 유학 경로 설계", "유학은 학교보다 지역과 졸업 후 경로를 먼저 같이 봐야 실제 이민 연결이 좋아집니다.", "study-route");
-          }
-
           if (answers.advantage !== "french" && statusSupports(insight.statuses.french)) {
             addAction(4, "프랑스어 점수도 선택지에 포함", "프랑스어 점수는 연방과 일부 주에서 예상보다 큰 차별점이 될 수 있습니다.", "french", 1);
           }
@@ -7534,8 +7636,30 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           const crsSnapshot = estimateCrsSnapshot(answers);
-          const topActions = actions
+          const sortedActions = actions
             .sort((left, right) => {
+              if (insight.id === "federal") {
+                const rightLift = right.scoreImpact?.lift ?? -1;
+                const leftLift = left.scoreImpact?.lift ?? -1;
+
+                if (rightLift !== leftLift) {
+                  return rightLift - leftLift;
+                }
+
+                const rightFutureLift = right.scoreImpact?.futureLift ?? -1;
+                const leftFutureLift = left.scoreImpact?.futureLift ?? -1;
+
+                if (rightFutureLift !== leftFutureLift) {
+                  return rightFutureLift - leftFutureLift;
+                }
+
+                if ((right.priority ?? 0) !== (left.priority ?? 0)) {
+                  return (right.priority ?? 0) - (left.priority ?? 0);
+                }
+
+                return right.delta - left.delta;
+              }
+
               if ((right.priority ?? 0) !== (left.priority ?? 0)) {
                 return (right.priority ?? 0) - (left.priority ?? 0);
               }
@@ -7555,13 +7679,14 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               }
 
               return right.delta - left.delta;
-            })
-            .slice(0, 3);
+            });
+          const topActions = sortedActions.slice(0, 3);
           const projectedScoreLift = topActions.reduce((sum, action) => sum + Math.max(0, action.scoreImpact?.lift ?? 0), 0);
           const bestFutureScoreLift = topActions.reduce((max, action) => Math.max(max, action.scoreImpact?.futureLift ?? 0), 0);
 
           return {
             items: topActions,
+            allItems: sortedActions,
             baseScore: crsSnapshot.score,
             projectedScoreLift,
             projectedScore: crsSnapshot.score + projectedScoreLift,
@@ -7864,7 +7989,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               .filter((criterion) => criterion.state !== "has")
               .map((criterion) => criterion.label)
               .slice(0, 3);
-            const topActionItems = improvementPlan.items.slice(0, 2);
+            const prioritizedQuickActions = isFederalCard
+              ? [
+                  ...improvementPlan.allItems.filter((item) => (item.scoreImpact?.lift ?? 0) > 0 || (item.scoreImpact?.futureLift ?? 0) > 0),
+                  ...improvementPlan.allItems.filter((item) => (item.scoreImpact?.lift ?? 0) <= 0 && (item.scoreImpact?.futureLift ?? 0) <= 0)
+                ]
+              : improvementPlan.items;
+            const topActionItems = prioritizedQuickActions.slice(0, 2);
             const leadSummary = buildRecommendationLeadSummary(answers, insight, evaluation, eeSnapshot);
             const recommendationContextSummary = buildRecommendationContextSummary(answers);
             const routeTypeLabel = isFederalCard ? "연방" : "주정부";
@@ -7921,6 +8052,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const comparePillLabel = isFederalCard
               ? "연방 EE 경쟁력 " + eeSnapshot.band
               : "선발 방식 " + selectionModel.badgeKo;
+            const defaultSelectedActionTitles = new Set(topActionItems.map((item) => item.title));
             const quickActionCards = [
               ...(!isFederalCard && concreteProvincePlans.length > 0 ? [{ mode: "plan", plan: concreteProvincePlans[0] }] : []),
               ...topActionItems.slice(0, !isFederalCard && concreteProvincePlans.length > 0 ? 1 : 2).map((item) => ({ mode: "action", item }))
@@ -8003,6 +8135,65 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   title: "최신 공지 계속 확인",
                   detail: "draw, intake, 직군 우선순위 변화가 실제 체감에 더 크게 작용할 수 있어요."
                 }];
+            const optionPanelItems = (improvementPlan.allItems || [])
+              .filter((item) => Boolean(item.actionId))
+              .slice(0, 10);
+            const optionPanelInitial = optionPanelItems.reduce((accumulator, item) => {
+              if (!defaultSelectedActionTitles.has(item.title)) {
+                return accumulator;
+              }
+
+              const projection = getActionProjectionNumbers(item);
+
+              return {
+                immediateLift: accumulator.immediateLift + projection.immediateLift,
+                futureLift: accumulator.futureLift + projection.futureLift
+              };
+            }, { immediateLift: 0, futureLift: 0 });
+            const showScoreOptionPanel = optionPanelItems.length > 2 && (isFederalCard || statusSupports(insight.statuses.ee));
+            const scoreOptionPanelHtml = showScoreOptionPanel
+              ? [
+                  '<section class="score-options-panel" data-score-options-card="true" data-recommendation-id="' + escapeHtmlClient(insight.id) + '" data-base-score="' + escapeHtmlClient(String(improvementPlan.baseScore)) + '" data-score-label="' + escapeHtmlClient(eeSnapshot.scoreLabel) + '">',
+                  '<div class="improvement-head">',
+                  '<strong>가능한 점수/경로 옵션 전체 보기</strong>',
+                  '<span class="improvement-total">체크해서 비교</span>',
+                  '</div>',
+                  '<p class="wizard-freshness">상위 액션만 앞에서 보여주고, 여기서는 가능한 옵션을 직접 체크해 대략 몇 점까지 가는지 볼 수 있어요.</p>',
+                  '<p class="score-options-summary" data-score-options-summary>' + escapeHtmlClient(buildOptionProjectionSummary(eeSnapshot.scoreLabel, improvementPlan.baseScore, optionPanelInitial.immediateLift, optionPanelInitial.futureLift)) + '</p>',
+                  '<div class="score-options-list">',
+                  optionPanelItems.map((item, optionIndex) => {
+                    const actionView = isFederalCard
+                      ? {
+                          badge: item.scoreImpact?.badge ?? "준비",
+                          tone: item.scoreImpact?.tone ?? "neutral",
+                          label: item.scoreImpact?.label ?? item.detail
+                        }
+                      : getProvinceActionPresentation(item);
+                    const actionMetaLine = buildActionMetaLine(item, answers, insight, eeSnapshot);
+                    const projection = getActionProjectionNumbers(item);
+                    const isChecked = defaultSelectedActionTitles.has(item.title);
+
+                    return [
+                      '<label class="score-option-row">',
+                      '<input type="checkbox" data-score-option data-action-id="' + escapeHtmlClient(item.actionId ?? ("option-" + optionIndex)) + '" data-immediate-lift="' + escapeHtmlClient(String(projection.immediateLift)) + '" data-future-lift="' + escapeHtmlClient(String(projection.futureLift)) + '"' + (isChecked ? " checked" : "") + ' />',
+                      '<div class="score-option-copy">',
+                      '<div class="score-option-topline">',
+                      '<strong>' + escapeHtmlClient(item.title) + '</strong>',
+                      '<span class="improvement-score-impact is-' + escapeHtmlClient(actionView.tone) + '">' + escapeHtmlClient(actionView.badge) + '</span>',
+                      '</div>',
+                      '<p>' + escapeHtmlClient(actionView.label) + '</p>',
+                      actionMetaLine ? '<p class="compact-action-meta">' + escapeHtmlClient(actionMetaLine) + '</p>' : "",
+                      (!isFederalCard && actionView.note && actionView.note !== actionView.label
+                        ? '<p>' + escapeHtmlClient(actionView.note) + '</p>'
+                        : '<p>' + escapeHtmlClient(item.detail) + '</p>'),
+                      '</div>',
+                      '</label>'
+                    ].join("");
+                  }).join(""),
+                  '</div>',
+                  '</section>'
+                ].join("")
+              : "";
             const improvementHtml = improvementPlan.items
               .map((item) => {
                 const actionView = isFederalCard
@@ -8319,6 +8510,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               (isFederalCard ? '<p class="wizard-freshness">EE 각 액션 아래에는 CRS 직접 변화도 같이 표시합니다.</p>' : ""),
               '<ul class="improvement-list">' + improvementHtml + '</ul>',
               '</section>',
+              scoreOptionPanelHtml,
               (alternativePlanHtml
                 ? '<section class="plan-variants-panel">'
                   + '<div class="plan-variants-head"><strong>가능한 플랜 A/B/C</strong><p class="wizard-freshness">한 가지 길만 보지 말고, 점수형·불어형·직무형·학교형 중 어떤 방식이 더 현실적인지도 같이 비교해 보세요.</p></div>'
@@ -10635,6 +10827,59 @@ function renderLayout({ title, page, body, updates, basePath = "", analyticsMeas
         color: var(--accent-deep) !important;
         font-size: 0.8rem !important;
         font-weight: 700;
+      }
+
+      .score-options-panel {
+        display: grid;
+        gap: 12px;
+        padding: 16px 18px;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(15, 61, 127, 0.08);
+        background: rgba(248, 251, 255, 0.88);
+      }
+
+      .score-options-summary {
+        margin: 0;
+        color: var(--accent-deep);
+        font-weight: 700;
+        line-height: 1.6;
+      }
+
+      .score-options-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .score-option-row {
+        display: grid;
+        grid-template-columns: 20px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+        padding: 12px 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(15, 61, 127, 0.08);
+        background: rgba(255, 255, 255, 0.92);
+      }
+
+      .score-option-row input {
+        margin-top: 4px;
+      }
+
+      .score-option-copy {
+        display: grid;
+        gap: 4px;
+      }
+
+      .score-option-topline {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .score-option-copy p {
+        margin: 0;
       }
 
       .result-details {

@@ -559,6 +559,33 @@ test("tight budget plus expiring permit favors low-cost and employer extension a
   assert.match(html, /비용 낮음|고용주 부담 중심/);
 });
 
+test("federal render exposes expanded score options for a skilled worker profile", () => {
+  const html = renderClientResults(
+    buildCompleteControls({
+      path: "canadian-worker",
+      base: "working-holiday",
+      household: "with-spouse",
+      age: "32",
+      languageProfile: "official:clb6",
+      foreignExp: "1",
+      canadianExp: "2",
+      canadianJobSkill: "skilled",
+      ecaStatus: "completed",
+      canadaOccupation: "cook-chef",
+      canadaJobTitle: "Cook",
+      targetOccupationPlan: "current-canada-job"
+    })
+  );
+
+  assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
+  assert.match(html, /가능한 점수\/경로 옵션 전체 보기/);
+  assert.match(html, /선택한 옵션 기준 대략 예상 CRS/);
+  assert.match(html, /언어점수 CLB 9 이상 목표/);
+  assert.match(html, /프랑스어 점수도 선택지에 포함/);
+  assert.match(html, /캐나다 학교 1-2년 \+ 졸업 후 경력 플랜 같이 보기/);
+  assert.match(html, /data-score-option/);
+});
+
 test("complete render persists recommendation snapshots with summed CRS lift", () => {
   const harness = buildDashboardClientHarness(buildCompleteControls({
     languageProfile: "official:clb7",
