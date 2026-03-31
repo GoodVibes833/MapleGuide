@@ -5033,6 +5033,102 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return parts.join(" / ");
         }
 
+        function getOccupationSkillBandExplanation(occupation) {
+          switch (getOccupationSkillBand(occupation)) {
+            case "skilled":
+              return "대체로 skilled 축으로 바로 비교 가능";
+            case "entry":
+              return "현재 title 그대로는 non-skilled 가능성이 큼";
+            default:
+              return "NOC와 주별 예외 stream을 같이 확인해야 함";
+          }
+        }
+
+        function buildTitleInterpretationEntries(answers) {
+          const entries = [];
+
+          function pushEntry(side) {
+            const isKoreaSide = side === "korea";
+            const title = (isKoreaSide ? answers.koreaJobTitle : answers.canadaJobTitle) || "";
+            const selectedOccupation = isKoreaSide ? answers.koreaOccupation : answers.canadaOccupation;
+
+            if (!title && !hasOccupationSelection(selectedOccupation)) {
+              return;
+            }
+
+            const resolvedOccupation = resolveOccupationId(selectedOccupation, title);
+
+            if (!hasOccupationSelection(resolvedOccupation)) {
+              return;
+            }
+
+            const meta = getOccupationMeta(resolvedOccupation);
+            const profiles = getOccupationCandidateProfiles(resolvedOccupation).slice(0, 3);
+            const upgradeTarget = profiles.find((profile) => /전환 목표|업그레이드 후보|한 단계 업그레이드/.test(profile.note)) || profiles[0];
+            const inferredByTitle = getOccupationInferenceSummary(selectedOccupation, title);
+            const isAnchor = isKoreaSide
+              ? ["previous-korea-job", "degree-field"].includes(answers.targetOccupationPlan)
+              : answers.targetOccupationPlan === "current-canada-job";
+
+            entries.push({
+              sideLabel: isKoreaSide ? "한국 경력" : "캐나다 현재 직무",
+              heading: title || meta.labelKo,
+              summary: title
+                ? ('"' + title + '"는 지금 ' + meta.labelKo + " 축으로 읽고 있어요.")
+                : (meta.labelKo + " 축으로 읽고 있어요."),
+              metaLabel: meta.labelKo,
+              bandLabel: getOccupationSkillBandExplanation(resolvedOccupation),
+              candidateLine: profiles.map((profile) => profile.label + " (" + profile.teer + ")").join(" / "),
+              targetLine: upgradeTarget
+                ? (upgradeTarget.label + " 쪽이 이민용으로 더 유리할 수 있어요.")
+                : "현재 title 그대로 밀 수 있는지 먼저 확인합니다.",
+              inferredLine: inferredByTitle ? inferredByTitle.labels.join(" / ") : meta.labelKo,
+              isAnchor
+            });
+          }
+
+          pushEntry("korea");
+          pushEntry("canada");
+
+          return entries;
+        }
+
+        function renderTitleInterpretationSection(answers) {
+          const entries = buildTitleInterpretationEntries(answers);
+
+          if (entries.length === 0) {
+            return "";
+          }
+
+          return [
+            '<section class="title-interpretation-panel">',
+            '<div class="selection-model-head">',
+            '<strong>입력한 직무를 이렇게 읽고 있어요</strong>',
+            '<span class="selection-model-badge">job title 해석</span>',
+            '</div>',
+            '<div class="title-interpretation-grid">',
+            entries.map((entry) => [
+              '<article class="title-interpretation-card">',
+              '<div class="plan-variant-topline">',
+              '<span class="compare-pill">' + escapeHtmlClient(entry.sideLabel) + '</span>',
+              entry.isAnchor ? '<span class="plan-variant-highlight">현재 주력 축</span>' : '',
+              '</div>',
+              '<strong>' + escapeHtmlClient(entry.heading) + '</strong>',
+              '<p>' + escapeHtmlClient(entry.summary) + '</p>',
+              '<ul class="reason-list">',
+              '<li>현재 해석: ' + escapeHtmlClient(entry.metaLabel) + '</li>',
+              '<li>title 후보: ' + escapeHtmlClient(entry.inferredLine) + '</li>',
+              '<li>직무 상태: ' + escapeHtmlClient(entry.bandLabel) + '</li>',
+              '<li>주요 후보: ' + escapeHtmlClient(entry.candidateLine) + '</li>',
+              '<li>더 유리한 방향: ' + escapeHtmlClient(entry.targetLine) + '</li>',
+              '</ul>',
+              '</article>'
+            ].join("")).join(""),
+            '</div>',
+            '</section>'
+          ].join("");
+        }
+
         function getStudyPlanLabel(insight) {
           if (insight.id === "ontario") {
             return "온타리오에서 PGWP 가능한 학위·졸업자 경로";
@@ -6395,6 +6491,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             );
             if (regionalFallbackHint) {
               resultsSections.push(regionalFallbackHint);
+            }
+            const titleInterpretationSection = renderTitleInterpretationSection(answers);
+            if (titleInterpretationSection) {
+              resultsSections.push(titleInterpretationSection);
             }
             resultsSections.push(provinceRanked.map((entry, index) => renderRecommendationCard(entry, index, "province")).join(""));
           }
@@ -8533,6 +8633,40 @@ function renderLayout({ title, page, body, updates, basePath = "", analyticsMeas
         border: 1px solid rgba(15, 61, 127, 0.1);
         border-radius: var(--radius-md);
         background: rgba(255, 255, 255, 0.72);
+      }
+
+      .title-interpretation-panel {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.76);
+      }
+
+      .title-interpretation-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .title-interpretation-card {
+        display: grid;
+        gap: 8px;
+        padding: 14px;
+        border: 1px solid rgba(15, 61, 127, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(248, 251, 255, 0.88);
+      }
+
+      .title-interpretation-card strong {
+        color: var(--accent-deep);
+        font-size: 0.96rem;
+      }
+
+      .title-interpretation-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.65;
       }
 
       .selection-model-head {

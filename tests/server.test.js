@@ -99,6 +99,13 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /학비·생활비 부담/);
   assert.match(dashboardResponse.body, /정착 선호/);
   assert.match(dashboardResponse.body, /현재 조건에서 먼저 볼 주정부 추천 순위/);
+  assert.match(dashboardResponse.body, /입력한 직무를 이렇게 읽고 있어요/);
+  assert.match(dashboardResponse.body, /job title 해석/);
+  assert.match(dashboardResponse.body, /현재 해석:/);
+  assert.match(dashboardResponse.body, /title 후보:/);
+  assert.match(dashboardResponse.body, /직무 상태:/);
+  assert.match(dashboardResponse.body, /주요 후보:/);
+  assert.match(dashboardResponse.body, /더 유리한 방향:/);
   assert.match(dashboardResponse.body, /연방 \/ EE는 따로 보기/);
   assert.match(dashboardResponse.body, /대도시가 우선이어도, 지역 정착까지 열면 PR 기회가 더 좋아질 수 있어요/);
   assert.match(dashboardResponse.body, /업데이트 더보기/);

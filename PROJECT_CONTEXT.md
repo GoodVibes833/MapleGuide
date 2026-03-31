@@ -42,6 +42,7 @@ Recent high-signal progress already completed:
 - added richer occupation families for hospitality, retail, warehouse, care, beauty, manufacturing, trades
 - added starter persona presets
 - added live title interpretation hints under Korea/Canada job title inputs
+- added a shared `입력한 직무를 이렇게 읽고 있어요` summary block above recommendations
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
 
 Recent commit trail worth checking:
@@ -230,6 +231,7 @@ The recommendation engine currently considers:
 
 Province recommendations currently show:
 
+- a shared typed-title interpretation summary above the recommendation cards
 - ranked province order
 - policy fit
 - current entry chance
