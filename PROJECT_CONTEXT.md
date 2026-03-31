@@ -59,6 +59,8 @@ Recent high-signal progress already completed:
 - changed required-field detection and recommendation rendering to read live form control values directly instead of relying on `FormData`, because browser-side select values could otherwise be misread and block results
 - removed the starter persona preset strip from the questionnaire to keep the top of the page simpler
 - extracted a shared raw-answer reader for dashboard form controls and added regression tests around selected age / disabled / unchecked inputs
+- added `input`-event re-rendering on the questionnaire form so the last required select, including ECA status, updates recommendations immediately in the browser
+- added regression coverage that treats `completed`, `canadian-degree`, and `unsure` ECA selections as answered required states
 
 Recent commit trail worth checking:
 

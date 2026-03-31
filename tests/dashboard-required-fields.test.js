@@ -134,3 +134,23 @@ test("readDashboardRawAnswersFromControls ignores disabled and unchecked control
   assert.equal(rawAnswers.disabledField, undefined);
   assert.equal(rawAnswers.age, "32");
 });
+
+test("required recommendations still render when ECA is canadian-degree", () => {
+  const rawAnswers = {
+    ...COMPLETE_REQUIRED_ANSWERS,
+    ecaStatus: "canadian-degree"
+  };
+
+  assert.deepEqual(getDashboardMissingRequiredFieldLabels(rawAnswers), []);
+  assert.equal(canRenderDashboardRecommendations(rawAnswers), true);
+});
+
+test("required recommendations still render when ECA is unsure", () => {
+  const rawAnswers = {
+    ...COMPLETE_REQUIRED_ANSWERS,
+    ecaStatus: "unsure"
+  };
+
+  assert.deepEqual(getDashboardMissingRequiredFieldLabels(rawAnswers), []);
+  assert.equal(canRenderDashboardRecommendations(rawAnswers), true);
+});

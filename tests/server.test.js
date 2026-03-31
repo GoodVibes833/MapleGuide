@@ -77,6 +77,7 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /function readQuickStartRawAnswers\(\)/);
   assert.match(dashboardResponse.body, /function readDashboardRawAnswersFromControls\(/);
   assert.match(dashboardResponse.body, /return readDashboardRawAnswersFromControls\(quickStartForm\.elements, normalizeDependentAnswers\)/);
+  assert.match(dashboardResponse.body, /quickStartForm\.addEventListener\("input", renderQuickStartResults\)/);
   assert.match(dashboardResponse.body, /최종 학력/);
   assert.match(dashboardResponse.body, /영어 상태/);
   assert.match(dashboardResponse.body, /캐나다 경력의 성격/);

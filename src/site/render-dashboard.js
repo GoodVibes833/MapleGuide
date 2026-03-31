@@ -6917,6 +6917,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         if (quickStartForm) {
           quickStartForm.addEventListener("change", renderQuickStartResults);
+          quickStartForm.addEventListener("input", renderQuickStartResults);
           quickStartForm.addEventListener("change", syncOccupationTitleHints);
           [koreaJobTitleInput, canadaJobTitleInput].forEach((inputNode) => {
             inputNode?.addEventListener("input", () => {
