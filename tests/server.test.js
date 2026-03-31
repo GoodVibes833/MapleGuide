@@ -62,8 +62,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /최신정보/);
   assert.match(dashboardResponse.body, /전체비교/);
   assert.match(dashboardResponse.body, /내 상황으로 먼저 찾기/);
-  assert.match(dashboardResponse.body, /흔한 케이스로 바로 시작/);
-  assert.match(dashboardResponse.body, /한국 요리사 -> 캐나다 cook/);
+  assert.doesNotMatch(dashboardResponse.body, /흔한 케이스로 바로 시작/);
+  assert.doesNotMatch(dashboardResponse.body, /한국 요리사 -> 캐나다 cook/);
   assert.match(dashboardResponse.body, /나이/);
   assert.match(dashboardResponse.body, /캐나다 밖에서 바로 EE\/취업이민을 보고 있어요/);
   assert.match(dashboardResponse.body, /캐나다에 먼저 와서 현지 경력 쌓는 방향이에요/);
@@ -75,7 +75,8 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /data-required-field="path"/);
   assert.match(dashboardResponse.body, /작성 필요/);
   assert.match(dashboardResponse.body, /function readQuickStartRawAnswers\(\)/);
-  assert.match(dashboardResponse.body, /querySelectorAll\("select\[name\], input\[name\], textarea\[name\]"\)/);
+  assert.match(dashboardResponse.body, /function readDashboardRawAnswersFromControls\(/);
+  assert.match(dashboardResponse.body, /return readDashboardRawAnswersFromControls\(quickStartForm\.elements, normalizeDependentAnswers\)/);
   assert.match(dashboardResponse.body, /최종 학력/);
   assert.match(dashboardResponse.body, /영어 상태/);
   assert.match(dashboardResponse.body, /캐나다 경력의 성격/);

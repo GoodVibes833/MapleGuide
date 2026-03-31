@@ -20,7 +20,6 @@ Current repo status:
 - public GitHub Pages deployment is live
 - recommendation engine is centered in `src/site/render-dashboard.js`
 - province recommendations are primary, federal/EE is separate
-- persona presets exist
 - typed Korea/Canada job titles now feed occupation inference
 - GA4 is prepared but only active if `MAPLEGUIDE_GA_MEASUREMENT_ID` is configured
 
@@ -40,7 +39,6 @@ Recent high-signal progress already completed:
 - added province occupation lens and NOC-like examples
 - added job reality checks and route reality badges
 - added richer occupation families for hospitality, retail, warehouse, care, beauty, manufacturing, trades
-- added starter persona presets
 - added live title interpretation hints under Korea/Canada job title inputs
 - added a shared `입력한 직무를 이렇게 읽고 있어요` summary block above recommendations
 - added a `지금 주력으로 보기` anchor summary so users can see whether MapleGuide currently prefers:
@@ -59,16 +57,17 @@ Recent high-signal progress already completed:
   - `office admin / customer service -> coordinator / administrator NOC tightening`
 - added more route-specific plan variants like `전환형`, `예외형`, `도시형`, `현직유지형` so recommendation details stop collapsing into the same generic language-score advice
 - changed required-field detection and recommendation rendering to read live form control values directly instead of relying on `FormData`, because browser-side select values could otherwise be misread and block results
+- removed the starter persona preset strip from the questionnaire to keep the top of the page simpler
+- extracted a shared raw-answer reader for dashboard form controls and added regression tests around selected age / disabled / unchecked inputs
 
 Recent commit trail worth checking:
 
-- `b336563` Improve starter persona UX and add tests
-- `f00ae9f` Fix required field live-value bug
 - `bed5666` Add required field regression tests
+- `f00ae9f` Fix required field live-value bug
+- `b336563` Improve starter persona UX and add tests
 - `b418bab` Refine occupation-specific route planning
 - `94ea7d5` Add occupation anchor guidance
 - `064c6a0` Add title hints and route-first province actions
-- `781d1a3` Add starter persona presets to the questionnaire
 - `7d1f7a4` Add richer occupation routes and feasibility badges
 - `1d5f471` Use job title inference throughout occupation scoring
 - `39e2676` Add province occupation lens and NOC guidance
@@ -81,7 +80,6 @@ Recent commit trail worth checking:
 
 - compact latest-updates block at the top
 - `내 상황으로 먼저 찾기` questionnaire
-- starter persona presets for a few high-frequency Korea-to-Canada cases so users can begin from a familiar pattern instead of a blank form
 - province recommendations shown first
 - federal / EE shown as a separate card, not mixed into province ranking
 - province cards include:
@@ -129,7 +127,6 @@ These are intentional decisions. Do not casually undo them in a new session.
 - actual job titles for both Korea and Canada, because category labels alone are too broad
 - live helper hints under both title fields should explain how the typed title is currently being interpreted
 - required field checks should use the current control values directly, not a more fragile serialized form snapshot
-- persona presets should stay opinionated and few in number; they are meant to help users start, not replace the full questionnaire
 - beginners should see:
   - current fit
   - missing requirements
@@ -159,7 +156,6 @@ These are intentional decisions. Do not casually undo them in a new session.
 
 - `form_started`
 - `form_completed`
-- `starter_persona_used`
 - `recommendations_rendered`
 - `recommendation_detail_opened`
 - `recommendation_region_clicked`
@@ -253,7 +249,6 @@ The recommendation engine currently considers:
 - typed Korea / Canada job titles with inferred occupation candidates
 - live Korea / Canada title interpretation hints under the form fields
 - expanded service / hospitality / retail / manufacturing role families
-- starter persona preset selection
 
 ## Current Recommendation Output
 

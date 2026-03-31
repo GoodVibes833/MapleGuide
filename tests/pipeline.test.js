@@ -7,6 +7,7 @@ import { extractTables } from "../src/core/html.js";
 import { parseArticlePage } from "../src/adapters/article-page.js";
 import { parseTablePage } from "../src/adapters/table-page.js";
 import { runPipeline } from "../src/core/pipeline.js";
+import { DASHBOARD_REQUIRED_FIELD_LABELS } from "../src/site/render-dashboard.js";
 
 test("extractTables parses headers and rows", () => {
   const html = `
@@ -125,9 +126,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
   const dashboardHtml = await readFile(path.join(outputDir, "dashboard.html"), "utf8");
   assert.match(dashboardHtml, /캐나다 이민/);
   assert.match(dashboardHtml, /내 상황으로 먼저 찾기/);
-  assert.match(dashboardHtml, /흔한 케이스로 바로 시작/);
-  assert.match(dashboardHtml, /한국 요리사 -> 캐나다 cook/);
-  assert.match(dashboardHtml, /서버 -> supervisor로 올리기/);
+  assert.doesNotMatch(dashboardHtml, /흔한 케이스로 바로 시작/);
+  assert.doesNotMatch(dashboardHtml, /한국 요리사 -> 캐나다 cook/);
   assert.match(dashboardHtml, /나이/);
   assert.match(dashboardHtml, /캐나다 밖에서 바로 EE\/취업이민을 보고 있어요/);
   assert.match(dashboardHtml, /캐나다에 먼저 와서 현지 경력 쌓는 방향이에요/);
@@ -145,7 +145,8 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /data-required-field="path"/);
   assert.match(dashboardHtml, /작성 필요/);
   assert.match(dashboardHtml, /function readQuickStartRawAnswers\(\)/);
-  assert.match(dashboardHtml, /querySelectorAll\("select\[name\], input\[name\], textarea\[name\]"\)/);
+  assert.match(dashboardHtml, /function readDashboardRawAnswersFromControls\(/);
+  assert.match(dashboardHtml, /return readDashboardRawAnswersFromControls\(quickStartForm\.elements, normalizeDependentAnswers\)/);
   assert.match(dashboardHtml, /필수\* 항목을 먼저 골라주세요/);
   assert.match(dashboardHtml, /최종 학력/);
   assert.match(dashboardHtml, /한국에서 주로 하던 일/);
@@ -241,6 +242,12 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
   assert.doesNotMatch(dashboardHtml, /Map Explorer/);
   assert.doesNotMatch(dashboardHtml, /지역 탐색은 필요할 때만 열기/);
+
+  const requiredFieldMatches = [...dashboardHtml.matchAll(/data-required-field="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(
+    [...new Set(requiredFieldMatches)].sort(),
+    Object.keys(DASHBOARD_REQUIRED_FIELD_LABELS).sort()
+  );
 
   const ontarioRegionPage = await readFile(
     path.join(outputDir, "region", "ontario", "index.html"),

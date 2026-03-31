@@ -37,6 +37,23 @@ export const DASHBOARD_REQUIRED_FIELD_LABELS = {
   ecaStatus: "ECA / 학력평가 상태"
 };
 
+export const DASHBOARD_OPTIONAL_DEFAULTS = {
+  ee: "unsure",
+  jobOffer: "unsure",
+  permitRemaining: "unsure",
+  budget: "medium",
+  setting: "balanced",
+  advantage: "none",
+  koreaJobTitle: "",
+  canadaJobTitle: "",
+  koreaOccupation: "general",
+  canadaOccupation: "general",
+  occupation: "general",
+  targetOccupationPlan: "unsure",
+  foreignExpAlignment: "none",
+  degreeCareerPlan: "unsure"
+};
+
 export function hasDashboardAnswerValue(value) {
   return !(typeof value === "undefined" || value === null || String(value).trim() === "");
 }
@@ -55,6 +72,90 @@ export function getDashboardAnsweredRequiredFieldCount(
   requiredFieldLabels = DASHBOARD_REQUIRED_FIELD_LABELS
 ) {
   return Object.keys(requiredFieldLabels).filter((field) => hasDashboardAnswerValue(rawAnswers[field])).length;
+}
+
+export function normalizeDashboardDependentAnswers(rawAnswers) {
+  const normalized = { ...rawAnswers };
+
+  normalized.koreaJobTitle = (normalized.koreaJobTitle || "").trim();
+  normalized.canadaJobTitle = (normalized.canadaJobTitle || "").trim();
+
+  if (normalized.canadianExp === "0") {
+    normalized.canadianJobSkill = "not-working";
+  } else if (normalized.canadianExp && normalized.canadianExp !== "0" && normalized.canadianJobSkill === "not-working") {
+    normalized.canadianJobSkill = "mixed";
+  }
+
+  if (normalized.base === "outside" && (!normalized.permitRemaining || normalized.permitRemaining === "unsure")) {
+    normalized.permitRemaining = "not-applicable";
+  }
+
+  if (normalized.base !== "outside" && normalized.permitRemaining === "not-applicable") {
+    normalized.permitRemaining = "";
+  }
+
+  if (normalized.canadianExp === "0") {
+    normalized.canadaOccupation = normalized.canadaOccupation || "general";
+  }
+
+  if (normalized.foreignExp === "0") {
+    normalized.koreaOccupation = normalized.koreaOccupation || "general";
+  }
+
+  return normalized;
+}
+
+export function readDashboardRawAnswersFromControls(
+  controls,
+  normalizeAnswers = normalizeDashboardDependentAnswers
+) {
+  const rawAnswers = {};
+
+  Array.from(controls ?? []).forEach((control) => {
+    if (!control || !("name" in control) || !("tagName" in control)) {
+      return;
+    }
+
+    const tagName = String(control.tagName || "").toLowerCase();
+    if (!["select", "input", "textarea"].includes(tagName)) {
+      return;
+    }
+
+    if (!control.name || control.disabled) {
+      return;
+    }
+
+    const controlType = String(control.type || "").toLowerCase();
+    if ((controlType === "checkbox" || controlType === "radio") && !control.checked) {
+      return;
+    }
+
+    rawAnswers[control.name] = control.value;
+  });
+
+  return normalizeAnswers(rawAnswers);
+}
+
+export function buildCompletedDashboardRawAnswers(
+  rawAnswers,
+  optionalDefaults = DASHBOARD_OPTIONAL_DEFAULTS
+) {
+  const completed = { ...rawAnswers };
+
+  for (const [field, value] of Object.entries(optionalDefaults)) {
+    if (!completed[field]) {
+      completed[field] = value;
+    }
+  }
+
+  return normalizeDashboardDependentAnswers(completed);
+}
+
+export function canRenderDashboardRecommendations(
+  rawAnswers,
+  requiredFieldLabels = DASHBOARD_REQUIRED_FIELD_LABELS
+) {
+  return getDashboardMissingRequiredFieldLabels(rawAnswers, requiredFieldLabels).length === 0;
 }
 
 export const JURISDICTION_META = [
@@ -109,212 +210,10 @@ const OCCUPATION_OPTIONS = [
   { value: "researcher-canada", labelKo: "연구자 + 캐나다 경력" }
 ];
 
-export const STARTER_PERSONAS = [
-  {
-    id: "cook-to-cook",
-    label: "한국 요리사 -> 캐나다 cook",
-    summary: "요리 경력을 그대로 이어서 PR을 보는 흔한 케이스",
-    fields: {
-      path: "canadian-worker",
-      base: "working-holiday",
-      age: "32",
-      household: "single",
-      education: "bachelor",
-      languageProfile: "official:clb7",
-      foreignExp: "5",
-      canadianExp: "1",
-      canadianJobSkill: "skilled",
-      ee: "yes",
-      jobOffer: "yes",
-      ecaStatus: "completed",
-      budget: "medium",
-      setting: "balanced",
-      advantage: "trades",
-      koreaOccupation: "cook-chef",
-      koreaJobTitle: "Cook",
-      canadaOccupation: "cook-chef",
-      canadaJobTitle: "Line Cook",
-      targetOccupationPlan: "current-canada-job",
-      foreignExpAlignment: "same-skilled",
-      degreeCareerPlan: "unsure",
-      permitRemaining: "12to24"
-    }
-  },
-  {
-    id: "office-to-office",
-    label: "한국 사무직 -> 캐나다 사무직",
-    summary: "오피스·코디네이터 계열로 그대로 이어가는 케이스",
-    fields: {
-      path: "canadian-worker",
-      base: "worker",
-      age: "33",
-      household: "single",
-      education: "bachelor",
-      languageProfile: "official:clb8",
-      foreignExp: "5",
-      canadianExp: "2",
-      canadianJobSkill: "skilled",
-      ee: "yes",
-      jobOffer: "yes",
-      ecaStatus: "completed",
-      budget: "flexible",
-      setting: "metro",
-      advantage: "none",
-      koreaOccupation: "office-admin",
-      koreaJobTitle: "Office Administrator",
-      canadaOccupation: "office-admin",
-      canadaJobTitle: "Administrative Coordinator",
-      targetOccupationPlan: "current-canada-job",
-      foreignExpAlignment: "same-skilled",
-      degreeCareerPlan: "use-degree",
-      permitRemaining: "12to24"
-    }
-  },
-  {
-    id: "server-to-supervisor",
-    label: "서버 -> supervisor로 올리기",
-    summary: "현재 front-line service라서 업그레이드가 필요한 케이스",
-    fields: {
-      path: "working-holiday",
-      base: "working-holiday",
-      age: "29",
-      household: "single",
-      education: "bachelor",
-      languageProfile: "official:clb7",
-      foreignExp: "3",
-      canadianExp: "1",
-      canadianJobSkill: "non-skilled",
-      ee: "unsure",
-      jobOffer: "yes",
-      ecaStatus: "completed",
-      budget: "medium",
-      setting: "metro",
-      advantage: "none",
-      koreaOccupation: "server-counter",
-      koreaJobTitle: "Server",
-      canadaOccupation: "server-counter",
-      canadaJobTitle: "Server",
-      targetOccupationPlan: "current-canada-job",
-      foreignExpAlignment: "related-skilled",
-      degreeCareerPlan: "unsure",
-      permitRemaining: "6to12"
-    }
-  },
-  {
-    id: "warehouse-pivot",
-    label: "창고/물류 -> dispatcher·lead",
-    summary: "warehouse에서 skilled 쪽으로 옮겨야 하는 케이스",
-    fields: {
-      path: "canadian-worker",
-      base: "worker",
-      age: "31",
-      household: "single",
-      education: "two-year",
-      languageProfile: "official:clb7",
-      foreignExp: "3",
-      canadianExp: "2",
-      canadianJobSkill: "non-skilled",
-      ee: "yes",
-      jobOffer: "yes",
-      ecaStatus: "completed",
-      budget: "medium",
-      setting: "regional",
-      advantage: "none",
-      koreaOccupation: "warehouse-logistics",
-      koreaJobTitle: "Warehouse Associate",
-      canadaOccupation: "warehouse-logistics",
-      canadaJobTitle: "Shipping Receiving Clerk",
-      targetOccupationPlan: "current-canada-job",
-      foreignExpAlignment: "related-skilled",
-      degreeCareerPlan: "unsure",
-      permitRemaining: "12to24"
-    }
-  },
-  {
-    id: "care-route",
-    label: "케어/PSW 예외 stream 찾기",
-    summary: "연방 skilled는 약하지만 주 예외 stream을 볼 수 있는 케이스",
-    fields: {
-      path: "canadian-worker",
-      base: "worker",
-      age: "35",
-      household: "single",
-      education: "two-year",
-      languageProfile: "official:clb7",
-      foreignExp: "2",
-      canadianExp: "2",
-      canadianJobSkill: "non-skilled",
-      ee: "no",
-      jobOffer: "yes",
-      ecaStatus: "completed",
-      budget: "medium",
-      setting: "balanced",
-      advantage: "health",
-      koreaOccupation: "caregiver-psw",
-      koreaJobTitle: "Caregiver",
-      canadaOccupation: "caregiver-psw",
-      canadaJobTitle: "PSW",
-      targetOccupationPlan: "current-canada-job",
-      foreignExpAlignment: "same-skilled",
-      degreeCareerPlan: "unsure",
-      permitRemaining: "12to24"
-    }
-  },
-  {
-    id: "study-reset",
-    label: "학교 다시 가서 경로 재설계",
-    summary: "현재 직무로 바로 안 풀려서 학교 -> PGWP를 보는 케이스",
-    fields: {
-      path: "study-plan",
-      base: "working-holiday",
-      age: "27",
-      household: "single",
-      education: "bachelor",
-      languageProfile: "official:clb7",
-      foreignExp: "1",
-      canadianExp: "1",
-      canadianJobSkill: "non-skilled",
-      ee: "unsure",
-      jobOffer: "no",
-      ecaStatus: "completed",
-      budget: "flexible",
-      setting: "balanced",
-      advantage: "none",
-      koreaOccupation: "retail-sales",
-      koreaJobTitle: "Sales Associate",
-      canadaOccupation: "server-counter",
-      canadaJobTitle: "Barista",
-      targetOccupationPlan: "degree-field",
-      foreignExpAlignment: "unrelated",
-      degreeCareerPlan: "use-degree",
-      permitRemaining: "6to12"
-    }
-  }
-];
-
 function renderOccupationSelectOptions() {
   return OCCUPATION_OPTIONS.map(
     (option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.labelKo)}</option>`
   ).join("");
-}
-
-function renderStarterPersonas() {
-  return `
-    <div class="starter-persona-panel">
-      <div class="starter-persona-copy">
-        <strong>흔한 케이스로 바로 시작</strong>
-        <span>폼을 처음부터 다 채우기 어렵다면, 아래와 비슷한 케이스를 눌러서 시작할 수 있어요.</span>
-      </div>
-      <div class="starter-persona-row">
-        ${STARTER_PERSONAS.map((persona) => `
-          <button type="button" class="starter-persona-chip" data-starter-persona="${escapeHtml(persona.id)}">
-            <strong>${escapeHtml(persona.label)}</strong>
-            <span>${escapeHtml(persona.summary)}</span>
-          </button>
-        `).join("")}
-      </div>
-    </div>
-  `;
 }
 
 function buildCanadaMapSvg({ idPrefix = "", className = "canada-map actual-map", ariaLabel = "캐나다 주 및 준주 지도" } = {}) {
@@ -610,7 +509,6 @@ function renderSituationSection(insights) {
         </div>
         <p class="panel-note">질문 몇 개만 답하면 먼저 볼 지역을 바로 좁혀줍니다.</p>
       </div>
-      ${renderStarterPersonas()}
       <div class="wizard-filter-bar">
         <div class="wizard-filter-copy">
           <strong>관심 지역 필터</strong>
@@ -1754,12 +1652,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
       const ANALYTICS_ENABLED = Boolean(ANALYTICS_MEASUREMENT_ID);
       const UPDATES = ${serializeForScript(updates)};
       const MAP_REGION_DEFS = ${serializeForScript(JURISDICTION_META)};
-      const STARTER_PERSONAS = ${serializeForScript(STARTER_PERSONAS)};
       const MINI_REGION_MAPS = ${serializeForScript(MINI_REGION_MAP_SVGS)};
       const SPECIAL_PATHWAYS = ${serializeForScript(page === "dashboard" ? specialPathways : [])};
       const DASHBOARD_INSIGHTS = ${serializeForScript(
         page === "dashboard" ? buildJurisdictionInsights(updates) : []
       )};
+      ${readDashboardRawAnswersFromControls.toString()}
       let hasTrackedFormStarted = false;
       let hasTrackedFormCompleted = false;
       let lastRenderedRecommendationSignature = "";
@@ -1790,7 +1688,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
         const quickStartResults = document.getElementById("quick-start-results");
-        const starterPersonaButtons = Array.from(document.querySelectorAll("[data-starter-persona]"));
         const koreaJobTitleInput = quickStartForm?.elements?.namedItem("koreaJobTitle");
         const canadaJobTitleInput = quickStartForm?.elements?.namedItem("canadaJobTitle");
         const koreaOccupationSelect = quickStartForm?.elements?.namedItem("koreaOccupation");
@@ -1843,6 +1740,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         const REQUIRED_FIELD_LABELS = ${JSON.stringify(DASHBOARD_REQUIRED_FIELD_LABELS)};
+        const OPTIONAL_ANSWER_DEFAULTS = ${JSON.stringify(DASHBOARD_OPTIONAL_DEFAULTS)};
 
         function getMissingRequiredFields(rawAnswers) {
           return Object.entries(REQUIRED_FIELD_LABELS)
@@ -1926,25 +1824,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         function applyOptionalAnswerDefaults(rawAnswers) {
-          const defaults = {
-            ee: "unsure",
-            jobOffer: "unsure",
-            permitRemaining: "unsure",
-            budget: "medium",
-            setting: "balanced",
-            advantage: "none",
-            koreaJobTitle: "",
-            canadaJobTitle: "",
-            koreaOccupation: "general",
-            canadaOccupation: "general",
-            occupation: "general",
-            targetOccupationPlan: "unsure",
-            foreignExpAlignment: "none",
-            degreeCareerPlan: "unsure"
-          };
           const completed = { ...rawAnswers };
 
-          for (const [field, value] of Object.entries(defaults)) {
+          for (const [field, value] of Object.entries(OPTIONAL_ANSWER_DEFAULTS)) {
             if (!completed[field]) {
               completed[field] = value;
             }
@@ -1989,57 +1871,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             return {};
           }
 
-          const rawAnswers = {};
-          quickStartForm.querySelectorAll("select[name], input[name], textarea[name]").forEach((control) => {
-            if (!control.name || control.disabled) {
-              return;
-            }
-
-            const controlType = (control.type || "").toLowerCase();
-            if ((controlType === "checkbox" || controlType === "radio") && !control.checked) {
-              return;
-            }
-
-            rawAnswers[control.name] = control.value;
-          });
-
-          return normalizeDependentAnswers(rawAnswers);
-        }
-
-        function applyStarterPersona(personaId) {
-          if (!quickStartForm) {
-            return;
-          }
-
-          const persona = STARTER_PERSONAS.find((item) => item.id === personaId);
-
-          if (!persona) {
-            return;
-          }
-
-          Object.entries(persona.fields).forEach(([field, value]) => {
-            const control = quickStartForm.elements.namedItem(field);
-
-            if (!control || typeof value === "undefined") {
-              return;
-            }
-
-            if ("value" in control) {
-              control.value = value;
-            }
-          });
-
-          syncDependentSelects();
-          syncOccupationTitleHints();
-          renderQuickStartResults();
-
-          if (window.matchMedia?.("(max-width: 980px)").matches) {
-            quickStartResults?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-
-          trackAnalytics("starter_persona_used", {
-            persona_id: persona.id
-          });
+          return readDashboardRawAnswersFromControls(quickStartForm.elements, normalizeDependentAnswers);
         }
 
         function toggleQuickRegion(regionId) {
@@ -7084,11 +6916,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         if (quickStartForm) {
-          starterPersonaButtons.forEach((buttonNode) => {
-            buttonNode.addEventListener("click", () => {
-              applyStarterPersona(buttonNode.dataset.starterPersona ?? "");
-            });
-          });
           quickStartForm.addEventListener("change", renderQuickStartResults);
           quickStartForm.addEventListener("change", syncOccupationTitleHints);
           [koreaJobTitleInput, canadaJobTitleInput].forEach((inputNode) => {
