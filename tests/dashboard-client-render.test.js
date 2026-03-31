@@ -73,7 +73,7 @@ function makeNode(overrides = {}) {
   };
 }
 
-function buildDashboardClientHarness(rawControlValues) {
+function buildDashboardClientHarness(rawControlValues, options = {}) {
   const html = renderDashboard({
     generatedAt: "2026-03-31",
     updates: [],
@@ -183,6 +183,18 @@ function buildDashboardClientHarness(rawControlValues) {
   };
 
   const windowListeners = new Map();
+  const sessionStore = new Map(Object.entries(options.sessionStorage ?? {}));
+  const sessionStorage = {
+    getItem(key) {
+      return sessionStore.has(key) ? sessionStore.get(key) : null;
+    },
+    setItem(key, value) {
+      sessionStore.set(key, String(value));
+    },
+    removeItem(key) {
+      sessionStore.delete(key);
+    }
+  };
   const addWindowListener = (type, handler) => {
     if (!windowListeners.has(type)) {
       windowListeners.set(type, []);
@@ -203,6 +215,7 @@ function buildDashboardClientHarness(rawControlValues) {
       addEventListener: addWindowListener,
       removeEventListener() {},
       innerWidth: 1440,
+      sessionStorage,
       scrollTo() {},
       requestAnimationFrame(fn) {
         fn();
@@ -217,6 +230,7 @@ function buildDashboardClientHarness(rawControlValues) {
     requestAnimationFrame(fn) {
       fn();
     },
+    sessionStorage,
     setTimeout,
     clearTimeout,
     Set,
@@ -235,7 +249,8 @@ function buildDashboardClientHarness(rawControlValues) {
     quickStartResults,
     controlByName,
     requiredFieldNodes,
-    dispatchWindowEvent
+    dispatchWindowEvent,
+    sessionStorage
   };
 }
 
@@ -312,4 +327,60 @@ test("pageshow resync clears stale missing state and rerenders recommendations a
   assert.doesNotMatch(harness.quickStartResults.innerHTML, /작성 필요|결과 계산 오류/);
   assert.match(harness.quickStartResults.innerHTML, /현재 조건에서 먼저 볼 주정부 추천 순위/);
   assert.equal(ecaFieldNode?.classList.contains("is-missing"), false);
+});
+
+test("saved questionnaire state restores recommendations and required markers on fresh load", () => {
+  const savedState = {
+    controlValues: {
+      path: "working-holiday",
+      base: "student",
+      age: "20-29",
+      household: "with-spouse",
+      education: "two-year",
+      languageProfile: "guess:clb7",
+      foreignExp: "1",
+      canadianExp: "2",
+      canadianJobSkill: "skilled",
+      ecaStatus: "completed"
+    },
+    activeQuickRegions: [
+      "federal",
+      "ontario",
+      "alberta"
+    ]
+  };
+
+  const harness = buildDashboardClientHarness({
+    path: "",
+    base: "",
+    age: "",
+    household: "",
+    education: "",
+    languageProfile: "",
+    foreignExp: "",
+    canadianExp: "",
+    canadianJobSkill: "",
+    ee: "",
+    jobOffer: "",
+    ecaStatus: "",
+    permitRemaining: "",
+    budget: "",
+    setting: "",
+    advantage: "",
+    koreaOccupation: "",
+    koreaJobTitle: "",
+    canadaOccupation: "",
+    canadaJobTitle: "",
+    targetOccupationPlan: "",
+    foreignExpAlignment: "",
+    degreeCareerPlan: ""
+  }, {
+    sessionStorage: {
+      "mapleguide.dashboard.state.v2": JSON.stringify(savedState)
+    }
+  });
+
+  assert.equal(harness.controlByName.ecaStatus.value, "completed");
+  assert.doesNotMatch(harness.quickStartResults.innerHTML, /작성 필요|결과 계산 오류/);
+  assert.match(harness.quickStartResults.innerHTML, /현재 조건에서 먼저 볼 주정부 추천 순위/);
 });

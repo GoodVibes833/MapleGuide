@@ -25,8 +25,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CANADA_MAP_ASSET_PATH = path.join(__dirname, "assets", "canada_labelled_map.svg");
 
 export const DASHBOARD_REQUIRED_FIELD_LABELS = {
-  path: "가장 가까운 현재 상황",
-  base: "현재 캐나다 체류 상태",
+  path: "지금 생각하는 큰 방향",
+  base: "현재 실제 체류 상태",
   age: "나이",
   household: "배우자 포함 여부",
   education: "최종 학력",
@@ -1685,6 +1685,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         track: trackAnalytics
       };
 
+      const DASHBOARD_STORAGE_KEY = "mapleguide.dashboard.state.v2";
+
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
         const quickStartResults = document.getElementById("quick-start-results");
@@ -1717,6 +1719,16 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           href: (BASE_PATH || "") + "/region/federal",
           linkText: "연방 / EE 먼저 보기"
         };
+
+        function getSessionStorage() {
+          try {
+            if (typeof window.sessionStorage !== "undefined") {
+              return window.sessionStorage;
+            }
+          } catch {}
+
+          return null;
+        }
 
         function hasAnswerValue(value) {
           return !(typeof value === "undefined" || value === null || String(value).trim() === "");
@@ -1872,6 +1884,98 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           return readDashboardRawAnswersFromControls(quickStartForm.elements, normalizeDependentAnswers);
+        }
+
+        function persistQuickStartState() {
+          const storage = getSessionStorage();
+          if (!storage || !quickStartForm) {
+            return;
+          }
+
+          const rawAnswers = readQuickStartRawAnswers();
+          const controlValues = {};
+          Array.from(quickStartForm.elements ?? []).forEach((control) => {
+            if (!control || !control.name || control.disabled) {
+              return;
+            }
+
+            const tagName = String(control.tagName || "").toLowerCase();
+            if (!["select", "input", "textarea"].includes(tagName)) {
+              return;
+            }
+
+            const controlType = String(control.type || "").toLowerCase();
+            if (controlType === "checkbox" || controlType === "radio") {
+              if (!control.checked) {
+                return;
+              }
+            }
+
+            controlValues[control.name] = control.value;
+          });
+
+          try {
+            storage.setItem(DASHBOARD_STORAGE_KEY, JSON.stringify({
+              rawAnswers,
+              controlValues,
+              activeQuickRegions: Array.from(activeQuickRegions)
+            }));
+          } catch {}
+        }
+
+        function restoreQuickStartStateFromStorage() {
+          const storage = getSessionStorage();
+          if (!storage || !quickStartForm) {
+            return false;
+          }
+
+          let parsedState = null;
+          try {
+            parsedState = JSON.parse(storage.getItem(DASHBOARD_STORAGE_KEY) || "null");
+          } catch {
+            parsedState = null;
+          }
+
+          if (!parsedState || typeof parsedState !== "object") {
+            return false;
+          }
+
+          const savedValues = parsedState.controlValues && typeof parsedState.controlValues === "object"
+            ? parsedState.controlValues
+            : parsedState.rawAnswers && typeof parsedState.rawAnswers === "object"
+              ? parsedState.rawAnswers
+              : null;
+
+          if (savedValues) {
+            Object.entries(savedValues).forEach(([fieldName, fieldValue]) => {
+              const control = quickStartForm.elements?.namedItem?.(fieldName);
+              if (!control || control.disabled) {
+                return;
+              }
+
+              const tagName = String(control.tagName || "").toLowerCase();
+              if (!["select", "input", "textarea"].includes(tagName)) {
+                return;
+              }
+
+              if (
+                typeof fieldValue === "string"
+                && hasAnswerValue(fieldValue)
+                && !hasAnswerValue(control.value)
+              ) {
+                control.value = fieldValue;
+              }
+            });
+          }
+
+          if (Array.isArray(parsedState.activeQuickRegions) && parsedState.activeQuickRegions.length > 0) {
+            activeQuickRegions.clear();
+            parsedState.activeQuickRegions
+              .filter((regionId) => allQuickRegionIds.includes(regionId))
+              .forEach((regionId) => activeQuickRegions.add(regionId));
+          }
+
+          return true;
         }
 
         function toggleQuickRegion(regionId) {
@@ -6441,6 +6545,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           const rawAnswers = readQuickStartRawAnswers();
+          persistQuickStartState();
           const missingRequiredFields = getMissingRequiredFields(rawAnswers);
           trackFormStarted(rawAnswers);
           syncMissingRequiredStates(rawAnswers);
@@ -7008,15 +7113,23 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         if (quickStartForm) {
+          restoreQuickStartStateFromStorage();
           refreshQuickStartStateFromControls();
 
           window.addEventListener("pageshow", () => {
+            restoreQuickStartStateFromStorage();
+            refreshQuickStartStateFromControls();
+          });
+
+          requestAnimationFrame(() => {
+            restoreQuickStartStateFromStorage();
             refreshQuickStartStateFromControls();
           });
 
           setTimeout(() => {
+            restoreQuickStartStateFromStorage();
             refreshQuickStartStateFromControls();
-          }, 0);
+          }, 120);
         } else {
           updateQuickRegionSummary();
         }
