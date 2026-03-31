@@ -109,7 +109,7 @@ const OCCUPATION_OPTIONS = [
   { value: "researcher-canada", labelKo: "연구자 + 캐나다 경력" }
 ];
 
-const STARTER_PERSONAS = [
+export const STARTER_PERSONAS = [
   {
     id: "cook-to-cook",
     label: "한국 요리사 -> 캐나다 cook",
@@ -2032,7 +2032,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           syncDependentSelects();
           syncOccupationTitleHints();
           renderQuickStartResults();
-          quickStartForm.scrollIntoView({ behavior: "smooth", block: "start" });
+
+          if (window.matchMedia?.("(max-width: 980px)").matches) {
+            quickStartResults?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
 
           trackAnalytics("starter_persona_used", {
             persona_id: persona.id
