@@ -62,6 +62,7 @@ export async function runPipeline({
   sourceIds = null,
   outputDir = path.join(process.cwd(), "out"),
   basePath = "",
+  analyticsMeasurementId = "",
   fetchImpl
 } = {}) {
   const selectedSources = Array.isArray(sourceIds) && sourceIds.length > 0
@@ -138,7 +139,8 @@ export async function runPipeline({
     generatedAt,
     updates,
     reports,
-    basePath
+    basePath,
+    analyticsMeasurementId
   });
   await writeFile(path.join(outputDir, "index.html"), dashboardHtml);
   await writeFile(path.join(outputDir, "dashboard.html"), dashboardHtml);
@@ -154,7 +156,8 @@ export async function runPipeline({
         reports,
         page: "jurisdiction",
         jurisdictionId: jurisdiction.id,
-        basePath
+        basePath,
+        analyticsMeasurementId
       })
     );
   }

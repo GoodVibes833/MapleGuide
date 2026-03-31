@@ -39,6 +39,7 @@ jobs:
       - name: Build static site
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          MAPLEGUIDE_GA_MEASUREMENT_ID: ${{ vars.MAPLEGUIDE_GA_MEASUREMENT_ID }}
         run: npm run fetch -- --base-path "$PAGES_BASE_PATH"
 
       - name: Upload Pages artifact

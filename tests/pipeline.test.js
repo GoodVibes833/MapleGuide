@@ -234,3 +234,18 @@ test("fixture pipeline supports a GitHub Pages base path", async () => {
 
   await access(path.join(outputDir, ".nojekyll"));
 });
+
+test("fixture pipeline injects GA4 when a measurement ID is provided", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "mapleguide-ga-"));
+  await runPipeline({
+    useFixtures: true,
+    outputDir,
+    analyticsMeasurementId: "G-TEST123456"
+  });
+
+  const indexHtml = await readFile(path.join(outputDir, "index.html"), "utf8");
+  assert.match(indexHtml, /googletagmanager\.com\/gtag\/js\?id=G-TEST123456/);
+  assert.ok(indexHtml.includes('const ANALYTICS_MEASUREMENT_ID = "G-TEST123456";'));
+  assert.match(indexHtml, /form_started/);
+  assert.match(indexHtml, /recommendation_detail_opened/);
+});

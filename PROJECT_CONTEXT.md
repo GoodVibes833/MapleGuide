@@ -65,6 +65,45 @@ These are intentional decisions. Do not casually undo them in a new session.
 - GitHub Pages is static and currently relies on generated output
 - when a live source is blocked or looks like anti-bot HTML, pipeline falls back to fixture-quality content instead of showing broken markup
 
+## Current Analytics Mode
+
+- free analytics path is Google Analytics 4
+- env / repo variable name: `MAPLEGUIDE_GA_MEASUREMENT_ID`
+- if the value is missing, the site should render with no analytics side effects
+- GitHub Pages workflow reads the ID from GitHub Actions repository variables
+- local preview can use:
+  - `MAPLEGUIDE_GA_MEASUREMENT_ID=G-XXXX npm run demo`
+  - `MAPLEGUIDE_GA_MEASUREMENT_ID=G-XXXX npm run dev`
+
+### Current Tracked Events
+
+- `form_started`
+- `form_completed`
+- `recommendations_rendered`
+- `recommendation_detail_opened`
+- `recommendation_region_clicked`
+- `latest_update_opened`
+- `older_updates_opened`
+
+### When User Asks About Traffic / Usage
+
+The intended dashboard is GA4, not a custom in-app dashboard yet.
+The first things to check are:
+
+1. Realtime
+2. Pages and screens
+3. Events
+4. Traffic acquisition
+5. Engagement time
+
+For MapleGuide specifically, pay attention to:
+
+- how many users start the questionnaire
+- how many finish required fields
+- which recommendation cards get opened
+- which province pages get clicked
+- whether users expand latest-updates content
+
 ## Current Official Sources Wired In Code
 
 These are the sources currently configured in `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/config/sources.js`.
@@ -234,6 +273,11 @@ node src/server.js --fixtures --port 3012
 4. improve live-update workflow
    - better parser resilience
    - clearer health reporting for blocked sources
+
+5. analytics follow-up
+   - review whether event naming stays stable
+   - consider adding compare-table open / province-page CTA events
+   - if needed later, build an in-app summary page from GA exports
 
 ## Session Notes
 

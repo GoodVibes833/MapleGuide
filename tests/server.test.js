@@ -124,3 +124,21 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.equal(refreshPayload.ok, true);
   assert.ok(refreshPayload.updateCount >= 10);
 });
+
+test("request handler injects GA4 when configured", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "canada-immigration-server-ga-"));
+  const handler = await createRequestHandler({
+    outputDir,
+    useFixtures: true,
+    analyticsMeasurementId: "G-TEST123456"
+  });
+
+  const dashboardResponse = await invoke(handler, {
+    method: "GET",
+    url: "/"
+  });
+
+  assert.equal(dashboardResponse.statusCode, 200);
+  assert.match(dashboardResponse.body, /googletagmanager\.com\/gtag\/js\?id=G-TEST123456/);
+  assert.ok(dashboardResponse.body.includes('const ANALYTICS_MEASUREMENT_ID = "G-TEST123456";'));
+});

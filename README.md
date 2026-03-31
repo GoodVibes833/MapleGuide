@@ -57,6 +57,35 @@ npm run dev
 - 배포 workflow는 fixture가 아니라 실제 수집(`npm run fetch`)으로 사이트를 생성합니다.
 - 로컬에서 Pages 경로를 흉내 내고 싶다면 `npm run demo -- --base-path /MapleGuide`처럼 실행할 수 있습니다.
 
+## 무료 방문자 추적 붙이기
+
+MapleGuide는 무료인 `Google Analytics 4 (GA4)`를 바로 붙일 수 있게 준비되어 있습니다.
+
+필요한 것:
+
+1. Google Analytics에서 웹 데이터 스트림을 만들고 `G-XXXXXXXXXX` 형태의 Measurement ID를 확인합니다.
+2. GitHub 저장소에서 `Settings > Secrets and variables > Actions > Variables`로 들어갑니다.
+3. Repository variable 이름을 `MAPLEGUIDE_GA_MEASUREMENT_ID`로 만들고 값에 위 `G-...` ID를 넣습니다.
+4. `main`에 다시 push하면 GitHub Pages에 자동 반영됩니다.
+
+로컬에서도 확인할 수 있습니다:
+
+```bash
+MAPLEGUIDE_GA_MEASUREMENT_ID=G-XXXXXXXXXX npm run demo
+MAPLEGUIDE_GA_MEASUREMENT_ID=G-XXXXXXXXXX npm run dev
+```
+
+현재 자동/커스텀으로 보는 이벤트:
+
+- 기본 page view
+- `form_started`
+- `form_completed`
+- `recommendations_rendered`
+- `recommendation_detail_opened`
+- `recommendation_region_clicked`
+- `latest_update_opened`
+- `older_updates_opened`
+
 ## 실제 운영 구조
 
 1. `src/config/sources.js`에서 공식 소스를 관리합니다.
@@ -65,6 +94,7 @@ npm run dev
 4. `src/translation/korean.js`가 한국어 요약을 만듭니다.
 5. `src/site/render-dashboard.js`가 메인 지도와 지역 상세 HTML을 생성합니다.
 6. `src/server.js`가 로컬 웹 서버와 새로고침 API를 제공합니다.
+7. `MAPLEGUIDE_GA_MEASUREMENT_ID`가 있으면 GA4 스크립트와 주요 UX 이벤트를 같이 보냅니다.
 
 ## 운영 시 다음으로 붙일 것
 

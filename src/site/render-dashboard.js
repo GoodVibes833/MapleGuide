@@ -809,7 +809,11 @@ function renderLatestUpdateCards(updates, basePath = "") {
           const updateDate = update.publishedAt ?? update.fetchedAt.slice(0, 10);
 
           return `
-            <details class="update-flash-card">
+            <details
+              class="update-flash-card"
+              data-analytics-jurisdiction="${escapeHtml(update.jurisdiction)}"
+              data-analytics-headline="${escapeHtml(headline)}"
+            >
               <summary class="update-flash-summary">
                 <span class="update-flash-jurisdiction">${escapeHtml(getJurisdictionMeta(update.jurisdiction).labelKo)}</span>
                 <span class="update-flash-date">${escapeHtml(updateDate)}</span>
@@ -1467,11 +1471,13 @@ function renderJurisdictionPage({ jurisdictionId, generatedAt, updates, reports 
   `;
 }
 
-function renderClientScript({ page, updates, basePath = "" }) {
+function renderClientScript({ page, updates, basePath = "", analyticsMeasurementId = "" }) {
   return `
     <script>
       const PAGE = ${JSON.stringify(page)};
       const BASE_PATH = ${serializeForScript(normalizeBasePath(basePath))};
+      const ANALYTICS_MEASUREMENT_ID = ${serializeForScript(analyticsMeasurementId)};
+      const ANALYTICS_ENABLED = Boolean(ANALYTICS_MEASUREMENT_ID);
       const UPDATES = ${serializeForScript(updates)};
       const MAP_REGION_DEFS = ${serializeForScript(JURISDICTION_META)};
       const MINI_REGION_MAPS = ${serializeForScript(MINI_REGION_MAP_SVGS)};
@@ -1479,6 +1485,32 @@ function renderClientScript({ page, updates, basePath = "" }) {
       const DASHBOARD_INSIGHTS = ${serializeForScript(
         page === "dashboard" ? buildJurisdictionInsights(updates) : []
       )};
+      let hasTrackedFormStarted = false;
+      let hasTrackedFormCompleted = false;
+      let lastRenderedRecommendationSignature = "";
+
+      function trackAnalytics(eventName, params = {}) {
+        if (!ANALYTICS_ENABLED || typeof window.gtag !== "function") {
+          return;
+        }
+
+        const payload = {
+          page_kind: PAGE,
+          ...params
+        };
+
+        if (typeof window.location?.pathname === "string") {
+          payload.page_path = window.location.pathname;
+        }
+
+        window.gtag("event", eventName, payload);
+      }
+
+      window.MapleGuideAnalytics = {
+        enabled: ANALYTICS_ENABLED,
+        measurementId: ANALYTICS_MEASUREMENT_ID,
+        track: trackAnalytics
+      };
 
       if (PAGE === "dashboard") {
         const quickStartForm = document.getElementById("quick-start-form");
@@ -1541,6 +1573,68 @@ function renderClientScript({ page, updates, basePath = "" }) {
           return Object.entries(REQUIRED_FIELD_LABELS)
             .filter(([field]) => !rawAnswers[field])
             .map(([, label]) => label);
+        }
+
+        function getAnsweredRequiredFieldCount(rawAnswers) {
+          return Object.keys(REQUIRED_FIELD_LABELS).filter((field) => Boolean(rawAnswers[field])).length;
+        }
+
+        function trackFormStarted(rawAnswers) {
+          if (hasTrackedFormStarted || getAnsweredRequiredFieldCount(rawAnswers) === 0) {
+            return;
+          }
+
+          hasTrackedFormStarted = true;
+          trackAnalytics("form_started", {
+            answered_required_fields: getAnsweredRequiredFieldCount(rawAnswers)
+          });
+        }
+
+        function trackFormCompleted(answers) {
+          if (hasTrackedFormCompleted) {
+            return;
+          }
+
+          hasTrackedFormCompleted = true;
+          trackAnalytics("form_completed", {
+            path: answers.path,
+            base: answers.base,
+            setting: answers.setting,
+            selected_region_count: activeQuickRegions.size || MAP_REGION_DEFS.length
+          });
+        }
+
+        function bindRecommendationInteractions() {
+          if (!quickStartResults) {
+            return;
+          }
+
+          quickStartResults
+            .querySelectorAll(".result-details")
+            .forEach((detailsNode) => {
+              detailsNode.addEventListener("toggle", () => {
+                if (!detailsNode.open) {
+                  return;
+                }
+
+                const cardNode = detailsNode.closest(".wizard-result-card");
+                trackAnalytics("recommendation_detail_opened", {
+                  recommendation_id: cardNode?.dataset.recommendationId ?? "",
+                  route_type: cardNode?.dataset.routeType ?? ""
+                });
+              });
+            });
+
+          quickStartResults
+            .querySelectorAll("[data-recommendation-link]")
+            .forEach((linkNode) => {
+              linkNode.addEventListener("click", () => {
+                trackAnalytics("recommendation_region_clicked", {
+                  recommendation_id: linkNode.dataset.recommendationId ?? "",
+                  route_type: linkNode.dataset.routeType ?? ""
+                });
+              });
+            });
         }
 
         function syncMissingRequiredStates(rawAnswers) {
@@ -1693,8 +1787,26 @@ function renderClientScript({ page, updates, basePath = "" }) {
               ? updatesMoreToggle.dataset.closeLabel || "업데이트 접기"
               : updatesMoreToggle.dataset.openLabel || "업데이트 더보기";
             olderUpdatesList.hidden = !nextExpanded;
+            if (nextExpanded) {
+              trackAnalytics("older_updates_opened", {
+                older_update_count: olderUpdatesList.querySelectorAll(".update-flash-card").length
+              });
+            }
           });
         }
+
+        document.querySelectorAll(".update-flash-card").forEach((updateNode) => {
+          updateNode.addEventListener("toggle", () => {
+            if (!updateNode.open) {
+              return;
+            }
+
+            trackAnalytics("latest_update_opened", {
+              jurisdiction: updateNode.dataset.analyticsJurisdiction ?? "",
+              headline: updateNode.dataset.analyticsHeadline ?? ""
+            });
+          });
+        });
 
         if (canadianExpSelect) {
           canadianExpSelect.addEventListener("change", () => {
@@ -4380,6 +4492,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
           const formData = new FormData(quickStartForm);
           const rawAnswers = normalizeDependentAnswers(Object.fromEntries(formData.entries()));
           const missingRequiredFields = getMissingRequiredFields(rawAnswers);
+          trackFormStarted(rawAnswers);
           syncMissingRequiredStates(rawAnswers);
 
           if (missingRequiredFields.length > 0) {
@@ -4414,6 +4527,14 @@ function renderClientScript({ page, updates, basePath = "" }) {
             .filter(({ insight }) => insight.id !== "federal")
             .slice(0, 3);
           const regionalFallbackHint = buildRegionalFallbackHint(answers, allEvaluated);
+          trackFormCompleted(answers);
+          const recommendationSignature = [
+            ...provinceRanked.map(({ insight }) => insight.id),
+            federalEntry?.insight.id ?? "none",
+            answers.path,
+            answers.base,
+            answers.setting
+          ].join("|");
 
           function renderRecommendationCard(entry, index = null, mode = "province") {
             const { insight, evaluation } = entry;
@@ -4584,7 +4705,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
               : "";
 
             return [
-              '<article class="wizard-result-card">',
+              '<article class="wizard-result-card" data-recommendation-id="' + escapeHtmlClient(insight.id) + '" data-route-type="' + escapeHtmlClient(routeTypeLabel) + '">',
               '<div class="wizard-card-header">',
               '<div class="wizard-card-title-stack">',
               '<div class="card-topline">',
@@ -4727,7 +4848,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
               "</div>",
               '<div><strong>' + escapeHtmlClient(timelineTitle) + '</strong><ul class="reason-list">' + timelineHtml + "</ul></div>",
               '</details>',
-              '<a class="btn ghost" href="' + ((BASE_PATH || "") + '/region/' + encodeURIComponent(insight.id)) + '">이 지역 먼저 보기</a>',
+              '<a class="btn ghost" data-recommendation-link data-recommendation-id="' + escapeHtmlClient(insight.id) + '" data-route-type="' + escapeHtmlClient(routeTypeLabel) + '" href="' + ((BASE_PATH || "") + '/region/' + encodeURIComponent(insight.id)) + '">이 지역 먼저 보기</a>',
               "</article>"
             ].join("");
           }
@@ -4771,6 +4892,17 @@ function renderClientScript({ page, updates, basePath = "" }) {
           }
 
           quickStartResults.innerHTML = resultsSections.join("");
+          bindRecommendationInteractions();
+
+          if (recommendationSignature !== lastRenderedRecommendationSignature) {
+            lastRenderedRecommendationSignature = recommendationSignature;
+            trackAnalytics("recommendations_rendered", {
+              top_province: provinceRanked[0]?.insight.id ?? "none",
+              has_federal_card: Boolean(federalEntry),
+              selected_region_count: activeQuickRegions.size || MAP_REGION_DEFS.length,
+              metro_preference: answers.setting
+            });
+          }
         }
 
         if (quickStartForm) {
@@ -5027,7 +5159,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
   `;
 }
 
-function renderLayout({ title, page, body, updates, basePath = "" }) {
+function renderLayout({ title, page, body, updates, basePath = "", analyticsMeasurementId = "" }) {
   return `<!doctype html>
 <html lang="ko">
   <head>
@@ -5038,6 +5170,19 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
       href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css"
       rel="stylesheet"
     />
+    ${analyticsMeasurementId
+      ? `
+    <script async src="https://www.googletagmanager.com/gtag/js?id=${escapeHtml(analyticsMeasurementId)}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag("js", new Date());
+      gtag("config", ${serializeForScript(analyticsMeasurementId)}, {
+        page_title: ${serializeForScript(title)},
+        page_path: window.location.pathname + window.location.search
+      });
+    </script>`
+      : ""}
     <style>
       :root {
         --bg: #edf4fc;
@@ -7895,7 +8040,7 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
       ${renderNav(page, basePath)}
       ${body}
     </div>
-    ${renderClientScript({ page, updates, basePath })}
+    ${renderClientScript({ page, updates, basePath, analyticsMeasurementId })}
   </body>
 </html>`;
 }
@@ -7906,7 +8051,8 @@ export function renderDashboard({
   reports = [],
   page = "dashboard",
   jurisdictionId = null,
-  basePath = ""
+  basePath = "",
+  analyticsMeasurementId = ""
 }) {
   if (page === "jurisdiction") {
     const meta = getJurisdictionMeta(jurisdictionId ?? "federal");
@@ -7922,7 +8068,8 @@ export function renderDashboard({
         basePath
       }),
       updates,
-      basePath
+      basePath,
+      analyticsMeasurementId
     });
   }
 
@@ -7936,6 +8083,7 @@ export function renderDashboard({
       basePath
     }),
     updates,
-    basePath
+    basePath,
+    analyticsMeasurementId
   });
 }

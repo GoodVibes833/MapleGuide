@@ -7,7 +7,8 @@ function parseArgs(argv) {
     useFixtures: false,
     outputDir: path.join(process.cwd(), "out"),
     sourceIds: null,
-    basePath: process.env.PAGES_BASE_PATH ?? ""
+    basePath: process.env.PAGES_BASE_PATH ?? "",
+    analyticsMeasurementId: process.env.MAPLEGUIDE_GA_MEASUREMENT_ID ?? ""
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -35,6 +36,12 @@ function parseArgs(argv) {
     if (arg === "--base-path" && argv[index + 1]) {
       options.basePath = argv[index + 1];
       index += 1;
+      continue;
+    }
+
+    if (arg === "--ga-id" && argv[index + 1]) {
+      options.analyticsMeasurementId = argv[index + 1];
+      index += 1;
     }
   }
 
@@ -51,7 +58,8 @@ console.log(
       sourcesProcessed: result.reports.length,
       updatesWritten: result.updateCount,
       outputDir: options.outputDir,
-      fixtureMode: options.useFixtures
+      fixtureMode: options.useFixtures,
+      analyticsEnabled: Boolean(options.analyticsMeasurementId)
     },
     null,
     2

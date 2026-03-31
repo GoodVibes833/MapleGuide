@@ -11,7 +11,8 @@ function parseArgs(argv) {
     host: "127.0.0.1",
     port: 3000,
     outputDir: path.join(process.cwd(), "out"),
-    useFixtures: false
+    useFixtures: false,
+    analyticsMeasurementId: process.env.MAPLEGUIDE_GA_MEASUREMENT_ID ?? ""
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -35,6 +36,12 @@ function parseArgs(argv) {
 
     if (arg === "--out" && argv[index + 1]) {
       options.outputDir = path.resolve(argv[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--ga-id" && argv[index + 1]) {
+      options.analyticsMeasurementId = argv[index + 1];
       index += 1;
     }
   }
@@ -74,10 +81,10 @@ async function loadSiteState(outputDir) {
   return { feed };
 }
 
-async function ensureInitialBuild({ outputDir, useFixtures }) {
+async function ensureInitialBuild({ outputDir, useFixtures, analyticsMeasurementId }) {
   const feed = await readJsonFile(path.join(outputDir, "feed.json"), null);
   if (!feed) {
-    await runPipeline({ outputDir, useFixtures });
+    await runPipeline({ outputDir, useFixtures, analyticsMeasurementId });
   }
 }
 
@@ -85,9 +92,10 @@ export async function createRequestHandler({
   host = "127.0.0.1",
   port = 3000,
   outputDir = path.join(process.cwd(), "out"),
-  useFixtures = false
+  useFixtures = false,
+  analyticsMeasurementId = process.env.MAPLEGUIDE_GA_MEASUREMENT_ID ?? ""
 } = {}) {
-  await ensureInitialBuild({ outputDir, useFixtures });
+  await ensureInitialBuild({ outputDir, useFixtures, analyticsMeasurementId });
 
   return async function handleRequest(request, response) {
     try {
@@ -101,7 +109,8 @@ export async function createRequestHandler({
         const body = await parseJsonBody(request);
         const result = await runPipeline({
           outputDir,
-          useFixtures: typeof body.useFixtures === "boolean" ? body.useFixtures : useFixtures
+          useFixtures: typeof body.useFixtures === "boolean" ? body.useFixtures : useFixtures,
+          analyticsMeasurementId
         });
 
         return respondJson(response, 200, {
@@ -121,7 +130,8 @@ export async function createRequestHandler({
             generatedAt: state.feed.generatedAt,
             updates: state.feed.updates,
             reports: state.feed.reports,
-            page: "dashboard"
+            page: "dashboard",
+            analyticsMeasurementId
           })
         );
       }
@@ -145,7 +155,8 @@ export async function createRequestHandler({
             updates: state.feed.updates,
             reports: state.feed.reports,
             page: "jurisdiction",
-            jurisdictionId
+            jurisdictionId,
+            analyticsMeasurementId
           })
         );
       }
@@ -167,13 +178,15 @@ export async function startServer({
   host = "127.0.0.1",
   port = 3000,
   outputDir = path.join(process.cwd(), "out"),
-  useFixtures = false
+  useFixtures = false,
+  analyticsMeasurementId = process.env.MAPLEGUIDE_GA_MEASUREMENT_ID ?? ""
 } = {}) {
   const handler = await createRequestHandler({
     host,
     port,
     outputDir,
-    useFixtures
+    useFixtures,
+    analyticsMeasurementId
   });
   const server = http.createServer((request, response) => {
     handler(request, response);
@@ -215,7 +228,8 @@ if (isEntrypoint) {
         ok: true,
         url: app.baseUrl,
         outputDir: options.outputDir,
-        fixtureMode: options.useFixtures
+        fixtureMode: options.useFixtures,
+        analyticsEnabled: Boolean(options.analyticsMeasurementId)
       },
       null,
       2
