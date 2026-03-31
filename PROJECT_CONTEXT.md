@@ -62,6 +62,8 @@ Recent high-signal progress already completed:
 - added `input`-event re-rendering on the questionnaire form so the last required select, including ECA status, updates recommendations immediately in the browser
 - added regression coverage that treats `completed`, `canadian-degree`, and `unsure` ECA selections as answered required states
 - fixed a second, more subtle regression where all required fields were actually answered but the browser still showed `작성 필요` because recommendation rendering crashed later in the federal card path
+- added `pageshow`-time questionnaire resync so browser back-navigation restores not only form values, but also missing-field highlighting, quick region selected state, and recommendation results
+- added a regression test for the browser-history case where the user comes back with preserved values and the app must clear stale `is-missing` highlighting after re-reading the current controls
 - root cause of that ECA-looking bug:
   - `buildProvinceOccupationLens()` returned too early for the federal case without `titleLensLines` / `candidateProfiles`
   - `renderRecommendationCard()` assumed those arrays always existed and threw while rendering the federal occupation lens

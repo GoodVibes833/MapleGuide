@@ -4,11 +4,36 @@ import vm from "node:vm";
 import { renderDashboard } from "../src/site/render-dashboard.js";
 
 class DummyClassList {
-  add() {}
-  remove() {}
-  toggle() {}
-  contains() {
-    return false;
+  constructor() {
+    this.values = new Set();
+  }
+  add(...tokens) {
+    tokens.forEach((token) => this.values.add(token));
+  }
+  remove(...tokens) {
+    tokens.forEach((token) => this.values.delete(token));
+  }
+  toggle(token, force) {
+    if (force === true) {
+      this.values.add(token);
+      return true;
+    }
+
+    if (force === false) {
+      this.values.delete(token);
+      return false;
+    }
+
+    if (this.values.has(token)) {
+      this.values.delete(token);
+      return false;
+    }
+
+    this.values.add(token);
+    return true;
+  }
+  contains(token) {
+    return this.values.has(token);
   }
 }
 
@@ -48,7 +73,7 @@ function makeNode(overrides = {}) {
   };
 }
 
-function renderClientResults(rawControlValues) {
+function buildDashboardClientHarness(rawControlValues) {
   const html = renderDashboard({
     generatedAt: "2026-03-31",
     updates: [],
@@ -157,17 +182,33 @@ function renderClientResults(rawControlValues) {
     documentElement: makeNode()
   };
 
+  const windowListeners = new Map();
+  const addWindowListener = (type, handler) => {
+    if (!windowListeners.has(type)) {
+      windowListeners.set(type, []);
+    }
+    windowListeners.get(type).push(handler);
+  };
+  const dispatchWindowEvent = (type, event = {}) => {
+    for (const handler of windowListeners.get(type) || []) {
+      handler({ type, ...event });
+    }
+  };
+
   const context = {
     console,
     document,
     window: {
       location: { hash: "" },
-      addEventListener() {},
+      addEventListener: addWindowListener,
       removeEventListener() {},
       innerWidth: 1440,
       scrollTo() {},
       requestAnimationFrame(fn) {
         fn();
+      },
+      dispatchEvent(event) {
+        dispatchWindowEvent(event.type, event);
       }
     },
     location: { hash: "" },
@@ -189,7 +230,17 @@ function renderClientResults(rawControlValues) {
   context.globalThis = context;
 
   vm.runInNewContext(script, context, { timeout: 5000 });
-  return quickStartResults.innerHTML;
+  return {
+    html: quickStartResults.innerHTML,
+    quickStartResults,
+    controlByName,
+    requiredFieldNodes,
+    dispatchWindowEvent
+  };
+}
+
+function renderClientResults(rawControlValues) {
+  return buildDashboardClientHarness(rawControlValues).html;
 }
 
 test("client render shows recommendations when ECA completed is the last required field", () => {
@@ -222,4 +273,43 @@ test("client render shows recommendations when ECA completed is the last require
   assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
   assert.match(html, /현재 조건에서 먼저 볼 주정부 추천 순위/);
   assert.match(html, /연방 \/ EE는 따로 보기/);
+});
+
+test("pageshow resync clears stale missing state and rerenders recommendations after browser restores values", () => {
+  const harness = buildDashboardClientHarness({
+    path: "working-holiday",
+    base: "student",
+    age: "20-29",
+    household: "with-spouse",
+    education: "two-year",
+    languageProfile: "guess:clb7",
+    foreignExp: "1",
+    canadianExp: "2",
+    canadianJobSkill: "skilled",
+    ee: "",
+    jobOffer: "",
+    ecaStatus: "",
+    permitRemaining: "",
+    budget: "",
+    setting: "",
+    advantage: "",
+    koreaOccupation: "",
+    koreaJobTitle: "",
+    canadaOccupation: "",
+    canadaJobTitle: "",
+    targetOccupationPlan: "",
+    foreignExpAlignment: "",
+    degreeCareerPlan: ""
+  });
+
+  assert.match(harness.quickStartResults.innerHTML, /작성 필요/);
+  const ecaFieldNode = harness.requiredFieldNodes.find((fieldNode) => fieldNode.dataset.requiredField === "ecaStatus");
+  assert.ok(ecaFieldNode?.classList.contains("is-missing"));
+
+  harness.controlByName.ecaStatus.value = "completed";
+  harness.dispatchWindowEvent("pageshow", { persisted: true });
+
+  assert.doesNotMatch(harness.quickStartResults.innerHTML, /작성 필요|결과 계산 오류/);
+  assert.match(harness.quickStartResults.innerHTML, /현재 조건에서 먼저 볼 주정부 추천 순위/);
+  assert.equal(ecaFieldNode?.classList.contains("is-missing"), false);
 });

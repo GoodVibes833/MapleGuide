@@ -6948,9 +6948,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               renderQuickStartResults();
             });
           });
-          syncDependentSelects();
-          syncOccupationTitleHints();
-          renderQuickStartResults();
         }
 
         const quickFilterMapEntries = Array.from(document.querySelectorAll("[data-quick-map-region]"))
@@ -6978,6 +6975,17 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             };
           });
 
+        function refreshQuickStartStateFromControls() {
+          syncDependentSelects();
+          syncOccupationTitleHints();
+          if (quickRegionFederalButton) {
+            quickRegionFederalButton.classList.toggle("active", activeQuickRegions.has("federal"));
+          }
+          quickFilterMapEntries.forEach((entry) => entry.syncSelectedState());
+          updateQuickRegionSummary();
+          renderQuickStartResults();
+        }
+
         if (quickRegionFederalButton) {
           quickRegionFederalButton.addEventListener("click", () => {
             toggleQuickRegion("federal");
@@ -6999,7 +7007,19 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           });
         }
 
-        updateQuickRegionSummary();
+        if (quickStartForm) {
+          refreshQuickStartStateFromControls();
+
+          window.addEventListener("pageshow", () => {
+            refreshQuickStartStateFromControls();
+          });
+
+          setTimeout(() => {
+            refreshQuickStartStateFromControls();
+          }, 0);
+        } else {
+          updateQuickRegionSummary();
+        }
 
         const svgRegionEntries = MAP_REGION_DEFS
           .filter((region) => region.svgId)
