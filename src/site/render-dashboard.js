@@ -4726,6 +4726,85 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
         }
 
+        function getOccupationPlannerFocus(occupation) {
+          const meta = getOccupationMeta(occupation);
+
+          switch (occupation) {
+            case "server-counter":
+              return {
+                transitionTarget: "food service supervisor 또는 cook",
+                transitionSummary: "server·barista·cashier 같은 front-line service는 대부분 주에서 그대로보다 supervisor나 cook으로 올라갈 때 훨씬 선명해집니다.",
+                schoolTrack: "culinary·hospitality 과정 -> cook / food service supervisor"
+              };
+            case "retail-sales":
+              return {
+                transitionTarget: "retail supervisor 또는 office coordinator",
+                transitionSummary: "retail sales는 그대로보다 supervisor나 coordinator로 올라가야 skilled 쪽으로 읽히기 쉬워집니다.",
+                schoolTrack: "business·office admin 과정 -> retail supervisor / office coordinator"
+              };
+            case "warehouse-logistics":
+              return {
+                transitionTarget: "inventory coordinator 또는 dispatcher",
+                transitionSummary: "warehouse associate 자체보다 inventory·shipping·dispatch 쪽으로 옮길 때 주정부와 연방에서 더 선명해집니다.",
+                schoolTrack: "supply chain / logistics 과정 -> dispatcher / coordinator"
+              };
+            case "caregiver-psw":
+              return {
+                transitionTarget: "PSW 예외 stream 또는 healthcare support employer path",
+                transitionSummary: "PSW·caregiver는 연방 direct보다 Ontario In-Demand, AIP, local employer 예외 경로를 먼저 보는 편이 현실적입니다.",
+                schoolTrack: "PSW·health support 과정 -> local employer / healthcare support"
+              };
+            case "office-admin":
+              return {
+                transitionTarget: "office administrator 또는 office coordinator",
+                transitionSummary: "사무직은 broad title 그대로보다 administrator·coordinator duties가 보일수록 skilled로 더 안정적으로 읽힙니다.",
+                schoolTrack: "business admin / office admin 과정 -> administrator / coordinator"
+              };
+            case "customer-service":
+              return {
+                transitionTarget: "client service coordinator 또는 office admin lead",
+                transitionSummary: "고객지원은 그대로보다 coordinator·lead 성격이 붙어야 많은 주에서 더 선명하게 읽힙니다.",
+                schoolTrack: "business / office support 과정 -> coordinator / lead"
+              };
+            case "cook-chef":
+              return {
+                transitionTarget: "cook 그대로 유지 또는 kitchen lead·chef 강화",
+                transitionSummary: "cook·chef는 skilled 축으로 그대로 갈 수 있지만, kitchen lead·chef duty까지 보이면 더 안정적입니다.",
+                schoolTrack: "culinary / hospitality management -> cook / chef"
+              };
+            case "food-service-supervisor":
+              return {
+                transitionTarget: "food service supervisor duty 명확화",
+                transitionSummary: "이 직군은 title보다 실제 supervisor duty와 팀 관리 범위를 문서화하는 게 중요합니다.",
+                schoolTrack: "hospitality management -> food service supervisor / restaurant supervisor"
+              };
+            case "hotel-front-desk":
+              return {
+                transitionTarget: "guest service supervisor 또는 front office supervisor",
+                transitionSummary: "front desk는 그대로보다 guest service supervisor·front office supervisor로 올라갈 때 더 선명합니다.",
+                schoolTrack: "hospitality / hotel operations 과정 -> guest service supervisor"
+              };
+            case "housekeeping-cleaning":
+              return {
+                transitionTarget: "housekeeping supervisor",
+                transitionSummary: "room attendant·cleaner는 대부분 supervisor나 inspection 성격이 붙어야 더 현실적인 경로가 열립니다.",
+                schoolTrack: "hospitality / accommodation 과정 -> housekeeping supervisor"
+              };
+            case "manufacturing-production":
+              return {
+                transitionTarget: "machine operator 또는 lead hand / technician",
+                transitionSummary: "production worker는 그대로보다 machine operator·lead hand·technician으로 옮겨야 skilled 또는 mixed-skill 해석이 쉬워집니다.",
+                schoolTrack: "manufacturing technician 과정 -> machine operator / technician"
+              };
+            default:
+              return {
+                transitionTarget: meta.upgradeKo,
+                transitionSummary: "같은 업종 안에서 skilled로 읽히는 title을 먼저 만드는 편이 현실적입니다.",
+                schoolTrack: meta.pivotKo + "와 연결되는 PGWP 가능한 과정"
+              };
+          }
+        }
+
         function buildProvinceOccupationLens(answers, insight) {
           const routeOccupationId = getPrimaryOccupationId(answers);
           const routeMeta = getOccupationMeta(routeOccupationId);
@@ -5195,6 +5274,16 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         function buildAlternativePlans(answers, insight) {
           const plans = [];
+          const routeOccupationId = getPrimaryOccupationId(answers);
+          const routeMeta = getOccupationMeta(routeOccupationId);
+          const canadaOccupationId = resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle);
+          const canadaMeta = getCanadaOccupationMeta(answers);
+          const koreaMeta = getKoreaOccupationMeta(answers);
+          const occupationLens = buildProvinceOccupationLens(answers, insight);
+          const plannerFocus = getOccupationPlannerFocus(hasResolvedCanadaOccupation(answers) ? canadaOccupationId : routeOccupationId);
+          const canUseKoreaSkilled = hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
+          const canadaIsNonSkilled = answers.canadianJobSkill === "non-skilled";
+          const routeTags = routeMeta.tags;
 
           function addPlan(priority, plan) {
             plans.push({ priority, ...plan });
@@ -5207,6 +5296,90 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const regionalStreamNames = getTaggedStreamNames(insight, "지역/커뮤니티");
           const healthStreamNames = getTaggedStreamNames(insight, "보건");
           const tradeStreamNames = getTaggedStreamNames(insight, "기술직");
+
+          if (canadaIsNonSkilled && hasResolvedCanadaOccupation(answers)) {
+            addPlan(12, {
+              type: "전환형",
+              title: "같은 업종 안에서 " + plannerFocus.transitionTarget + "로 올리는 플랜",
+              highlight: plannerFocus.transitionTarget,
+              summary: plannerFocus.transitionSummary,
+              streamLine: "같이 볼 경로: " + buildProvinceSpecificPlanLabel(answers, insight),
+              steps: [
+                "현재 " + canadaMeta.labelKo + "에서 실제로 맡는 duty 중 leader·coordinator·cook·supervisor 성격을 먼저 정리합니다.",
+                plannerFocus.transitionTarget + " 쪽 job title로 옮긴 뒤, " + insight.labelKo + "에서 " + occupationLens.primaryRoute + "와 맞는지 다시 계산합니다.",
+                statusSupports(insight.statuses.graduate)
+                  ? "전환이 어렵다면 " + plannerFocus.schoolTrack + " 경로도 같이 열어둡니다."
+                  : "전환 후 6-12개월 경력 또는 잡오퍼를 붙여 다시 비교합니다."
+              ]
+            });
+          }
+
+          if (canUseKoreaSkilled && canadaIsNonSkilled) {
+            addPlan(11, {
+              type: "한국경력형",
+              title: "한국 " + koreaMeta.labelKo + " 경력으로 다시 짜는 플랜",
+              highlight: "primary occupation 재정리",
+              summary: "현재 캐나다 일보다 한국 경력 축이 더 깔끔하면, 이민 설명의 주력 축을 한국 경력으로 다시 잡는 편이 더 현실적일 수 있습니다.",
+              streamLine: "같이 볼 경로: " + occupationLens.primaryRoute,
+              steps: [
+                "한국 " + koreaMeta.labelKo + " 경력의 NOC와 job duties를 primary occupation 기준으로 다시 정리합니다.",
+                "현재 캐나다 일은 보조 축으로 두고, " + insight.labelKo + "에서 한국 경력으로 읽히는 stream부터 다시 좁힙니다.",
+                "그 위에 언어점수, 고용주 연결, nomination 가능성을 얹어 다시 계산합니다."
+              ]
+            });
+          }
+
+          if (["caregiver-psw", "warehouse-logistics"].includes(routeOccupationId)) {
+            const exceptionTrack = insight.id === "ontario"
+              ? "In-Demand Skills / Employer Job Offer"
+              : isAtlanticProvinceId(insight.id)
+                ? "AIP / designated employer"
+                : buildProvinceSpecificPlanLabel(answers, insight);
+            addPlan(10, {
+              type: "예외형",
+              title: "점수형보다 예외 stream부터 확인하는 플랜",
+              highlight: exceptionTrack,
+              summary: routeOccupationId === "caregiver-psw"
+                ? "PSW·caregiver는 연방 direct보다 주정부 예외 stream이나 employer-driven 경로에서 먼저 풀리는 경우가 많습니다."
+                : "warehouse·logistics는 role 자체보다 In-Demand Skills, local employer, dispatcher·coordinator 전환을 함께 보는 편이 더 현실적입니다.",
+              streamLine: "같이 볼 경로: " + exceptionTrack,
+              steps: [
+                "현재 NOC가 " + exceptionTrack + "와 맞는지 먼저 확인합니다.",
+                "직접 안 맞으면 " + plannerFocus.transitionTarget + "로 옮기는 플랜을 같이 둡니다.",
+                "예외 stream과 직무 전환 중 어느 쪽이 더 빠른지 6-12개월 기준으로 비교합니다."
+              ]
+            });
+          }
+
+          if (answers.setting === "metro" && routeTags.some((tag) => ["office", "business-admin", "sales", "stem"].includes(tag))) {
+            addPlan(9, {
+              type: "도시형",
+              title: "대도시형 취업 플랜",
+              highlight: routeMeta.pivotKo,
+              summary: "이 직군은 메트로 노동시장, local employer, EE/NOI 연계가 붙는 쪽이 훨씬 자연스럽습니다.",
+              streamLine: "같이 볼 경로: " + buildProvinceSpecificPlanLabel(answers, insight),
+              steps: [
+                "현재 title보다 실제 duties가 coordinator / administrator / specialist 쪽으로 읽히는지 먼저 확인합니다.",
+                "대도시 고용시장 기준으로 employer job offer 또는 EE-linked stream을 같이 봅니다.",
+                "job title이 broad하면 " + plannerFocus.transitionTarget + "처럼 더 선명한 title로 좁혀 다시 계산합니다."
+              ]
+            });
+          }
+
+          if (["cook-chef", "food-service-supervisor"].includes(routeOccupationId)) {
+            addPlan(9, {
+              type: "현직유지형",
+              title: "현재 직무를 그대로 살리는 플랜",
+              highlight: plannerFocus.transitionTarget,
+              summary: plannerFocus.transitionSummary,
+              streamLine: "같이 볼 경로: " + buildProvinceSpecificPlanLabel(answers, insight),
+              steps: [
+                "현재 job title, duty, 팀 관리 범위를 서류상으로 더 선명하게 정리합니다.",
+                "현재 고용주 또는 지역 employer 연결을 이 주 stream 조건에 맞게 다시 묶습니다.",
+                "언어점수와 EE-linked nomination은 보조 축으로 같이 계산합니다."
+              ]
+            });
+          }
 
           if ((insight.id === "federal" || statusSupports(insight.statuses.ee)) && (answers.english !== "clb9plus" || answers.ee !== "yes")) {
             addPlan(10, {
@@ -5375,6 +5548,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const primaryMeta = getActiveOccupationMeta(answers);
           const canadaMeta = getCanadaOccupationMeta(answers);
           const koreaMeta = getKoreaOccupationMeta(answers);
+          const canadaOccupationId = resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle);
+          const plannerFocus = getOccupationPlannerFocus(canadaOccupationId);
           const items = [];
 
           if (!hasResolvedKoreaOccupation(answers) && !hasResolvedCanadaOccupation(answers)) {
@@ -5385,17 +5560,37 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             items.push("지금 캐나다 " + canadaMeta.labelKo + " 경력은 EE/CEC 기준 skilled 경력으로 읽힐 가능성이 커요.");
 
             if (getCanadaOccupationMeta(answers).tags.some((tag) => ["office", "business-admin", "sales"].includes(tag))) {
-              items.push("사무·세일즈 계열은 title보다 job duties와 NOC가 더 중요해서, coordinator / analyst / supervisor 쪽으로 정리되는지 먼저 봐야 해요.");
+              items.push("사무·세일즈 계열은 broad title보다 administrator·coordinator·specialist duties가 보일수록 many province streams에서 더 안정적으로 읽혀요.");
             }
 
             if (getCanadaOccupationMeta(answers).tags.includes("hospitality")) {
-              items.push("호스피탈리티 안에서도 cook·chef·supervisor처럼 skilled로 읽히는 직무는 그대로 밀어볼 수 있어요.");
+              items.push("호스피탈리티 안에서도 cook·chef·food service supervisor처럼 skilled로 읽히는 직무는 그대로 밀어볼 수 있어요.");
+            }
+
+            if (canadaOccupationId === "warehouse-logistics") {
+              items.push("창고 쪽도 inventory coordinator·dispatcher처럼 duties가 더 명확해질수록 skilled 또는 mixed-skill 해석이 쉬워집니다.");
             }
           } else if (answers.canadianJobSkill === "non-skilled") {
             if (hasResolvedCanadaOccupation(answers) && getCanadaOccupationMeta(answers).tags.some((tag) => ["service-entry", "retail"].includes(tag))) {
               items.push(canadaMeta.labelKo + " 같은 front-line service 일은 보통 연방 EE skilled 경력으로는 안 잡힐 수 있어요.");
             } else {
               items.push("지금 캐나다 일은 연방 EE/CEC 기준 skilled 경력으로는 바로 안 들어갈 가능성이 커요.");
+            }
+
+            if (canadaOccupationId === "server-counter") {
+              items.push("server·barista·cashier는 대부분 주에서 그대로보다 food service supervisor나 cook으로 올라갈 때 경로가 훨씬 선명해집니다.");
+            }
+
+            if (canadaOccupationId === "retail-sales") {
+              items.push("retail sales는 그대로보다 retail supervisor·assistant manager·office coordinator 쪽으로 옮겨야 skilled 쪽으로 읽히기 쉬워요.");
+            }
+
+            if (canadaOccupationId === "warehouse-logistics") {
+              items.push("warehouse associate는 주마다 TEER 4로 읽히는 경우가 많아 dispatcher·inventory coordinator 전환이나 예외 stream 확인이 중요해요.");
+            }
+
+            if (canadaOccupationId === "caregiver-psw") {
+              items.push("PSW·caregiver는 연방 direct보다 Ontario In-Demand, Atlantic employer-driven, local health support 경로가 더 현실적인 경우가 많아요.");
             }
 
             if (insight.id === "alberta" && hasResolvedCanadaOccupation(answers) && getCanadaOccupationMeta(answers).tags.some((tag) => ["hospitality", "service-entry"].includes(tag))) {
@@ -5413,9 +5608,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             if (hasResolvedKoreaOccupation(answers) && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated") {
               items.push("현재 캐나다 일은 non-skilled여도 한국 " + koreaMeta.labelKo + " 경력이 맞다면, 한국 경력 기준 primary occupation으로 다시 짜는 방법도 있어요.");
             } else if (statusSupports(insight.statuses.graduate)) {
-              items.push("그게 아니면 학교 -> PGWP -> skilled 직무 1년 경유가 더 현실적인 플랜이 될 수 있어요.");
+              items.push("그게 아니면 " + plannerFocus.schoolTrack + "처럼 학교 -> PGWP -> skilled 직무 1년 경유가 더 현실적인 플랜이 될 수 있어요.");
             } else {
-              items.push("지금 일을 그대로 밀기 어렵다면 " + canadaMeta.upgradeKo + " 쪽으로 움직이는 게 더 현실적인 플랜일 수 있어요.");
+              items.push("지금 일을 그대로 밀기 어렵다면 " + plannerFocus.transitionTarget + " 쪽으로 움직이는 게 더 현실적인 플랜일 수 있어요.");
             }
           } else if (answers.canadianJobSkill === "mixed") {
             items.push("같은 직무군 안에서도 NOC와 job duties에 따라 skilled 여부가 달라져요. 현재 일의 NOC·TEER를 먼저 확인해야 해요.");
@@ -5469,6 +5664,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           const canadaMeta = getCanadaOccupationMeta(answers);
           const koreaMeta = getKoreaOccupationMeta(answers);
           const occupationLens = buildProvinceOccupationLens(answers, insight);
+          const routeOccupationId = getPrimaryOccupationId(answers);
+          const canadaOccupationId = resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle);
+          const plannerFocus = getOccupationPlannerFocus(hasResolvedCanadaOccupation(answers) ? canadaOccupationId : routeOccupationId);
           const hasCanadaOccupation = hasResolvedCanadaOccupation(answers);
           const hasKoreaOccupation = hasResolvedKoreaOccupation(answers);
           const hasDirectCanadaSkilled = hasCanadaOccupation && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
@@ -5494,13 +5692,29 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           if (answers.canadianJobSkill === "non-skilled" && hasCanadaOccupation) {
+            if (["caregiver-psw", "warehouse-logistics"].includes(canadaOccupationId)) {
+              addPlan(
+                10,
+                "예외 stream",
+                plannerFocus.transitionTarget + "부터 확인",
+                canadaOccupationId === "caregiver-psw"
+                  ? "PSW·caregiver는 많은 경우 연방 direct보다 예외 stream이나 employer-driven 경로를 먼저 보는 편이 더 현실적입니다."
+                  : "warehouse·logistics는 그대로보다 In-Demand Skills, local employer, dispatcher·coordinator 전환을 함께 보는 편이 더 현실적입니다.",
+                [
+                  "현재 NOC가 이 주의 예외 stream이나 employer-driven 경로와 맞는지 먼저 확인합니다.",
+                  "직접 안 맞으면 " + plannerFocus.transitionTarget + "로 옮겨 다시 비교합니다.",
+                  "6-12개월 안에 예외 stream과 직무 전환 중 어느 쪽이 더 빠른지 비교합니다."
+                ]
+              );
+            }
+
             addPlan(
               9,
               "전환 필요",
-              "현재 캐나다 " + canadaMeta.labelKo + "에서 " + canadaMeta.upgradeKo,
-              "현재 캐나다 일만으로는 약할 수 있어 같은 업종 안에서 한 단계 위 직무나 skilled로 읽히는 직무로 옮기는 플랜이 현실적입니다.",
+              "현재 캐나다 " + canadaMeta.labelKo + "에서 " + plannerFocus.transitionTarget,
+              plannerFocus.transitionSummary,
               [
-                canadaMeta.labelKo + "가 이 주에서 바로 읽히는지 먼저 확인하고, 안 되면 " + canadaMeta.upgradeKo + " 쪽 job title을 찾습니다.",
+                canadaMeta.labelKo + "가 이 주에서 바로 읽히는지 먼저 확인하고, 안 되면 " + plannerFocus.transitionTarget + " 쪽 job title을 찾습니다.",
                 "전환한 직무가 이 주의 " + occupationLens.primaryRoute + "와 맞는지 확인합니다.",
                 "전환 후 6-12개월 경력을 만들거나 잡오퍼를 붙여 다시 계산합니다."
               ]
@@ -5525,11 +5739,11 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             addPlan(
               7,
               "학교 경유",
-              insight.labelKo + "에서 학교 -> PGWP -> skilled 경력",
-              "현재 직무가 애매하면 학교를 통해 현지 학위와 PGWP를 만든 뒤, 그 주에서 실제로 읽히는 skilled 직무 1년을 만드는 플랜이 더 현실적일 수 있습니다.",
+              insight.labelKo + "에서 " + plannerFocus.schoolTrack,
+              "현재 직무가 애매하면 학교를 통해 현지 학위와 PGWP를 만든 뒤, 그 주에서 실제로 읽히는 skilled 직무로 들어가는 플랜이 더 현실적일 수 있습니다.",
               [
                 insight.labelKo + "에서 PGWP 가능한 과정과 졸업자 경로를 먼저 확인합니다.",
-                "졸업 후 " + getActiveOccupationMeta(answers).upgradeKo + " 쪽으로 직무를 잡아 1년 경력을 만듭니다.",
+                "졸업 후 " + plannerFocus.transitionTarget + " 쪽으로 직무를 잡아 1년 경력을 만듭니다.",
                 "graduate stream, local experience stream, EE-linked nomination을 다시 계산합니다."
               ]
             );
@@ -5613,6 +5827,15 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             };
           }
 
+          if (leadPlan?.badge === "예외 stream") {
+            return {
+              badge: "예외 stream 우선",
+              tone: "neutral",
+              title: "이 주에서는 일반 점수형보다 예외 stream이나 employer-driven 경로를 먼저 보는 편이 더 맞아요.",
+              summary: leadPlan.summary
+            };
+          }
+
           if (leadPlan?.badge === "고용주 연결") {
             return {
               badge: "고용주/지역 먼저",
@@ -5677,6 +5900,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
         function buildImprovementPlan(answers, insight, immigrationChancePercent) {
           const actions = [];
+          const canadaOccupationId = resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle);
+          const canadaMeta = getCanadaOccupationMeta(answers);
+          const plannerFocus = getOccupationPlannerFocus(canadaOccupationId);
 
           function addAction(delta, title, detail, actionId, priority = 0) {
             if (actions.some((action) => action.title === title)) {
@@ -5696,6 +5922,34 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           if (answers.path === "business" && statusSupports(insight.statuses.entrepreneur)) {
             addAction(8, "사업계획서와 자금 증빙 정리", "사업·창업 stream은 운영 계획, 투자금, 순자산 증빙 준비도가 실제 체감에 크게 작용합니다.");
             addAction(5, "해당 지역 사업성 검토 또는 탐방 준비", "지역 시장성과 운영 가능성을 미리 정리하면 entrepreneur 심사 준비가 훨씬 쉬워집니다.");
+          }
+
+          if (answers.canadianJobSkill === "non-skilled" && hasResolvedCanadaOccupation(answers)) {
+            if (canadaOccupationId === "server-counter") {
+              addAction(13, "food service supervisor 또는 cook으로 직무 올리기", "server·barista·cashier는 그대로보다 food service supervisor나 cook으로 올라갈 때 주정부와 EE 연결이 훨씬 선명해집니다.", "teer-upgrade", 6);
+            } else if (canadaOccupationId === "retail-sales") {
+              addAction(12, "retail supervisor 또는 office coordinator로 옮기기", "retail sales는 supervisor·assistant manager·office coordinator 쪽으로 올라가야 많은 주에서 skilled로 읽히기 쉬워요.", "teer-upgrade", 6);
+            } else if (canadaOccupationId === "warehouse-logistics") {
+              addAction(12, "inventory coordinator 또는 dispatcher로 옮기기", "warehouse associate 자체보다 inventory·shipping·dispatch 쪽으로 옮겨야 주정부와 연방에서 더 선명해집니다.", "teer-upgrade", 6);
+            } else if (canadaOccupationId === "caregiver-psw") {
+              if (insight.id === "ontario") {
+                addAction(12, "Ontario In-Demand Skills 대상 NOC인지 먼저 확인", "PSW·caregiver는 온타리오에서 예외 stream으로 먼저 풀리는 경우가 많아, 현재 NOC가 목록과 지역 조건에 맞는지부터 봐야 합니다.", "ontario-indemand", 6);
+              } else if (isAtlanticProvinceId(insight.id)) {
+                addAction(12, "AIP designated employer + TEER 4 가능 여부 확인", "Atlantic 쪽은 designated employer job offer와 현재 NOC가 맞으면 PSW·caregiver를 employer-driven으로 먼저 풀 수 있는 경우가 있습니다.", "aip-teer4", 6);
+              } else {
+                addAction(11, "healthcare support employer path부터 확인", "PSW·caregiver는 일반 점수형보다 local employer나 health support 예외 경로를 먼저 보는 편이 현실적입니다.", "job-offer", 5);
+              }
+            } else if (canadaOccupationId === "housekeeping-cleaning") {
+              addAction(11, "housekeeping supervisor 쪽으로 role 올리기", "room attendant·cleaner는 supervisor·inspection duty가 생겨야 skilled로 읽히는 길이 더 넓어질 수 있습니다.", "teer-upgrade", 6);
+            } else if (canadaOccupationId === "hotel-front-desk") {
+              addAction(10, "guest service supervisor 또는 front office supervisor로 옮기기", "front desk는 supervisor duty가 붙을수록 many province streams에서 더 선명하게 읽힙니다.", "teer-upgrade", 6);
+            } else if (canadaOccupationId === "manufacturing-production") {
+              addAction(11, "machine operator 또는 lead hand / technician으로 옮기기", "production worker는 그대로보다 machine operator·lead hand·technician으로 올라가야 skilled 또는 mixed-skill 해석이 쉬워집니다.", "teer-upgrade", 6);
+            }
+          }
+
+          if (hasResolvedCanadaOccupation(answers) && answers.canadianJobSkill === "skilled" && ["office-admin", "customer-service", "sales-marketing"].includes(canadaOccupationId)) {
+            addAction(9, canadaMeta.labelKo + " duties를 coordinator / administrator NOC로 정리", "사무·세일즈 계열은 broad title보다 실제 duties가 coordinator·administrator·specialist 쪽으로 읽히는지가 중요합니다.", "focus-occupation", 6);
           }
 
           const languageActions = getLanguageImprovementActions(answers);

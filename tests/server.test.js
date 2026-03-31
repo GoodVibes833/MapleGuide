@@ -126,6 +126,11 @@ test("request handler renders dashboard, region page, and refresh endpoint", asy
   assert.match(dashboardResponse.body, /이 주에서 가능한 현실 플랜/);
   assert.match(dashboardResponse.body, /이 경로가 실제로 보는 것/);
   assert.match(dashboardResponse.body, /자세히 보기/);
+  assert.match(dashboardResponse.body, /food service supervisor 또는 cook/);
+  assert.match(dashboardResponse.body, /inventory coordinator 또는 dispatcher/);
+  assert.match(dashboardResponse.body, /점수형보다 예외 stream부터 확인하는 플랜/);
+  assert.match(dashboardResponse.body, /대도시형 취업 플랜/);
+  assert.match(dashboardResponse.body, /PSW·caregiver는 연방 direct보다 Ontario In-Demand, AIP, local employer 예외 경로를 먼저 보는 편이 현실적입니다/);
   assert.match(dashboardResponse.body, /캐나다 한눈에 비교/);
   assert.match(dashboardResponse.body, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
 

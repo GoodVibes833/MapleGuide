@@ -44,10 +44,18 @@ Recent high-signal progress already completed:
 - added live title interpretation hints under Korea/Canada job title inputs
 - added a shared `입력한 직무를 이렇게 읽고 있어요` summary block above recommendations
 - changed province quick actions so non-skilled or ambiguous roles prioritize route steps before generic score boosting
+- added occupation-specific planner focus for common ambiguous personas:
+  - `server / barista / cashier -> food service supervisor or cook`
+  - `retail sales -> retail supervisor or office coordinator`
+  - `warehouse associate -> inventory coordinator or dispatcher`
+  - `PSW / caregiver -> exception stream or employer-driven path`
+  - `office admin / customer service -> coordinator / administrator NOC tightening`
+- added more route-specific plan variants like `전환형`, `예외형`, `도시형`, `현직유지형` so recommendation details stop collapsing into the same generic language-score advice
 - changed required-field detection and recommendation rendering to read live form control values directly instead of relying on `FormData`, because browser-side select values could otherwise be misread and block results
 
 Recent commit trail worth checking:
 
+- `b336563` Improve starter persona UX and add tests
 - `064c6a0` Add title hints and route-first province actions
 - `781d1a3` Add starter persona presets to the questionnaire
 - `7d1f7a4` Add richer occupation routes and feasibility badges
@@ -77,6 +85,7 @@ Recent commit trail worth checking:
     - concrete action list
     - multiple plan variants
     - timeline
+    - occupation-specific planner focus for common ambiguous jobs
 
 ### Region Pages
 
@@ -96,6 +105,12 @@ These are intentional decisions. Do not casually undo them in a new session.
 - province cards can mention EE linkage, but must label it clearly as federal reference logic
 - province cards should not lead with raw federal point deltas in the main action area; point math belongs mainly to the federal card or a clearly labeled EE-bridge section
 - when the current role is non-skilled or ambiguous, province quick actions should prioritize route steps like job-title upgrade, school/PGWP, employer-driven, or local connection before generic score boosting
+- the most common ambiguous Korean personas should currently read like this unless a future session replaces them with tighter official rules:
+  - `server / barista / cashier`: direct EE weak, prefer food service supervisor or cook pivot
+  - `retail sales`: direct EE weak, prefer retail supervisor / assistant manager / office coordinator pivot
+  - `warehouse associate`: check exception streams, otherwise inventory / shipping / dispatch pivot
+  - `PSW / caregiver`: prefer Ontario In-Demand, AIP, or local employer-driven before generic EE-first advice
+  - `office admin / customer service`: broad office titles need coordinator / administrator / specialist duties, not just the word "office"
 - questionnaire should separate:
   - Korean previous job
   - current Canadian job

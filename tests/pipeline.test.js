@@ -223,6 +223,11 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /직무·고용주 연결 플랜/);
   assert.match(dashboardHtml, /학교·졸업자 플랜/);
   assert.match(dashboardHtml, /지역 정착 플랜/);
+  assert.match(dashboardHtml, /food service supervisor 또는 cook/);
+  assert.match(dashboardHtml, /inventory coordinator 또는 dispatcher/);
+  assert.match(dashboardHtml, /점수형보다 예외 stream부터 확인하는 플랜/);
+  assert.match(dashboardHtml, /대도시형 취업 플랜/);
+  assert.match(dashboardHtml, /PSW·caregiver는 연방 direct보다 Ontario In-Demand, AIP, local employer 예외 경로를 먼저 보는 편이 현실적입니다/);
   assert.match(dashboardHtml, /캐나다 한눈에 비교/);
   assert.match(dashboardHtml, /원할 때만 펼쳐서 보는 전체 비교표입니다/);
   assert.doesNotMatch(dashboardHtml, /Map Explorer/);
