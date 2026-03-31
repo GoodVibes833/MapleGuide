@@ -3,6 +3,26 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { renderDashboard } from "../src/site/render-dashboard.js";
 
+const CLIENT_TEST_UPDATES = [
+  {
+    sourceId: "ee-rounds",
+    sourceName: "Express Entry rounds of invitations",
+    jurisdiction: "federal",
+    jurisdictionId: "federal",
+    program: "express-entry",
+    publishedAt: "2026-03-27",
+    titleKo: "EE 컷오프 492점, 4,200명 초청됐어요",
+    translation: {
+      titleKo: "EE 컷오프 492점, 4,200명 초청됐어요",
+      bulletsKo: []
+    },
+    metrics: {
+      cutoffScore: "492",
+      invitationsIssued: "4200"
+    }
+  }
+];
+
 class DummyClassList {
   constructor() {
     this.values = new Set();
@@ -105,7 +125,7 @@ function makeNode(overrides = {}) {
 function buildDashboardClientHarness(rawControlValues, options = {}) {
   const html = renderDashboard({
     generatedAt: "2026-03-31",
-    updates: [],
+    updates: options.updates ?? CLIENT_TEST_UPDATES,
     reports: [],
     basePath: ""
   });
@@ -306,7 +326,7 @@ function buildDashboardClientHarness(rawControlValues, options = {}) {
 function buildJurisdictionClientHarness(jurisdictionId, options = {}) {
   const html = renderDashboard({
     generatedAt: "2026-03-31",
-    updates: [],
+    updates: options.updates ?? CLIENT_TEST_UPDATES,
     reports: [],
     page: "jurisdiction",
     jurisdictionId,
@@ -584,6 +604,7 @@ test("federal render exposes expanded score options for a skilled worker profile
   assert.match(html, /프랑스어 점수도 선택지에 포함/);
   assert.match(html, /캐나다 학교 1-2년 \+ 졸업 후 경력 플랜 같이 보기/);
   assert.match(html, /data-score-option/);
+  assert.match(html, /최근 EE 컷오프 \d+점(?:보다 \d+점 높아요| 기준 아직 \d+점 모자라요|과 같아요)/);
   assert.ok(html.indexOf("점수 올리는 옵션 직접 체크해보기") < html.indexOf("자세히 보기"));
 });
 
@@ -606,7 +627,7 @@ test("score option panel exposes staged Canadian experience milestones without d
   assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
   assert.match(html, /캐나다 skilled 경력 4년까지 늘리기/);
   assert.match(html, /캐나다 skilled 경력 5년까지 늘리기/);
-  assert.match(html, /선택한 옵션 기준 대략 (예상 CRS|연방 EE 참고점수) \d+점 \+\d+점 → \d+점/);
+  assert.match(html, /선택한 옵션 기준 대략 (예상 CRS|연방 EE 참고점수) \d+점 \+\d+점 → \d+점 · 최근 EE 컷오프 \d+점(?:보다 \d+점 높아요| 기준 아직 \d+점 모자라요|과 같아요)/);
 });
 
 test("complete render persists recommendation snapshots with summed CRS lift", () => {

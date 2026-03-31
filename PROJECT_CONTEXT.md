@@ -86,6 +86,8 @@ Recent high-signal progress already completed:
 - Canadian skilled experience options inside that panel are now staged by remaining milestone year, e.g. `4년까지`, `5년까지`
   - if the user is already at 3 years, MapleGuide should expose both 4-year and 5-year options
   - these staged options must not double-count against each other in the selected-score summary; same-family score options should collapse to the best checked milestone instead of summing every step
+- score option summaries now also show the gap against the latest EE cutoff when `ee-rounds` cutoff data is available
+  - expected phrasing is plain-language Korean, e.g. `최근 EE 컷오프 492점 기준 아직 40점 모자라요` or `최근 EE 컷오프 492점보다 10점 높아요`
 - changed the federal improvement summary so the header shows the summed lift from the currently proposed actions, e.g. `예상 CRS 423점 +89점 → 512점`, instead of hiding the delta inside only the sub-actions
 - added recommendation snapshot persistence from the main dashboard so recommendation cards can hand a user-specific action bundle to the matching jurisdiction page
 - added a new jurisdiction top panel, `메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것`, that restores:

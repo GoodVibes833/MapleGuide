@@ -1863,6 +1863,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               const optionNodes = Array.from(cardNode.querySelectorAll("[data-score-option]"));
               const scoreLabel = cardNode.dataset.scoreLabel || "예상 CRS";
               const baseScore = Number.parseInt(cardNode.dataset.baseScore || "0", 10) || 0;
+              const cutoff = Number.parseInt(cardNode.dataset.cutoff || "", 10);
 
               function syncScoreOptionSummary() {
                 if (!summaryNode) {
@@ -1882,7 +1883,8 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   scoreLabel,
                   baseScore,
                   projectionSummary.immediateLift,
-                  projectionSummary.futureLift
+                  projectionSummary.futureLift,
+                  Number.isFinite(cutoff) ? cutoff : null
                 );
               }
 
@@ -4256,17 +4258,47 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           };
         }
 
-        function buildOptionProjectionSummary(scoreLabel, baseScore, immediateLift, futureLift) {
+        function describeCutoffGap(score, cutoff) {
+          if (cutoff == null) {
+            return "";
+          }
+
+          const gap = score - cutoff;
+
+          if (gap > 0) {
+            return "최근 EE 컷오프 " + cutoff + "점보다 " + gap + "점 높아요";
+          }
+
+          if (gap < 0) {
+            return "최근 EE 컷오프 " + cutoff + "점 기준 아직 " + Math.abs(gap) + "점 모자라요";
+          }
+
+          return "최근 EE 컷오프 " + cutoff + "점과 같아요";
+        }
+
+        function buildOptionProjectionSummary(scoreLabel, baseScore, immediateLift, futureLift, cutoff = null) {
+          const immediateScore = baseScore + immediateLift;
+          const immediateGapText = describeCutoffGap(immediateScore, cutoff);
+          const futureMaxScore = immediateScore + futureLift;
+          const futureGapText = describeCutoffGap(futureMaxScore, cutoff);
+
           if (immediateLift > 0 && futureLift > 0) {
-            return "선택한 옵션 기준 대략 " + scoreLabel + " " + baseScore + "점 +" + immediateLift + "점 → " + (baseScore + immediateLift) + "점 · 시간이 필요한 옵션까지 보면 최대 +" + (immediateLift + futureLift) + "점";
+            return "선택한 옵션 기준 대략 " + scoreLabel + " " + baseScore + "점 +" + immediateLift + "점 → " + immediateScore + "점"
+              + (immediateGapText ? " · " + immediateGapText : "")
+              + " · 시간이 필요한 옵션까지 보면 최대 " + futureMaxScore + "점"
+              + (futureGapText ? " (" + futureGapText + ")" : "");
           }
 
           if (immediateLift > 0) {
-            return "선택한 옵션 기준 대략 " + scoreLabel + " " + baseScore + "점 +" + immediateLift + "점 → " + (baseScore + immediateLift) + "점";
+            return "선택한 옵션 기준 대략 " + scoreLabel + " " + baseScore + "점 +" + immediateLift + "점 → " + immediateScore + "점"
+              + (immediateGapText ? " · " + immediateGapText : "");
           }
 
           if (futureLift > 0) {
-            return "선택한 옵션 기준 지금 " + scoreLabel + " " + baseScore + "점 · 시간이 필요한 옵션까지 보면 최대 +" + futureLift + "점";
+            return "선택한 옵션 기준 지금 " + scoreLabel + " " + baseScore + "점"
+              + (cutoff != null ? " · " + describeCutoffGap(baseScore, cutoff) : "")
+              + " · 시간이 필요한 옵션까지 보면 최대 " + (baseScore + futureLift) + "점"
+              + (futureGapText ? " (" + futureGapText + ")" : "");
           }
 
           return "선택한 옵션은 점수보다 경로 설계와 서류 준비에 더 영향을 줍니다.";
@@ -8239,13 +8271,13 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const showScoreOptionPanel = optionPanelItems.length > 2 && (isFederalCard || statusSupports(insight.statuses.ee));
             const scoreOptionPanelHtml = showScoreOptionPanel
               ? [
-                  '<section class="score-options-panel" data-score-options-card="true" data-recommendation-id="' + escapeHtmlClient(insight.id) + '" data-base-score="' + escapeHtmlClient(String(improvementPlan.baseScore)) + '" data-score-label="' + escapeHtmlClient(eeSnapshot.scoreLabel) + '">',
+                  '<section class="score-options-panel" data-score-options-card="true" data-recommendation-id="' + escapeHtmlClient(insight.id) + '" data-base-score="' + escapeHtmlClient(String(improvementPlan.baseScore)) + '" data-score-label="' + escapeHtmlClient(eeSnapshot.scoreLabel) + '" data-cutoff="' + escapeHtmlClient(String(eeSnapshot.crsSnapshot.cutoff ?? "")) + '">',
                   '<div class="improvement-head">',
                   '<strong>점수 올리는 옵션 직접 체크해보기</strong>',
                   '<span class="improvement-total">체크해서 비교</span>',
                   '</div>',
                   '<p class="wizard-freshness">영어, 불어, 캐나다 학교, 잡오퍼, nomination 같은 옵션을 직접 체크하면 지금 기준으로 어디까지 갈 수 있는지 바로 볼 수 있어요.</p>',
-                  '<p class="score-options-summary" data-score-options-summary>' + escapeHtmlClient(buildOptionProjectionSummary(eeSnapshot.scoreLabel, improvementPlan.baseScore, optionPanelInitial.immediateLift, optionPanelInitial.futureLift)) + '</p>',
+                  '<p class="score-options-summary" data-score-options-summary>' + escapeHtmlClient(buildOptionProjectionSummary(eeSnapshot.scoreLabel, improvementPlan.baseScore, optionPanelInitial.immediateLift, optionPanelInitial.futureLift, eeSnapshot.crsSnapshot.cutoff ?? null)) + '</p>',
                   '<div class="score-options-list">',
                   optionPanelItems.map((item, optionIndex) => {
                     const actionView = isFederalCard
