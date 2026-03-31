@@ -578,12 +578,13 @@ test("federal render exposes expanded score options for a skilled worker profile
   );
 
   assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
-  assert.match(html, /가능한 점수\/경로 옵션 전체 보기/);
+  assert.match(html, /점수 올리는 옵션 직접 체크해보기/);
   assert.match(html, /선택한 옵션 기준 대략 예상 CRS/);
   assert.match(html, /언어점수 CLB 9 이상 목표/);
   assert.match(html, /프랑스어 점수도 선택지에 포함/);
   assert.match(html, /캐나다 학교 1-2년 \+ 졸업 후 경력 플랜 같이 보기/);
   assert.match(html, /data-score-option/);
+  assert.ok(html.indexOf("점수 올리는 옵션 직접 체크해보기") < html.indexOf("자세히 보기"));
 });
 
 test("complete render persists recommendation snapshots with summed CRS lift", () => {

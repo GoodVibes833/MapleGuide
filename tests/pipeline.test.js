@@ -181,7 +181,7 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /ECA \/ 학력평가 상태/);
   assert.match(dashboardHtml, /해외에서 이민에 쓸 숙련 경력/);
   assert.match(dashboardHtml, /한국 알바·비숙련 서비스 경력은 보통 여기 넣지 않고/);
-  assert.match(dashboardHtml, /가능한 점수\/경로 옵션 전체 보기/);
+  assert.match(dashboardHtml, /점수 올리는 옵션 직접 체크해보기/);
   assert.match(dashboardHtml, /data-score-option/);
   assert.match(dashboardHtml, /먼저 꼭 필요한 정보/);
   assert.match(dashboardHtml, /추가로 알려주면 더 정확해요/);

@@ -8155,10 +8155,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               ? [
                   '<section class="score-options-panel" data-score-options-card="true" data-recommendation-id="' + escapeHtmlClient(insight.id) + '" data-base-score="' + escapeHtmlClient(String(improvementPlan.baseScore)) + '" data-score-label="' + escapeHtmlClient(eeSnapshot.scoreLabel) + '">',
                   '<div class="improvement-head">',
-                  '<strong>가능한 점수/경로 옵션 전체 보기</strong>',
+                  '<strong>점수 올리는 옵션 직접 체크해보기</strong>',
                   '<span class="improvement-total">체크해서 비교</span>',
                   '</div>',
-                  '<p class="wizard-freshness">상위 액션만 앞에서 보여주고, 여기서는 가능한 옵션을 직접 체크해 대략 몇 점까지 가는지 볼 수 있어요.</p>',
+                  '<p class="wizard-freshness">영어, 불어, 캐나다 학교, 잡오퍼, nomination 같은 옵션을 직접 체크하면 지금 기준으로 어디까지 갈 수 있는지 바로 볼 수 있어요.</p>',
                   '<p class="score-options-summary" data-score-options-summary>' + escapeHtmlClient(buildOptionProjectionSummary(eeSnapshot.scoreLabel, improvementPlan.baseScore, optionPanelInitial.immediateLift, optionPanelInitial.futureLift)) + '</p>',
                   '<div class="score-options-list">',
                   optionPanelItems.map((item, optionIndex) => {
@@ -8361,6 +8361,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               '<ul class="compact-action-list">' + quickActionsHtml + '</ul>',
               '</div>',
               '</div>',
+              scoreOptionPanelHtml,
               '<details class="result-details">',
               '<summary>자세히 보기</summary>',
               '<p class="wizard-freshness">정책 반영 기준: ' + freshnessText + "</p>",
@@ -8510,7 +8511,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               (isFederalCard ? '<p class="wizard-freshness">EE 각 액션 아래에는 CRS 직접 변화도 같이 표시합니다.</p>' : ""),
               '<ul class="improvement-list">' + improvementHtml + '</ul>',
               '</section>',
-              scoreOptionPanelHtml,
               (alternativePlanHtml
                 ? '<section class="plan-variants-panel">'
                   + '<div class="plan-variants-head"><strong>가능한 플랜 A/B/C</strong><p class="wizard-freshness">한 가지 길만 보지 말고, 점수형·불어형·직무형·학교형 중 어떤 방식이 더 현실적인지도 같이 비교해 보세요.</p></div>'
