@@ -5140,27 +5140,22 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         }
 
         function buildOccupationContextSummary(answers) {
+          const anchorGuidance = buildOccupationAnchorGuidance(answers);
           const parts = [];
-          const koreaInference = getOccupationInferenceSummary(answers.koreaOccupation, answers.koreaJobTitle);
-          const canadaInference = getOccupationInferenceSummary(answers.canadaOccupation, answers.canadaJobTitle);
 
-          if (hasResolvedKoreaOccupation(answers)) {
-            parts.push("한국: " + getKoreaOccupationMeta(answers).labelKo);
-          } else if (koreaInference) {
-            parts.push('한국 title "' + answers.koreaJobTitle + '" -> ' + koreaInference.labels[0]);
+          if (anchorGuidance.summary) {
+            parts.push(anchorGuidance.summary);
           }
 
-          if (hasResolvedCanadaOccupation(answers)) {
-            parts.push("캐나다 현재: " + getCanadaOccupationMeta(answers).labelKo);
-          } else if (canadaInference) {
-            parts.push('캐나다 title "' + answers.canadaJobTitle + '" -> ' + canadaInference.labels[0]);
+          if (anchorGuidance.detail) {
+            parts.push(anchorGuidance.detail);
           }
 
           if (parts.length === 0) {
             return "직무 축을 아직 좁히지 못했어요.";
           }
 
-          return parts.join(" / ");
+          return parts.join(" · ");
         }
 
         function getOccupationSkillBandExplanation(occupation) {
@@ -5223,8 +5218,78 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return entries;
         }
 
+        function buildOccupationAnchorGuidance(answers) {
+          const hasKoreaOccupation = hasResolvedKoreaOccupation(answers);
+          const hasCanadaOccupation = hasResolvedCanadaOccupation(answers);
+          const koreaMeta = getKoreaOccupationMeta(answers);
+          const canadaMeta = getCanadaOccupationMeta(answers);
+          const hasCanadaSkilled = hasCanadaOccupation && hasSkilledCanadianTrack(answers) && answers.canadianExp !== "0";
+          const canUseKoreaSkilled = hasKoreaOccupation && answers.foreignExp !== "0" && answers.foreignExpAlignment !== "unrelated";
+          const canadaNonSkilled = answers.canadianJobSkill === "non-skilled";
+
+          if (answers.targetOccupationPlan === "current-canada-job" && hasCanadaOccupation) {
+            return {
+              anchorLabel: "캐나다 현재 직무 축",
+              summary: "지금은 캐나다 현재 직무 축을 주력으로 보는 쪽이 맞아요.",
+              detail: canadaNonSkilled
+                ? canadaMeta.labelKo + "은 그대로보다 " + getOccupationPlannerFocus(resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle)).transitionTarget + "로 올라가는 플랜을 같이 봐야 해요."
+                : canadaMeta.labelKo + " 경력을 이민용 주력 축으로 설명할 수 있어요."
+            };
+          }
+
+          if (answers.targetOccupationPlan === "previous-korea-job" && hasKoreaOccupation) {
+            return {
+              anchorLabel: "한국 경력 축",
+              summary: "지금은 한국 경력 축을 주력으로 보는 쪽이 맞아요.",
+              detail: canUseKoreaSkilled
+                ? koreaMeta.labelKo + " 경력을 primary occupation으로 다시 정리하면 설명이 더 선명해질 수 있어요."
+                : koreaMeta.labelKo + " 경력은 있지만 NOC와 job duties 정리를 더 해야 해요."
+            };
+          }
+
+          if (hasCanadaSkilled && !canadaNonSkilled) {
+            return {
+              anchorLabel: "캐나다 현재 직무 축",
+              summary: "현재는 캐나다 현재 직무 축이 가장 자연스러워요.",
+              detail: canadaMeta.labelKo + " 경력이 이미 skilled 축이라 EE와 주정부 둘 다 여기서 출발하기 좋아요."
+            };
+          }
+
+          if (canUseKoreaSkilled && (canadaNonSkilled || !hasCanadaSkilled)) {
+            return {
+              anchorLabel: "한국 경력 축",
+              summary: "현재 캐나다 일보다 한국 경력 축이 더 유리해 보여요.",
+              detail: koreaMeta.labelKo + " 경력을 primary occupation으로 두고, 현재 캐나다 일은 보조 축으로 설명하는 편이 더 현실적일 수 있어요."
+            };
+          }
+
+          if (canadaNonSkilled && hasCanadaOccupation) {
+            const plannerFocus = getOccupationPlannerFocus(resolveOccupationId(answers.canadaOccupation, answers.canadaJobTitle));
+            return {
+              anchorLabel: "전환/학교 축",
+              summary: "지금 직무 그대로보다 전환이나 학교 경유를 먼저 보는 편이 맞아요.",
+              detail: canadaMeta.labelKo + "은 보통 그대로보다 " + plannerFocus.transitionTarget + " 또는 " + plannerFocus.schoolTrack + " 쪽이 더 현실적이에요."
+            };
+          }
+
+          if (hasCanadaOccupation || hasKoreaOccupation) {
+            return {
+              anchorLabel: "비교 진행 중",
+              summary: "한국 경력과 캐나다 현재 직무 중 어느 축이 더 유리한지 계속 비교하는 단계예요.",
+              detail: "job title, duties, NOC를 조금 더 구체적으로 넣으면 주력 축이 더 분명해집니다."
+            };
+          }
+
+          return {
+            anchorLabel: "직무 축 미정",
+            summary: "직무 축을 아직 좁히지 못했어요.",
+            detail: "한국과 캐나다 job title을 더 구체적으로 적으면 주력 경력 축을 바로 제안할 수 있어요."
+          };
+        }
+
         function renderTitleInterpretationSection(answers) {
           const entries = buildTitleInterpretationEntries(answers);
+          const anchorGuidance = buildOccupationAnchorGuidance(answers);
 
           if (entries.length === 0) {
             return "";
@@ -5236,6 +5301,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             '<strong>입력한 직무를 이렇게 읽고 있어요</strong>',
             '<span class="selection-model-badge">job title 해석</span>',
             '</div>',
+            '<p class="wizard-freshness">지금 주력으로 보기: '
+              + escapeHtmlClient(anchorGuidance.anchorLabel)
+              + " · "
+              + escapeHtmlClient(anchorGuidance.summary)
+              + (anchorGuidance.detail ? " · " + escapeHtmlClient(anchorGuidance.detail) : "")
+              + '</p>',
             '<div class="title-interpretation-grid">',
             entries.map((entry) => [
               '<article class="title-interpretation-card">',
