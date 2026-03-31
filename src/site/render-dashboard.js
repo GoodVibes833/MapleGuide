@@ -17,6 +17,7 @@ import {
   estimateCanadianExperienceCrsPoints
 } from "./crs-helpers.js";
 import {
+  getFutureCanadianExperienceYears,
   getLanguageImprovementActions,
   getNextCanadianExperienceYear,
   shouldSuggestSkilledSwitch
@@ -1868,18 +1869,21 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   return;
                 }
 
-                const immediateLift = optionNodes.reduce((sum, optionNode) => (
-                  optionNode.checked
-                    ? sum + (Number.parseInt(optionNode.dataset.immediateLift || "0", 10) || 0)
-                    : sum
-                ), 0);
-                const futureLift = optionNodes.reduce((sum, optionNode) => (
-                  optionNode.checked
-                    ? sum + (Number.parseInt(optionNode.dataset.futureLift || "0", 10) || 0)
-                    : sum
-                ), 0);
+                const projectionSummary = summarizeProjectionSelections(
+                  optionNodes.map((optionNode) => ({
+                    selected: optionNode.checked,
+                    groupId: optionNode.dataset.projectionGroup || "ungrouped",
+                    immediateLift: Number.parseInt(optionNode.dataset.immediateLift || "0", 10) || 0,
+                    futureLift: Number.parseInt(optionNode.dataset.futureLift || "0", 10) || 0
+                  }))
+                );
 
-                summaryNode.textContent = buildOptionProjectionSummary(scoreLabel, baseScore, immediateLift, futureLift);
+                summaryNode.textContent = buildOptionProjectionSummary(
+                  scoreLabel,
+                  baseScore,
+                  projectionSummary.immediateLift,
+                  projectionSummary.futureLift
+                );
               }
 
               optionNodes.forEach((optionNode) => {
@@ -2252,6 +2256,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
         ${describeCanadianExperienceCrsTreatment.toString()}
         ${estimateCanadianExperienceCrsPoints.toString()}
         ${getLanguageImprovementActions.toString()}
+        ${getFutureCanadianExperienceYears.toString()}
         ${getNextCanadianExperienceYear.toString()}
         ${shouldSuggestSkilledSwitch.toString()}
 
@@ -3996,6 +4001,73 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return items.slice(0, 3);
         }
 
+        function getCanadianExperienceMilestoneYear(answers, actionId) {
+          if (actionId === "canadian-exp-next") {
+            return getNextCanadianExperienceYear(answers);
+          }
+
+          const milestoneMatch = /^canadian-exp-(\d+)$/.exec(actionId || "");
+          return milestoneMatch ? milestoneMatch[1] : null;
+        }
+
+        function getActionProjectionGroupId(actionOrActionId) {
+          const actionId = typeof actionOrActionId === "string"
+            ? actionOrActionId
+            : actionOrActionId?.actionId ?? "";
+          const fallbackKey = typeof actionOrActionId === "object"
+            ? actionOrActionId?.title || "ungrouped"
+            : "ungrouped";
+
+          if (/^canadian-exp-(?:next|\d+)$/.test(actionId)) {
+            return "canadian-exp";
+          }
+
+          return actionId || fallbackKey;
+        }
+
+        function summarizeProjectionSelections(entries) {
+          const groupedSelections = new Map();
+
+          entries.forEach((entry) => {
+            if (!entry?.selected) {
+              return;
+            }
+
+            const groupId = entry.groupId || "ungrouped";
+            const current = groupedSelections.get(groupId) || { immediateLift: 0, futureLift: 0 };
+            current.immediateLift = Math.max(current.immediateLift, Math.max(0, entry.immediateLift || 0));
+            current.futureLift = Math.max(current.futureLift, Math.max(0, entry.futureLift || 0));
+            groupedSelections.set(groupId, current);
+          });
+
+          return Array.from(groupedSelections.values()).reduce((summary, groupedSelection) => ({
+            immediateLift: summary.immediateLift + groupedSelection.immediateLift,
+            futureLift: summary.futureLift + groupedSelection.futureLift
+          }), { immediateLift: 0, futureLift: 0 });
+        }
+
+        function selectTopActionsByProjectionGroup(sortedActions, limit = 3) {
+          const selectedActions = [];
+          const seenProjectionGroups = new Set();
+
+          for (const action of sortedActions) {
+            const projectionGroup = getActionProjectionGroupId(action);
+
+            if (seenProjectionGroups.has(projectionGroup)) {
+              continue;
+            }
+
+            selectedActions.push(action);
+            seenProjectionGroups.add(projectionGroup);
+
+            if (selectedActions.length >= limit) {
+              break;
+            }
+          }
+
+          return selectedActions;
+        }
+
         function describeActionScoreImpact(answers, insight, actionId) {
           const supportsEeReference = insight.id === "federal" || statusSupports(insight.statuses.ee);
 
@@ -4021,6 +4093,15 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   label: noDirectScoreLabel,
                   tone: "neutral"
                 };
+          }
+
+          const canadianExperienceMilestoneYear = getCanadianExperienceMilestoneYear(answers, actionId);
+
+          if (canadianExperienceMilestoneYear) {
+            return exactLift({
+              canadianJobSkill: "skilled",
+              canadianExp: canadianExperienceMilestoneYear
+            });
           }
 
           switch (actionId) {
@@ -4101,17 +4182,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 label: "EE-linked nomination 되면 " + scorePlanLabel + " +600점",
                 tone: "deferred"
               };
-            case "canadian-exp-next":
-              {
-                const nextCanadianYear = getNextCanadianExperienceYear(answers);
-
-                return nextCanadianYear
-                  ? exactLift({
-                      canadianJobSkill: "skilled",
-                      canadianExp: nextCanadianYear
-                    })
-                  : { lift: 0, badge: "변화 없음", label: noDirectScoreLabel, tone: "neutral" };
-              }
             case "canadian-exp-1":
               return exactLift({
                 canadianJobSkill: "skilled",
@@ -4142,6 +4212,15 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               : "변화 없음";
           }
 
+          const canadianExperienceMilestoneYear = getCanadianExperienceMilestoneYear(answers, actionId);
+
+          if (canadianExperienceMilestoneYear) {
+            return exactLift({
+              canadianJobSkill: "skilled",
+              canadianExp: canadianExperienceMilestoneYear
+            });
+          }
+
           switch (actionId) {
             case "language-clb9":
               return exactLift({
@@ -4149,16 +4228,6 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                 languageScoreStatus: "official",
                 languageEvidence: "official"
               });
-            case "canadian-exp-next":
-              {
-                const nextCanadianYear = getNextCanadianExperienceYear(answers);
-                return nextCanadianYear
-                  ? exactLift({
-                      canadianJobSkill: "skilled",
-                      canadianExp: nextCanadianYear
-                    })
-                  : "변화 없음";
-              }
             case "canadian-exp-1":
               return exactLift({
                 canadianJobSkill: "skilled",
@@ -7599,16 +7668,18 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const delta = statusSupports(insight.statuses.localExperience) ? 10 : 7;
             addAction(delta, "캐나다 경력 1년 만들기", "현지 경력 1년은 CEC와 여러 주정부 경로에서 직접적인 체감 차이를 만드는 경우가 많습니다.", "canadian-exp-1");
           } else {
-            const nextCanadianYear = getNextCanadianExperienceYear(answers);
+            const futureCanadianYears = getFutureCanadianExperienceYears(answers);
 
-            if (nextCanadianYear && statusSupports(insight.statuses.localExperience)) {
-              addAction(
-                8,
-                "캐나다 skilled 경력 " + nextCanadianYear + "년까지 늘리기",
-                "캐나다 skilled 경력은 해가 하나 늘 때마다 CRS와 일부 경로 안정성이 같이 올라가는 편입니다.",
-                "canadian-exp-next",
-                insight.id === "federal" ? 2 : 1
-              );
+            if (futureCanadianYears.length > 0 && statusSupports(insight.statuses.localExperience)) {
+              futureCanadianYears.forEach((futureYear, milestoneIndex) => {
+                addAction(
+                  8 - Math.min(milestoneIndex, 2),
+                  "캐나다 skilled 경력 " + futureYear + "년까지 늘리기",
+                  "캐나다 skilled 경력을 " + futureYear + "년까지 채우면 CRS와 일부 경로 안정성이 같이 올라가는 편입니다.",
+                  "canadian-exp-" + futureYear,
+                  insight.id === "federal" ? 2 : 1
+                );
+              });
             }
           }
 
@@ -7680,8 +7751,19 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
               return right.delta - left.delta;
             });
-          const topActions = sortedActions.slice(0, 3);
-          const projectedScoreLift = topActions.reduce((sum, action) => sum + Math.max(0, action.scoreImpact?.lift ?? 0), 0);
+          const topActions = selectTopActionsByProjectionGroup(sortedActions, 3);
+          const topActionProjectionSummary = summarizeProjectionSelections(
+            topActions.map((action) => {
+              const projection = getActionProjectionNumbers(action);
+              return {
+                selected: true,
+                groupId: getActionProjectionGroupId(action),
+                immediateLift: projection.immediateLift,
+                futureLift: projection.futureLift
+              };
+            })
+          );
+          const projectedScoreLift = topActionProjectionSummary.immediateLift;
           const bestFutureScoreLift = topActions.reduce((max, action) => Math.max(max, action.scoreImpact?.futureLift ?? 0), 0);
 
           return {
@@ -7709,7 +7791,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             urgent: new Set(["permit-urgent", "permit-status", "permit-extension"]),
             route: new Set(["job-offer", "pnp-nomination", "ee-profile", "aip-teer4", "ontario-indemand", "alberta-hospitality"]),
             document: new Set(["language-proof", "language-clb9", "eca-complete", "eca-finish", "eca-check", "french", "regulated-license"]),
-            experience: new Set(["teer-upgrade", "canadian-exp-next", "canadian-exp-1", "canadian-exp-2", "foreign-exp-1", "degree-experience"]),
+            experience: new Set(["teer-upgrade", "canadian-exp-1", "canadian-exp-2", "foreign-exp-1", "degree-experience"]),
             strategy: new Set(["focus-occupation", "korea-primary-noc", "korea-noc-detail", "regional-setting", "expand-regions", "study-route", "spouse-strategy", "low-cost-plan"])
           };
 
@@ -7723,6 +7805,9 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             return { badge: "서류", tone: "neutral", label: action.detail };
           }
           if (groups.experience.has(actionId)) {
+            return { badge: "경력", tone: "positive", label: action.detail };
+          }
+          if (/^canadian-exp-(?:next|\d+)$/.test(actionId)) {
             return { badge: "경력", tone: "positive", label: action.detail };
           }
           if (groups.strategy.has(actionId)) {
@@ -7765,10 +7850,12 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               return "비용 큼";
             case "teer-upgrade":
             case "canadian-exp-1":
-            case "canadian-exp-next":
             case "foreign-exp-1":
               return "시간 투자형";
             default:
+              if (/^canadian-exp-(?:next|\d+)$/.test(actionId)) {
+                return "시간 투자형";
+              }
               return "";
           }
         }
@@ -8138,18 +8225,17 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const optionPanelItems = (improvementPlan.allItems || [])
               .filter((item) => Boolean(item.actionId))
               .slice(0, 10);
-            const optionPanelInitial = optionPanelItems.reduce((accumulator, item) => {
-              if (!defaultSelectedActionTitles.has(item.title)) {
-                return accumulator;
-              }
-
-              const projection = getActionProjectionNumbers(item);
-
-              return {
-                immediateLift: accumulator.immediateLift + projection.immediateLift,
-                futureLift: accumulator.futureLift + projection.futureLift
-              };
-            }, { immediateLift: 0, futureLift: 0 });
+            const optionPanelInitial = summarizeProjectionSelections(
+              optionPanelItems.map((item) => {
+                const projection = getActionProjectionNumbers(item);
+                return {
+                  selected: defaultSelectedActionTitles.has(item.title),
+                  groupId: getActionProjectionGroupId(item),
+                  immediateLift: projection.immediateLift,
+                  futureLift: projection.futureLift
+                };
+              })
+            );
             const showScoreOptionPanel = optionPanelItems.length > 2 && (isFederalCard || statusSupports(insight.statuses.ee));
             const scoreOptionPanelHtml = showScoreOptionPanel
               ? [
@@ -8175,7 +8261,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
 
                     return [
                       '<label class="score-option-row">',
-                      '<input type="checkbox" data-score-option data-action-id="' + escapeHtmlClient(item.actionId ?? ("option-" + optionIndex)) + '" data-immediate-lift="' + escapeHtmlClient(String(projection.immediateLift)) + '" data-future-lift="' + escapeHtmlClient(String(projection.futureLift)) + '"' + (isChecked ? " checked" : "") + ' />',
+                      '<input type="checkbox" data-score-option data-action-id="' + escapeHtmlClient(item.actionId ?? ("option-" + optionIndex)) + '" data-projection-group="' + escapeHtmlClient(getActionProjectionGroupId(item)) + '" data-immediate-lift="' + escapeHtmlClient(String(projection.immediateLift)) + '" data-future-lift="' + escapeHtmlClient(String(projection.futureLift)) + '"' + (isChecked ? " checked" : "") + ' />',
                       '<div class="score-option-copy">',
                       '<div class="score-option-topline">',
                       '<strong>' + escapeHtmlClient(item.title) + '</strong>',

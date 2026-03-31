@@ -83,6 +83,9 @@ Recent high-signal progress already completed:
   - users can see more than the top 2 actions
   - language / French / school / job-offer / nomination style options can be checked together
   - the panel shows a rough selected-score summary like `예상 CRS 378점 +89점 → 467점`
+- Canadian skilled experience options inside that panel are now staged by remaining milestone year, e.g. `4년까지`, `5년까지`
+  - if the user is already at 3 years, MapleGuide should expose both 4-year and 5-year options
+  - these staged options must not double-count against each other in the selected-score summary; same-family score options should collapse to the best checked milestone instead of summing every step
 - changed the federal improvement summary so the header shows the summed lift from the currently proposed actions, e.g. `예상 CRS 423점 +89점 → 512점`, instead of hiding the delta inside only the sub-actions
 - added recommendation snapshot persistence from the main dashboard so recommendation cards can hand a user-specific action bundle to the matching jurisdiction page
 - added a new jurisdiction top panel, `메인에서 보던 내 상황 기준으로 이 주에서 먼저 할 것`, that restores:

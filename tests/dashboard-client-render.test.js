@@ -587,6 +587,28 @@ test("federal render exposes expanded score options for a skilled worker profile
   assert.ok(html.indexOf("점수 올리는 옵션 직접 체크해보기") < html.indexOf("자세히 보기"));
 });
 
+test("score option panel exposes staged Canadian experience milestones without double-grouping metadata loss", () => {
+  const html = renderClientResults(
+    buildCompleteControls({
+      path: "canadian-worker",
+      base: "working-holiday",
+      household: "single",
+      age: "30-39",
+      languageProfile: "official:clb8",
+      foreignExp: "5",
+      canadianExp: "3",
+      canadianJobSkill: "skilled",
+      ecaStatus: "completed",
+      ee: "yes"
+    })
+  );
+
+  assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
+  assert.match(html, /캐나다 skilled 경력 4년까지 늘리기/);
+  assert.match(html, /캐나다 skilled 경력 5년까지 늘리기/);
+  assert.match(html, /선택한 옵션 기준 대략 (예상 CRS|연방 EE 참고점수) \d+점 \+\d+점 → \d+점/);
+});
+
 test("complete render persists recommendation snapshots with summed CRS lift", () => {
   const harness = buildDashboardClientHarness(buildCompleteControls({
     languageProfile: "official:clb7",

@@ -34,3 +34,17 @@ export function getNextCanadianExperienceYear(answers) {
 
   return String(currentYears + 1);
 }
+
+export function getFutureCanadianExperienceYears(answers) {
+  if (answers.canadianJobSkill !== "skilled") {
+    return [];
+  }
+
+  const currentYears = Number.parseInt(answers.canadianExp, 10) || 0;
+
+  if (currentYears < 1 || currentYears >= 5) {
+    return [];
+  }
+
+  return Array.from({ length: 5 - currentYears }, (_, index) => String(currentYears + index + 1));
+}

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  getFutureCanadianExperienceYears,
   getLanguageImprovementActions,
   getNextCanadianExperienceYear,
   shouldSuggestSkilledSwitch
@@ -72,5 +73,23 @@ test("skilled Canadian work suggests the next year milestone until 5 years", () 
       canadianJobSkill: "skilled"
     }),
     null
+  );
+});
+
+test("skilled Canadian work exposes every remaining milestone through year five", () => {
+  assert.deepEqual(
+    getFutureCanadianExperienceYears({
+      canadianExp: "3",
+      canadianJobSkill: "skilled"
+    }),
+    ["4", "5"]
+  );
+
+  assert.deepEqual(
+    getFutureCanadianExperienceYears({
+      canadianExp: "5",
+      canadianJobSkill: "skilled"
+    }),
+    []
   );
 });
