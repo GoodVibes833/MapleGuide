@@ -169,7 +169,10 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.doesNotMatch(dashboardHtml, /이 주 자체 점수 아님/);
   assert.match(dashboardHtml, /EOI \+ 노동시장 우선/);
   assert.match(dashboardHtml, /왜 이 순위인가/);
+  assert.match(dashboardHtml, /현재 자격상태/);
   assert.match(dashboardHtml, /이 경로가 실제로 보는 것/);
+  assert.match(dashboardHtml, /연방\/EE 연계/);
+  assert.match(dashboardHtml, /nomination 되면 대략 .*점까지 뛰어오를 수 있어요/);
   assert.match(dashboardHtml, /자세히 보기/);
   assert.match(dashboardHtml, /최저 CRS는 492점이고 4,200명에게 초청장이 나왔습니다/);
   assert.match(dashboardHtml, /언어점수 CLB 9 이상 목표/);

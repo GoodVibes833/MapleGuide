@@ -3391,12 +3391,14 @@ function renderClientScript({ page, updates, basePath = "" }) {
         }
 
         function describeActionScoreImpact(answers, insight, actionId) {
-          if (insight.id !== "federal") {
+          const supportsEeReference = insight.id === "federal" || statusSupports(insight.statuses.ee);
+
+          if (!supportsEeReference) {
             return null;
           }
 
-          const scorePlanLabel = "예상 CRS";
-          const noDirectScoreLabel = "CRS 직접 변화 없음";
+          const scorePlanLabel = insight.id === "federal" ? "예상 CRS" : "연방 EE 참고점수";
+          const noDirectScoreLabel = insight.id === "federal" ? "CRS 직접 변화 없음" : "연방 EE 직접 변화 없음";
 
           function exactLift(overrides) {
             const lift = estimateProjectedCrsLift(answers, overrides);
@@ -3734,6 +3736,88 @@ function renderClientScript({ page, updates, basePath = "" }) {
             .slice(0, 3);
         }
 
+        function buildEligibilitySnapshot(answers, insight, guideBundle) {
+          const evaluated = guideBundle.evaluated;
+          const missing = evaluated.filter((criterion) => criterion.state === "missing");
+          const partial = evaluated.filter((criterion) => criterion.state === "partial");
+          const has = evaluated.filter((criterion) => criterion.state === "has");
+
+          let badge = "조건 일부 확인 필요";
+          let summary = "지금 당장 신청 여부보다, 이 주에서 어느 stream으로 갈지 먼저 좁히는 편이 좋아요.";
+
+          if (missing.length === 0 && partial.length <= 1) {
+            badge = "지금 바로 검토 가능";
+            summary = "핵심 축은 이미 갖추고 있어 이 주의 맞는 stream을 바로 비교해 볼 수 있어요.";
+          } else if (statusSupports(insight.statuses.graduate) && !has.some((criterion) => criterion.id === "local-graduate")) {
+            badge = "학교·현지경력 경유가 자연스러움";
+            summary = "지금 바로보다 학교 또는 졸업 후 현지경력 경로를 거쳐 들어가는 편이 더 자연스러워 보여요.";
+          } else if ((statusSupports(insight.statuses.localExperience) || statusSupports(insight.statuses.ee)) && !hasSkilledCanadianTrack(answers)) {
+            badge = "현지 skilled 경력 보완 필요";
+            summary = "이 주는 현지 skilled 경력이나 EE-linked 연결이 붙을 때 훨씬 읽기 쉬운 구조예요.";
+          } else if (missing.length >= 3) {
+            badge = "준비 후 다시 계산";
+            summary = "핵심 자격 몇 가지가 비어 있어, 지금은 준비를 먼저 하고 다시 계산하는 편이 정확해요.";
+          }
+
+          let nextTrack = "맞는 stream 선택 후 서류를 정리";
+
+          if (statusSupports(insight.statuses.graduate) && !has.some((criterion) => criterion.id === "local-graduate")) {
+            nextTrack = "학교 -> 졸업자 경로 -> 현지경력";
+          } else if (["중심", "있음"].includes(insight.statuses.jobOffer) && answers.jobOffer !== "yes") {
+            nextTrack = "고용주 오퍼 확보 -> 주정부 stream";
+          } else if ((statusSupports(insight.statuses.localExperience) || statusSupports(insight.statuses.ee)) && !hasSkilledCanadianTrack(answers)) {
+            nextTrack = "TEER 0-3 경력 -> EE/주정부 재계산";
+          } else if (statusSupports(insight.statuses.ee)) {
+            nextTrack = "EE-linked stream 또는 nomination";
+          }
+
+          return {
+            badge,
+            summary,
+            currentLine: has.length > 0
+              ? has.slice(0, 3).map((criterion) => criterion.label).join(" / ")
+              : "핵심 강점 정리가 더 필요해요.",
+            blockerLine: (missing.length > 0 ? missing : partial).slice(0, 3).map((criterion) => criterion.label).join(" / "),
+            nextTrack
+          };
+        }
+
+        function buildProvinceEeBridge(answers, insight, eeSnapshot) {
+          if (insight.id === "federal" || !statusSupports(insight.statuses.ee)) {
+            return null;
+          }
+
+          const currentScore = eeSnapshot.crsSnapshot.score;
+          const cutoff = eeSnapshot.crsSnapshot.cutoff;
+          const nominationScore = currentScore + 600;
+          const clb9Lift = estimateProjectedCrsLift(answers, {
+            english: "clb9plus",
+            languageScoreStatus: "official",
+            languageEvidence: "official"
+          });
+          const clb9Score = clb9Lift > 0 ? currentScore + clb9Lift : currentScore;
+          const nextCanadianYear = getNextCanadianExperienceYear(answers);
+          const nextCanadianLift = nextCanadianYear
+            ? estimateProjectedCrsLift(answers, {
+                canadianJobSkill: "skilled",
+                canadianExp: nextCanadianYear
+              })
+            : 0;
+          const nextCanadianScore = nextCanadianLift > 0 ? currentScore + nextCanadianLift : currentScore;
+
+          return {
+            currentLine: "지금 기준 연방 EE 참고점수 " + currentScore + "점"
+              + (cutoff != null ? " / 최근 컷오프 " + cutoff + "점" : ""),
+            nominationLine: "이 주 nomination 되면 대략 " + nominationScore + "점까지 뛰어오를 수 있어요.",
+            clb9Line: clb9Lift > 0
+              ? "영어를 CLB 9 이상으로 올리면 약 " + clb9Score + "점까지 볼 수 있어요."
+              : "영어 점수는 이미 반영된 상태예요.",
+            canadianExpLine: nextCanadianLift > 0
+              ? "캐나다 skilled 경력을 " + nextCanadianYear + "년까지 채우면 약 " + nextCanadianScore + "점까지 볼 수 있어요."
+              : "지금 단계에서는 경력 증가보다 nomination·직군 선택 영향이 더 커요."
+          };
+        }
+
         function buildImprovementPlan(answers, insight, immigrationChancePercent) {
           const actions = [];
 
@@ -3933,6 +4017,15 @@ function renderClientScript({ page, updates, basePath = "" }) {
         }
 
         function getProvinceActionPresentation(action) {
+          if (action.scoreImpact) {
+            return {
+              badge: action.scoreImpact.badge,
+              tone: action.scoreImpact.tone ?? "neutral",
+              label: action.scoreImpact.label ?? action.detail,
+              note: action.detail
+            };
+          }
+
           const actionId = action.actionId ?? "";
           const groups = {
             urgent: new Set(["permit-urgent", "permit-status"]),
@@ -4130,6 +4223,9 @@ function renderClientScript({ page, updates, basePath = "" }) {
             const timeline = buildScenarioTimeline(answers, insight);
             const alternativePlans = buildAlternativePlans(answers, insight);
             const pathwayGuideBundle = buildEvaluatedPathwayGuide(answers, insight, eeSnapshot);
+            const eligibilitySnapshot = buildEligibilitySnapshot(answers, insight, pathwayGuideBundle);
+            const provinceEeBridge = buildProvinceEeBridge(answers, insight, eeSnapshot);
+            const profileStrengthItems = buildProfileStrengths(answers);
             const pathwayCurrentItems = pathwayGuideBundle.evaluated
               .filter((criterion) => criterion.state === "has")
               .map((criterion) => criterion.label)
@@ -4210,6 +4306,9 @@ function renderClientScript({ page, updates, basePath = "" }) {
                       '<div class="compact-action-copy">',
                       '<strong>' + escapeHtmlClient(item.title) + '</strong>',
                       '<p>' + escapeHtmlClient(actionView.label) + '</p>',
+                      (!isFederalCard && actionView.note && actionView.note !== actionView.label
+                        ? '<p>' + escapeHtmlClient(actionView.note) + '</p>'
+                        : ""),
                       '</div>',
                       '</li>'
                     ].join("");
@@ -4227,7 +4326,8 @@ function renderClientScript({ page, updates, basePath = "" }) {
                     }
                   : {
                       ...getProvinceActionPresentation(item),
-                      showImpact: false
+                      showImpact: Boolean(item.scoreImpact),
+                      impactLabel: item.scoreImpact?.label ?? ""
                     };
 
                 return [
@@ -4237,7 +4337,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
                   '<div class="improvement-title-row">',
                   '<strong>' + escapeHtmlClient(item.title) + '</strong>',
                   actionView.showImpact
-                    ? '<span class="improvement-score-impact is-' + escapeHtmlClient(actionView.tone) + '">' + escapeHtmlClient(actionView.label) + '</span>'
+                    ? '<span class="improvement-score-impact is-' + escapeHtmlClient(actionView.tone) + '">' + escapeHtmlClient(actionView.impactLabel || actionView.label) + '</span>'
                     : "",
                   '</div>',
                   '<p>' + escapeHtmlClient(item.detail) + '</p>',
@@ -4254,8 +4354,28 @@ function renderClientScript({ page, updates, basePath = "" }) {
                       ? "지금 " + improvementPlan.baseScore + "점 · 나중에 최대 " + (improvementPlan.baseScore + improvementPlan.bestFutureScoreLift) + "점"
                       : "예상 CRS " + improvementPlan.baseScore + "점 유지"
                 )
-              : "주 기준 우선 액션 " + Math.max(1, topActionItems.length) + "개";
+              : (
+                  topActionItems.some((item) => Boolean(item.scoreImpact))
+                    ? "주 액션 " + Math.max(1, topActionItems.length) + "개 · EE 연계 포함"
+                    : "주 기준 우선 액션 " + Math.max(1, topActionItems.length) + "개"
+                );
             const pathwayGuideHtml = renderPathwayGuidePanel(insight, pathwayGuideBundle);
+            const provinceEeBridgeHtml = provinceEeBridge
+              ? [
+                  '<section class="ee-bridge-panel">',
+                  '<div class="selection-model-head">',
+                  '<strong>연방/EE 연계</strong>',
+                  '<span class="selection-model-badge">EE-linked</span>',
+                  '</div>',
+                  '<ul class="reason-list">',
+                  '<li>' + escapeHtmlClient(provinceEeBridge.currentLine) + '</li>',
+                  '<li>' + escapeHtmlClient(provinceEeBridge.nominationLine) + '</li>',
+                  '<li>' + escapeHtmlClient(provinceEeBridge.clb9Line) + '</li>',
+                  '<li>' + escapeHtmlClient(provinceEeBridge.canadianExpLine) + '</li>',
+                  '</ul>',
+                  '</section>'
+                ].join("")
+              : "";
 
             return [
               '<article class="wizard-result-card">',
@@ -4300,8 +4420,10 @@ function renderClientScript({ page, updates, basePath = "" }) {
               '<div class="result-summary-card">',
               '<strong>내가 이미 가진 것</strong>',
               '<ul class="result-summary-list">'
-                + (pathwayCurrentItems.length
-                  ? pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+                + (profileStrengthItems.length
+                  ? profileStrengthItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
+                  : pathwayCurrentItems.length
+                    ? pathwayCurrentItems.map((item) => '<li>' + escapeHtmlClient(item) + '</li>').join("")
                   : '<li>강점 정리를 더 해보는 게 좋아요.</li>')
                 + '</ul>',
               '</div>',
@@ -4317,6 +4439,20 @@ function renderClientScript({ page, updates, basePath = "" }) {
               '<summary>자세히 보기</summary>',
               '<p class="wizard-freshness">정책 반영 기준: ' + freshnessText + "</p>",
               '<p class="wizard-freshness">서류 준비 상태: ' + readinessLine + "</p>",
+              (!isFederalCard
+                ? '<section class="result-summary-block detail-summary-block">'
+                  + '<strong>현재 자격상태</strong>'
+                  + '<div class="eligibility-snapshot">'
+                  + '<span class="compare-pill">' + escapeHtmlClient(eligibilitySnapshot.badge) + '</span>'
+                  + '<p>' + escapeHtmlClient(eligibilitySnapshot.summary) + '</p>'
+                  + '<ul class="reason-list">'
+                  + '<li>지금 가진 축: ' + escapeHtmlClient(eligibilitySnapshot.currentLine) + '</li>'
+                  + (eligibilitySnapshot.blockerLine ? '<li>더 확인할 것: ' + escapeHtmlClient(eligibilitySnapshot.blockerLine) + '</li>' : '')
+                  + '<li>이 주에서 들어가는 기본 흐름: ' + escapeHtmlClient(eligibilitySnapshot.nextTrack) + '</li>'
+                  + '</ul>'
+                  + '</div>'
+                  + '</section>'
+                : ""),
               '<section class="result-summary-block detail-summary-block">',
               '<strong>이 경로가 실제로 보는 것</strong>',
               '<ul class="result-summary-list">'
@@ -4342,6 +4478,7 @@ function renderClientScript({ page, updates, basePath = "" }) {
                   + '<p class="wizard-freshness">' + escapeHtmlClient(eeSnapshot.comparison) + "</p>"
                   + '<p class="wizard-freshness">' + escapeHtmlClient(crsNoteText) + "</p>"
                 : ""),
+              provinceEeBridgeHtml,
               pathwayGuideHtml,
               '<section class="career-check-panel">',
               '<strong>경력 인정 체크</strong>',
@@ -6255,6 +6392,17 @@ function renderLayout({ title, page, body, updates, basePath = "" }) {
       .plan-variant-stream {
         font-weight: 700;
         color: var(--accent-deep);
+      }
+
+      .eligibility-snapshot {
+        display: grid;
+        gap: 10px;
+      }
+
+      .eligibility-snapshot p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
       }
 
       .result-summary-list,

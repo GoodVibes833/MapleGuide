@@ -1,52 +1,190 @@
 # MapleGuide Project Context
 
-## What This Is
+## Product Goal
 
-MapleGuide is a Canada immigration guidance web app for Korean-speaking users.
-It has two core goals:
+MapleGuide is a Korean-first Canada immigration guidance site.
 
-- help beginners understand which province or federal path to look at first
-- track official immigration updates and explain them in a simpler, structured way
+The product goal is not just "show immigration info".
+It should help a beginner answer these questions quickly:
 
-## Current Product Shape
+1. Should I look at federal or provincial first?
+2. Which province should I look at first?
+3. What do I already have?
+4. What is missing right now?
+5. If I change my language score, job, school path, or region choice, what path opens up?
 
-- Home page:
-  - compact `가장 최신 업데이트` strip at the top
-  - `내 상황으로 먼저 찾기` questionnaire
-  - recommendation cards with:
-    - 예상 적합도
-    - 이민 가능성
-    - 예상 CRS
-    - 최신 EE 컷오프
-    - 현재 차이
-    - 경력 인정 체크
-    - 가능성 올리는 다음 액션
-- Region pages:
-  - objective overview first
-  - stream categories
-  - official source links
-  - latest updates
+## Current Site Shape
+
+### Home
+
+- compact latest-updates block at the top
+- `내 상황으로 먼저 찾기` questionnaire
+- province recommendations shown first
+- federal / EE shown as a separate card, not mixed into province ranking
+- province cards include:
+  - why this rank
+  - what the user already has
+  - immediate next actions
+  - detailed view with:
+    - current eligibility snapshot
+    - how the province selects
+    - federal / EE bridge when relevant
+    - career recognition notes
+    - concrete action list
+    - multiple plan variants
+    - timeline
+
+### Region Pages
+
+- objective province overview first
+- stream structure
+- official links
+- tracked updates
+
+## Current UX Direction
+
+These are intentional decisions. Do not casually undo them in a new session.
+
+- keep the top of the page compact
+- avoid long explanatory hero text
+- recommendation cards should be the main product surface
+- federal / EE must stay visually separate from province ranking
+- province cards can mention EE linkage, but must label it clearly as federal reference logic
+- beginners should see:
+  - current fit
+  - missing requirements
+  - concrete next steps
+  - alternate plans
+- too much explanation at once hurts usability
 
 ## Current Data Mode
 
-- local preview usually runs in `fixture` mode
+- local preview usually runs in fixture mode
 - fixtures live in `/Users/alexhan/Documents/Alex_dev/Canada Imigration/fixtures`
 - generated output goes to `/Users/alexhan/Documents/Alex_dev/Canada Imigration/out`
+- GitHub Pages is static and currently relies on generated output
+- when a live source is blocked or looks like anti-bot HTML, pipeline falls back to fixture-quality content instead of showing broken markup
+
+## Current Official Sources Wired In Code
+
+These are the sources currently configured in `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/config/sources.js`.
+
+1. Federal Express Entry rounds of invitations
+2. Ontario OINP updates
+3. BC PNP invitations to apply
+4. Manitoba EOI draw
+5. PEI EOI draws
+6. New Brunswick invitation and selection rounds
+
+## Important Non-Wired Official Directions Already Researched
+
+These are important route families the product already references in logic or UX direction, even if not all of them are fully crawled yet.
+
+- federal category-based selection
+- Atlantic Immigration Program
+- Rural Community Immigration Pilot
+- Francophone Community Immigration Pilot
+- Alberta Rural Renewal Stream
+- Newfoundland and Labrador 2-step EOI model
+- provincial EE-linked nomination logic
+
+When future sessions expand the data layer, these are high-priority official directions to revisit.
+
+## When User Says "정보 업데이트해"
+
+If a future session is asked to update information, do not only tweak copy.
+Redo the update process end to end:
+
+1. re-check current official sources
+2. rerun the pipeline with live fetch where possible
+3. inspect whether any source returned anti-bot or broken HTML
+4. refresh fixtures if the live parser is blocked but the official page structure changed
+5. verify translated summaries still read cleanly in Korean
+6. rerun tests and demo build
+7. check GitHub Pages output so broken raw HTML is not exposed
+
+In other words:
+- refresh the official information first
+- then refresh generated output
+- then refresh UX wording
+
+## Current Recommendation Logic
+
+The recommendation engine currently considers:
+
+- federal vs provincial direction
+- province selection models
+- EE linkage
+- language status
+- ECA / Canadian degree
+- foreign skilled experience
+- Canadian experience
+- TEER 0-3 vs non-skilled Canadian work
+- current immigration intent
+- current actual status in Canada
+- permit remaining time
+- job offer possibility
+- metro vs regional preference
+- occupation category
+- Korea experience alignment
+- degree usage plan
+
+## Current Recommendation Output
+
+Province recommendations currently show:
+
+- ranked province order
+- policy fit
+- current entry chance
+- province selection model
+- what the user already has
+- immediate actions
+- detailed eligibility snapshot
+- federal / EE bridge section when the province has EE linkage
+- multiple concrete plan variants:
+  - score route
+  - French route
+  - job / employer route
+  - study / graduate route
+  - regional route
+
+Federal recommendation currently shows:
+
+- CRS estimate
+- latest EE cutoff
+- score gap
+- direct CRS-improvement actions
+
+## Important Current Implementation Detail
+
+Province cards should not look like they are scored by federal CRS directly.
+
+Correct behavior:
+
+- province card = province selection logic first
+- province card may include a separate `연방/EE 연계` block
+- that block can show:
+  - current federal reference score
+  - latest EE cutoff
+  - what happens if nomination is received
+  - how CLB 9 or more Canadian experience affects the federal side
 
 ## Important Files
 
 - `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/site/render-dashboard.js`
-  - main UI, questionnaire rendering, CRS estimate UI, latest updates strip
-- `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/site/jurisdiction-ux.js`
-  - jurisdiction normalization and beginner-friendly summaries
-- `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/config/jurisdiction-profiles.js`
-  - stream structure by province/federal
+  - main UI, recommendation logic, questionnaire, score logic, detailed cards
 - `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/config/sources.js`
-  - official sources registry
+  - official source registry
 - `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/core/pipeline.js`
-  - fetch/normalize/build pipeline
+  - source fetch, normalize, output build
+- `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/core/html.js`
+  - HTML cleanup and anti-broken-markup protections
 - `/Users/alexhan/Documents/Alex_dev/Canada Imigration/src/server.js`
   - local preview server
+- `/Users/alexhan/Documents/Alex_dev/Canada Imigration/tests/pipeline.test.js`
+  - output and dashboard regression checks
+- `/Users/alexhan/Documents/Alex_dev/Canada Imigration/tests/server.test.js`
+  - server rendering checks
 
 ## Commands
 
@@ -56,46 +194,48 @@ npm run demo
 node src/server.js --fixtures --port 3012
 ```
 
-Preview URL commonly used:
+## Preview / Deploy
 
-- `http://127.0.0.1:3012/`
-
-## Git / Repo
-
+- local preview URL: `http://127.0.0.1:3012/`
 - GitHub repo: `https://github.com/GoodVibes833/MapleGuide`
-- branch: `main`
-- repo is intended to stay private for now
-
-## Current UX Decisions
-
-- top intro was intentionally reduced
-- latest updates should stay visually compact and horizontal
-- action buttons belong in the sticky top bar, not in the hero body
-- users want direct number comparison, not vague EE wording
-- career alignment matters:
-  - working holiday
-  - TEER 0-3 vs non-skilled work
-  - Korean experience aligned or not aligned with target NOC
-  - degree used vs not used
+- GitHub Pages: `https://goodvibes833.github.io/MapleGuide/`
+- repository is public right now because GitHub Pages is enabled
 
 ## Known Limitations
 
 - CRS is still an estimate, not a full official calculator
-- exact IELTS/CELPIP section scores are not yet collected
-- spouse factors are only lightly reflected
-- provincial rules are not yet a full rules database
+- IELTS/CELPIP section-level input is not yet fully collected
+- spouse scoring is still shallow
+- provincial rules are not a full stream-by-stream rules database yet
+- some official sources still block static cloud fetches, which is why fixture fallback exists
+- GitHub Pages cannot run the full dynamic refresh flow by itself
 
-## Best Next Steps
+## High-Priority Next Steps
 
-1. add precise CRS inputs:
-   - IELTS/CELPIP section scores
-   - spouse details
-   - Canadian study / sibling / French bonus details
-2. build province rules DB:
-   - Ontario
-   - BC
-   - Alberta first
-3. keep home page dense but compact:
-   - update strip
-   - better comparison cards
-   - less explanatory filler
+1. make province stream requirements more explicit
+   - required
+   - preferred
+   - scored
+   - disqualifier
+
+2. improve detailed plans
+   - exact language targets
+   - more concrete school route conditions
+   - more concrete occupation / NOC pivots
+   - province-specific "if not eligible now, do this first" flows
+
+3. expand official source coverage
+   - Alberta
+   - Newfoundland and Labrador
+   - Nova Scotia
+   - special route sources
+
+4. improve live-update workflow
+   - better parser resilience
+   - clearer health reporting for blocked sources
+
+## Session Notes
+
+- if a new session sees weird raw HTML in updates, first check source blocking and parser health before changing UI copy
+- if users complain that a province recommendation conflicts with their metro preference, inspect lifestyle weighting first
+- if users complain about province cards showing federal scores, keep federal scores only in explicitly labeled EE-linkage sections
