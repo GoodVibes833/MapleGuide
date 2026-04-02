@@ -454,6 +454,10 @@ test("client render shows recommendations when ECA completed is the last require
   assert.doesNotMatch(html, /작성 필요|결과 계산 오류/);
   assert.match(html, /현재 조건에서 먼저 볼 주정부 추천 순위/);
   assert.match(html, /연방 \/ EE는 따로 보기/);
+  assert.match(html, /주정부와 연방 EE를 이렇게 나눠서 보세요/);
+  assert.match(html, /이 카드의 메인/);
+  assert.match(html, /보조로 같이 보는 연방 EE 연계|연방 EE는 별도 카드에서 비교/);
+  assert.match(html, /이 카드에서 보이는 EE 점수와 EE-linked nomination 얘기는 이 주 자체 선발점수가 아니라/);
 });
 
 test("pageshow resync clears stale missing state and rerenders recommendations after browser restores values", () => {
@@ -605,7 +609,7 @@ test("federal render exposes expanded score options for a skilled worker profile
   assert.match(html, /캐나다 학교 1-2년 \+ 졸업 후 경력 플랜 같이 보기/);
   assert.match(html, /data-score-option/);
   assert.match(html, /최근 EE 컷오프 \d+점(?:보다 \d+점 높아요| 기준 아직 \d+점 모자라요|과 같아요)/);
-  assert.ok(html.indexOf("점수 올리는 옵션 직접 체크해보기") < html.indexOf("자세히 보기"));
+  assert.ok(html.lastIndexOf("점수 올리는 옵션 직접 체크해보기") < html.lastIndexOf("자세히 보기"));
 });
 
 test("score option panel exposes staged Canadian experience milestones without double-grouping metadata loss", () => {

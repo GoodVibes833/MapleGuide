@@ -7849,6 +7849,22 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return { badge: "준비", tone: "neutral", label: action.detail };
         }
 
+        function getProvinceEeChipLabel(status) {
+          if (!statusSupports(status)) {
+            return "연방 EE 별도";
+          }
+
+          if (status === "많음") {
+            return "연방 EE 연계 강함";
+          }
+
+          if (status === "있음") {
+            return "연방 EE 연계 있음";
+          }
+
+          return "연방 EE 연계 " + status;
+        }
+
         function getActionCostLabel(actionId, answers) {
           switch (actionId) {
             case "language-proof":
@@ -7901,10 +7917,30 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           }
 
           if (eeSnapshot?.crsSnapshot?.gap != null && (insight.id === "federal" || statusSupports(insight.statuses.ee))) {
-            pieces.push((insight.id === "federal" ? "현재 점수 차이 " : "연방 EE 차이 ") + eeSnapshot.crsSnapshot.gapLabel + "점");
+            pieces.push((insight.id === "federal" ? "현재 점수 차이 " : "연방 EE 참고 차이 ") + eeSnapshot.crsSnapshot.gapLabel + "점");
           }
 
           return pieces.join(" · ");
+        }
+
+        function buildProvinceEeClarifier(insight) {
+          if (insight.id === "federal") {
+            return null;
+          }
+
+          if (statusSupports(insight.statuses.ee)) {
+            return {
+              primaryLine: "주정부 경로",
+              secondaryLine: "보조로 같이 보는 연방 EE 연계",
+              detail: "이 카드에서 보이는 EE 점수와 EE-linked nomination 얘기는 이 주 자체 선발점수가 아니라, 이 주가 연방 EE와 연결되는 stream도 같이 볼 수 있어서 붙는 보조 참고입니다."
+            };
+          }
+
+          return {
+            primaryLine: "주정부 경로",
+            secondaryLine: "연방 EE는 별도 카드에서 비교",
+            detail: "이 카드는 주정부 경로를 메인으로 보는 카드예요. 연방 EE 점수 비교는 아래 연방 / EE 카드에서 따로 읽는 편이 덜 헷갈립니다."
+          };
         }
 
         function getProvinceScenarioFocus(insight) {
@@ -8094,6 +8130,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
             const concreteProvincePlans = isFederalCard ? [] : buildConcreteProvincePlans(answers, insight);
             const routeReality = buildRouteRealitySnapshot(answers, insight, occupationLens, concreteProvincePlans, isFederalCard);
             const provinceEeBridge = buildProvinceEeBridge(answers, insight, eeSnapshot);
+            const provinceEeClarifier = buildProvinceEeClarifier(insight);
             const provinceStreamGuide = isFederalCard ? null : buildProvinceStreamGuide(answers, insight);
             const spouseStrategy = buildSpouseStrategy(answers, insight);
             const schoolRouteGuidance = buildSchoolRouteGuidance(answers, insight);
@@ -8273,10 +8310,14 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               ? [
                   '<section class="score-options-panel" data-score-options-card="true" data-recommendation-id="' + escapeHtmlClient(insight.id) + '" data-base-score="' + escapeHtmlClient(String(improvementPlan.baseScore)) + '" data-score-label="' + escapeHtmlClient(eeSnapshot.scoreLabel) + '" data-cutoff="' + escapeHtmlClient(String(eeSnapshot.crsSnapshot.cutoff ?? "")) + '">',
                   '<div class="improvement-head">',
-                  '<strong>점수 올리는 옵션 직접 체크해보기</strong>',
-                  '<span class="improvement-total">체크해서 비교</span>',
+                  '<strong>' + escapeHtmlClient(isFederalCard ? "점수 올리는 옵션 직접 체크해보기" : "연방 EE 연계도 같이 계산해보기") + '</strong>',
+                  '<span class="improvement-total">' + escapeHtmlClient(isFederalCard ? "체크해서 비교" : "보조 계산") + '</span>',
                   '</div>',
-                  '<p class="wizard-freshness">영어, 불어, 캐나다 학교, 잡오퍼, nomination 같은 옵션을 직접 체크하면 지금 기준으로 어디까지 갈 수 있는지 바로 볼 수 있어요.</p>',
+                  '<p class="wizard-freshness">' + escapeHtmlClient(
+                    isFederalCard
+                      ? "영어, 불어, 캐나다 학교, 잡오퍼, nomination 같은 옵션을 직접 체크하면 지금 기준으로 어디까지 갈 수 있는지 바로 볼 수 있어요."
+                      : "이건 이 주 자체 점수가 아니라, 이 주가 연방 EE와 연결될 때 같이 볼 수 있는 보조 참고 계산이에요. 영어, 불어, 학교, 잡오퍼, nomination 옵션을 체크해보면 연방 EE 쪽이 얼마나 가까워지는지 볼 수 있어요."
+                  ) + '</p>',
                   '<p class="score-options-summary" data-score-options-summary>' + escapeHtmlClient(buildOptionProjectionSummary(eeSnapshot.scoreLabel, improvementPlan.baseScore, optionPanelInitial.immediateLift, optionPanelInitial.futureLift, eeSnapshot.crsSnapshot.cutoff ?? null)) + '</p>',
                   '<div class="score-options-list">',
                   optionPanelItems.map((item, optionIndex) => {
@@ -8363,9 +8404,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               ? [
                   '<section class="ee-bridge-panel">',
                   '<div class="selection-model-head">',
-                  '<strong>연방/EE 연계</strong>',
+                  '<strong>연방 EE는 보조 연결</strong>',
                   '<span class="selection-model-badge">EE-linked</span>',
                   '</div>',
+                  '<p class="selection-model-detail">이 주 카드에서 보이는 EE 점수와 nomination 계산은 이 주 자체 선발점수가 아니라, EE-linked stream을 같이 볼 때만 쓰는 보조 참고예요.</p>',
                   '<ul class="reason-list">',
                   '<li>' + escapeHtmlClient(provinceEeBridge.currentLine) + '</li>',
                   '<li>' + escapeHtmlClient(provinceEeBridge.nominationLine) + '</li>',
@@ -8444,7 +8486,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                   + "</div>"
                 : ""),
               '<div class="scenario-chip-row">',
-              '<span class="compare-pill">EE ' + escapeHtmlClient(insight.statuses.ee) + "</span>",
+              '<span class="compare-pill">' + escapeHtmlClient(isFederalCard ? "EE 핵심" : getProvinceEeChipLabel(insight.statuses.ee)) + "</span>",
               '<span class="compare-pill">잡오퍼 ' + escapeHtmlClient(insight.statuses.jobOffer) + "</span>",
               '<span class="compare-pill">졸업자 ' + escapeHtmlClient(insight.statuses.graduate) + "</span>",
               '<span class="compare-pill">비용 ' + escapeHtmlClient(insight.lifestyle.costLabelKo) + "</span>",
@@ -8452,6 +8494,19 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
               "</div>",
               (!isFederalCard
                 ? '<p class="wizard-freshness">직무 기준: ' + escapeHtmlClient(occupationContextLine) + "</p>"
+                : ""),
+              (!isFederalCard && provinceEeClarifier
+                ? '<section class="selection-model-panel">'
+                  + '<div class="selection-model-head">'
+                  + '<strong>주정부와 연방 EE를 이렇게 나눠서 보세요</strong>'
+                  + '<span class="selection-model-badge">구분</span>'
+                  + '</div>'
+                  + '<div class="selection-model-grid">'
+                  + '<div class="selection-model-stat"><span>이 카드의 메인</span><strong>' + escapeHtmlClient(provinceEeClarifier.primaryLine) + '</strong></div>'
+                  + '<div class="selection-model-stat"><span>연방 EE</span><strong>' + escapeHtmlClient(provinceEeClarifier.secondaryLine) + '</strong></div>'
+                  + '</div>'
+                  + '<p class="selection-model-detail">' + escapeHtmlClient(provinceEeClarifier.detail) + '</p>'
+                  + '</section>'
                 : ""),
               '<div class="route-reality-banner is-' + escapeHtmlClient(routeReality.tone) + '">',
               '<span class="route-reality-badge">' + escapeHtmlClient(routeReality.badge) + '</span>',
@@ -8624,7 +8679,7 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
                         ? "바로 오르는 점수는 없지만, 아래처럼 시간이 필요한 액션은 나중에 실제 CRS 상승으로 이어질 수 있습니다."
                         : "점수는 안 오르지만 경로를 넓히거나 서류를 정리하는 액션을 먼저 보여줍니다."
                   )
-                  : "이 주는 점수 하나보다 stream 자격, 고용주 연결, 서류 순서를 먼저 정리하는 편이 이해가 쉽습니다."
+                  : "이 주 카드는 주정부 경로가 메인입니다. 아래에 보이는 연방 EE 점수는 이 주 자체 점수가 아니라 EE-linked 연결을 같이 볼 때만 쓰는 보조 참고예요."
               ) + '</p>',
               (isFederalCard ? '<p class="wizard-freshness">EE 각 액션 아래에는 CRS 직접 변화도 같이 표시합니다.</p>' : ""),
               '<ul class="improvement-list">' + improvementHtml + '</ul>',
@@ -9098,9 +9153,10 @@ function renderClientScript({ page, updates, basePath = "", analyticsMeasurement
           return [
             '<section class="ee-bridge-panel">',
             '<div class="selection-model-head">',
-            '<strong>연방 / EE 같이 보면</strong>',
+            '<strong>연방 EE는 보조 연결</strong>',
             '<span class="selection-model-badge">EE-linked</span>',
             '</div>',
+            '<p class="selection-model-detail">이 주 페이지에서 보이는 EE 점수와 +600 같은 숫자는 이 주 자체 점수가 아니라, 이 주가 연방 EE와 연결되는 stream도 같이 볼 수 있을 때만 쓰는 보조 참고예요.</p>',
             '<ul class="reason-list">',
             '<li>' + escapeHtmlClient(eeBridge.currentLine || "") + '</li>',
             '<li>' + escapeHtmlClient(eeBridge.nominationLine || "") + '</li>',

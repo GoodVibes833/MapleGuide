@@ -228,7 +228,9 @@ test("fixture pipeline writes feed and dashboard", async () => {
   assert.match(dashboardHtml, /캐나다 title "/);
   assert.match(dashboardHtml, /이 주에서 가능한 현실 플랜/);
   assert.match(dashboardHtml, /이 경로가 실제로 보는 것/);
-  assert.match(dashboardHtml, /연방\/EE 연계/);
+  assert.match(dashboardHtml, /주정부와 연방 EE를 이렇게 나눠서 보세요/);
+  assert.match(dashboardHtml, /이 카드에서 보이는 EE 점수와 EE-linked nomination 얘기는 이 주 자체 선발점수가 아니라/);
+  assert.match(dashboardHtml, /연방 EE는 보조 연결/);
   assert.match(dashboardHtml, /nomination 되면 대략 .*점까지 뛰어오를 수 있어요/);
   assert.match(dashboardHtml, /주별 stream 현실 가이드/);
   assert.match(dashboardHtml, /맞는 이유:/);
